@@ -99,7 +99,7 @@ npm run serve            # http://localhost:8080 (camera needs HTTPS or localhos
 npm test                 # JS-vs-Python parity on the 2 bundled recordings
 scripts/reproduce.sh /path/to/oximetry-phone-cam-data   # figures + tables + refit + parity on all 12 recordings
 ```
-**Parity result:** the JavaScript engine reproduces the Python reference on all 12 Hoffman recordings, 5,646 windows: max |Δp| = 3.2×10⁻¹³, 0 decision mismatches. The clean Python package reproduces the original research outputs exactly, and refitting reproduces the shipped weights exactly.
+**Parity result:** the JavaScript engine reproduces the Python reference on all 12 Hoffman recordings, 5,646 windows: max |Δp| = 3.2×10⁻¹³, 0 decision mismatches. An end-to-end browser test of the live camera path with a synthetic 72 bpm fingertip video (`tests/e2e/`) passes: calibration completes and the app reads 72 bpm. This does not validate real fingertips or real phones. The clean Python package reproduces the original research outputs exactly, and refitting reproduces the shipped weights exactly.
 
 ## Deploy
 The site is the `app/` folder served from the `gh-pages` branch (`scripts/deploy_pages.sh`). Any static host works (Cloudflare Pages / Netlify / Vercel: set the output directory to `app`). HTTPS is required for the camera.

@@ -1,0 +1,20 @@
+import { chromium } from 'playwright-core';
+const b = await chromium.launch({ executablePath: process.env.CHROME,
+  args: ['--no-sandbox', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-file-for-fake-video-capture=' + (process.env.FAKE_Y4M || 'fake.y4m')] });
+const ctx = await b.newContext({ permissions: ['camera'], viewport: { width: 414, height: 860 } });
+const p = await ctx.newPage(); const errs = [];
+p.on('pageerror', (e) => errs.push(String(e))); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+await p.goto('http://127.0.0.1:8765/index.html');
+await p.check('#ack'); await p.click('#btn-live'); await p.click('#btn-cam');
+await p.waitForSelector('#setup-live:not([hidden])', { timeout: 15000 });
+await p.waitForFunction(() => !document.getElementById('btn-begin').disabled, null, { timeout: 40000 });
+console.log('setup:', await p.textContent('#q-text'), '|', (await p.$$eval('#checks li', (l) => l.map((x) => x.textContent))).join(' ; '));
+await p.click('#btn-begin');
+const t0 = Date.now();
+await p.waitForFunction(() => /Measuring|Restart/.test(document.getElementById('phase').textContent), null, { timeout: 100000 });
+console.log('after', ((Date.now() - t0) / 1000).toFixed(0), 's phase=', await p.textContent('#phase'), '| status=', await p.textContent('#status-main'), '|', await p.textContent('#status-sub'));
+await p.waitForTimeout(6000);
+console.log('hr=', await p.textContent('#hr'), 'dHR=', await p.textContent('#dhr'), 'sig=', await p.textContent('#sig'), 'status=', await p.textContent('#status-main'), '| clock', await p.textContent('#clock'));
+await p.screenshot({ path: 'live.png' });
+console.log('errors:', JSON.stringify(errs));
+await b.close();
