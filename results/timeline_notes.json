@@ -1,0 +1,53 @@
+{
+ "100004L": {
+  "rec": "100004L",
+  "acc": 0.823,
+  "acc_answered": 0.882,
+  "abstain": 0.141,
+  "FA_windows": 79,
+  "FN_windows": 5,
+  "first_ref_below_90_s": 372,
+  "FA_before_first_hypoxemia": 62,
+  "FA_first_s": 212,
+  "FA_ref_spo2_range": [
+   90.0,
+   95.9
+  ],
+  "FN_first_s": 432,
+  "FN_last_s": 440
+ },
+ "100004R": {
+  "rec": "100004R",
+  "acc": 0.727,
+  "acc_answered": 0.765,
+  "abstain": 0.298,
+  "FA_windows": 22,
+  "FN_windows": 107,
+  "first_ref_below_90_s": 372,
+  "FA_before_first_hypoxemia": 12,
+  "FA_first_s": 254,
+  "FA_ref_spo2_range": [
+   90.0,
+   93.6
+  ],
+  "FN_first_s": 414,
+  "FN_last_s": 874
+ },
+ "100005L": {
+  "rec": "100005L",
+  "acc": 0.916,
+  "acc_answered": 0.942,
+  "abstain": 0.042,
+  "FA_windows": 30,
+  "FN_windows": 6,
+  "first_ref_below_90_s": 230,
+  "FA_before_first_hypoxemia": 30,
+  "FA_first_s": 166,
+  "FA_ref_spo2_range": [
+   90.0,
+   91.6
+  ],
+  "FN_first_s": 762,
+  "FN_last_s": 772
+ }
+}

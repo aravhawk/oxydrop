@@ -1,0 +1,14 @@
+100001L: 511 windows  max|dp|=1.79e-13  label mismatches=0  (2.63 ms/decision)
+100002L: 526 windows  max|dp|=6.55e-14  label mismatches=0  (2.67 ms/decision)
+100003L: 499 windows  max|dp|=8.02e-14  label mismatches=0  (2.92 ms/decision)
+100004L: 474 windows  max|dp|=1.54e-14  label mismatches=0  (2.56 ms/decision)
+100005L: 429 windows  max|dp|=3.15e-14  label mismatches=0  (2.54 ms/decision)
+100006L: 382 windows  max|dp|=4.51e-14  label mismatches=0  (2.54 ms/decision)
+100001R: 511 windows  max|dp|=3.18e-13  label mismatches=0  (2.49 ms/decision)
+100002R: 528 windows  max|dp|=4.79e-14  label mismatches=0  (2.52 ms/decision)
+100003R: 499 windows  max|dp|=2.41e-14  label mismatches=0  (2.51 ms/decision)
+100004R: 473 windows  max|dp|=5.63e-14  label mismatches=0  (2.49 ms/decision)
+100005R: 430 windows  max|dp|=1.92e-14  label mismatches=0  (2.58 ms/decision)
+100006R: 384 windows  max|dp|=1.80e-14  label mismatches=0  (2.57 ms/decision)
+TOTAL windows=5646 worst |dp|=3.18e-13 label mismatches=0
+PARITY PASS

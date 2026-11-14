@@ -1,0 +1,13 @@
+sid,hand,ethnicity,age,sex,skintone_hex
+100001,Left,White,31,Male,#FAF3EB
+100002,Left,African American/Black,34,Male,#32210F
+100003,Left,White,23,Female,#F1E1D1
+100004,Left,White,20,Male,#F1E1D1
+100005,Left,White,24,Female,#DEC09C
+100006,Left,White,23,Female,#F1E1D1
+100001,Right,White,31,Male,#FAF3EB
+100002,Right,African American/Black,34,Male,#32210F
+100003,Right,White,23,Female,#F1E1D1
+100004,Right,White,20,Male,#F1E1D1
+100005,Right,White,24,Female,#DEC09C
+100006,Right,White,23,Female,#F1E1D1

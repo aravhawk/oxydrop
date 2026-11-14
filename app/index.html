@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="OxyDrop">
+<title>OxyDrop: phone-camera oxygen-drop check</title>
+<meta name="description" content="Research prototype. Detects a drop in blood oxygen from your own baseline using only your phone camera. Not medical advice.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <!-- HOME -->
+  <section id="home" class="screen active">
+    <header class="hero">
+      <img src="icons/icon.svg" alt="" width="56" height="56">
+      <h1>OxyDrop</h1>
+      <p class="tag">Does your blood oxygen look lower than your own baseline? A phone-camera check, no extra hardware.</p>
+    </header>
+
+    <div class="disclaimer" role="note">
+      <strong>This project is a prototype and is not medical advice.</strong>
+      <p>It is a research demo validated on only 6 people. It does not measure SpO₂, it is not a medical device, and it must never replace a pulse oximeter or a clinician. If you feel short of breath, confused, or unwell, get medical help now.</p>
+    </div>
+
+    <div class="card">
+      <h2>What it does</h2>
+      <p>Rest for 60 seconds so it learns <em>your</em> normal. Then, every 2 seconds, it says <b class="c-green">normal</b>, <b class="c-red">possible low-oxygen episode</b> (SpO₂ below 90%), or <b class="c-amber">unsure, re-measure</b>.</p>
+      <ul class="facts">
+        <li>Works only <b>seated at rest</b>. Exercise raises heart rate and causes false alarms.</li>
+        <li>Detects a <b>drop from your own first minute</b>. It cannot tell if you are already low at the start.</li>
+        <li>Your camera video never leaves your phone. Everything runs in this page.</li>
+      </ul>
+    </div>
+
+    <label class="ack"><input type="checkbox" id="ack"> <span>I understand this is a research prototype, not medical advice.</span></label>
+    <div class="actions">
+      <button id="btn-live" class="primary" disabled>Measure with my camera</button>
+      <button id="btn-replay" class="secondary">Watch a recorded demo (no camera)</button>
+    </div>
+    <p class="fine" id="compat"></p>
+
+    <details class="card">
+      <summary>How it works</summary>
+      <p>A small chain of stages turns camera frames into a decision: average colour per frame, a band-pass filter, beat detection (heart rate, variability, breathing, pulse strength), red/green light-absorption features, subtraction of <em>your</em> first-minute median, then two logistic regressions averaged. The whole model is 62 numbers. The data-rich stages carry the signal because only 6 people with phone video and real SpO₂ below 90% exist in open data.</p>
+      <p>Held-out accuracy on those 6 people: 87.0% on every window; 92.5% on the 85% of windows it answers when it is allowed to say &ldquo;unsure&rdquo;. A clock-only baseline gets 83.5%, but only 52% once time is controlled. Exercise falsely flags 63% of windows. See the project page for the full audit.</p>
+      <p><a id="repo" href="https://github.com/aravhawk/oxydrop" target="_blank" rel="noopener">Code, results and limitations on GitHub</a></p>
+    </details>
+  </section>
+
+  <!-- SETUP (live camera) -->
+  <section id="setup" class="screen">
+    <button class="back" data-go="home">← Back</button>
+    <h2>Set up your fingertip</h2>
+    <ol class="steps">
+      <li>Sit down and rest for 2 minutes. Rest the phone and your hand on a table.</li>
+      <li>Cover the <b>rear camera and the flash</b> with your fingertip, pressing lightly.</li>
+      <li>Keep still. Don&rsquo;t talk. Keep the screen on.</li>
+    </ol>
+    <div class="status-line"><span id="cam-state">Camera off</span></div>
+    <button id="btn-cam" class="primary">Turn on camera</button>
+    <div id="setup-live" hidden>
+      <div class="meter"><div class="meter-fill" id="q-fill"></div></div>
+      <p id="q-text" class="fine">Looking for your pulse…</p>
+      <canvas id="wave-setup" class="wave" width="600" height="120" aria-label="Pulse waveform"></canvas>
+      <ul class="checks" id="checks"></ul>
+      <button id="btn-begin" class="primary" disabled>Start 60-second calibration</button>
+    </div>
+  </section>
+
+  <!-- MEASURE -->
+  <section id="measure" class="screen">
+    <div class="topbar">
+      <span id="phase">Calibrating</span>
+      <span id="clock" class="mono">0:00</span>
+    </div>
+    <div id="replay-note" class="replay-note" hidden></div>
+    <div id="status" class="status-card calibrating" aria-live="polite">
+      <div class="status-icon" id="status-icon">◔</div>
+      <div class="status-main" id="status-main">Calibrating</div>
+      <div class="status-sub" id="status-sub">Rest, keep still. Learning your normal.</div>
+    </div>
+    <div class="progress" id="cal-progress"><div id="cal-fill"></div></div>
+
+    <div class="grid">
+      <div class="tile"><span class="k">Heart rate</span><span class="v" id="hr">–</span><span class="u">bpm</span></div>
+      <div class="tile"><span class="k">vs your baseline</span><span class="v" id="dhr">–</span><span class="u">bpm</span></div>
+      <div class="tile"><span class="k">Signal</span><span class="v" id="sig">–</span><span class="u" id="sig-u"></span></div>
+      <div class="tile"><span class="k">Motion</span><span class="v" id="mot">–</span><span class="u" id="mot-u"></span></div>
+    </div>
+    <div class="tile wide" id="ref-tile" hidden><span class="k">Study reference oximeter (replay only)</span><span class="v" id="ref">–</span><span class="u">SpO₂ %</span></div>
+
+    <canvas id="wave" class="wave" width="600" height="120" aria-label="Pulse waveform"></canvas>
+    <div class="strip-label">Last decisions <span class="legend"><i class="d-normal"></i>normal <i class="d-hyp"></i>low-oxygen <i class="d-uns"></i>unsure <i class="d-pause"></i>paused</span></div>
+    <div id="strip" class="strip" aria-hidden="true"></div>
+    <p class="fine" id="tally"></p>
+
+    <div class="actions">
+      <button id="btn-stop" class="secondary">Stop</button>
+      <button id="btn-restart" class="secondary" hidden>Restart calibration</button>
+    </div>
+    <p class="fine foot">Prototype. Not medical advice. Not a medical device.</p>
+  </section>
+</main>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

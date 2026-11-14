@@ -1,0 +1,4 @@
+setting,false_positive_rate
+"exercise normoxic (moshekam, window-weighted, 13 people)",0.6839925625422583
+rest TINY (1-spec),0.14166666666666672
+rest DeltaHR-only (1-spec),0.18791666666666662

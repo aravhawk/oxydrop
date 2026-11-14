@@ -1,0 +1,2 @@
+{ "name": "oxydrop", "version": "1.0.0", "private": true, "type": "module", "license": "MIT",
+  "scripts": { "test": "node tests/parity.mjs tests/fixtures/ref_2rec.json tests/fixtures/ppg-csv", "serve": "python3 -m http.server 8080 --directory app" } }
