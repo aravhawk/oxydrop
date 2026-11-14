@@ -43,7 +43,7 @@ UW Hoffman 2022, 6 people, 12 hands, **leave-one-person-out** (both hands of a p
 | ![roc](docs/figures/fig_roc.png) | ![cov](docs/figures/fig_coverage_accuracy.png) | ![pp](docs/figures/fig_per_person.png) |
 
 ### Failure case
-Person 4 (a 20-year-old man with a resting heart rate of 43 bpm, the worst person at 77.5% accuracy). On his right hand the chain misses hypoxemia for 107 windows (414–874 s) and abstains on 30% of windows; on his left hand it raises 79 false alarms between 212 s and 400 s while the reference is 90–96%. His heart-rate response to falling SpO₂ is weak, which is exactly where a heart-rate-led chain fails.
+Person 4 (a 20-year-old man with a resting heart rate of 43 bpm, the worst person at 77.5% accuracy). On his right hand the chain misses hypoxemia for 107 windows (414–874 s) and abstains on 30% of windows; on his left hand it raises 79 false alarms between 212 s and 400 s while the reference is 90–96%. We have not established why. Possible factors (hypotheses, not tested): his very low resting heart rate (43 bpm) makes the heart-rate-rise feature unstable, and one person's physiology can differ from the other five.
 
 ![failure](docs/figures/fig_timeline_failure.png)
 
