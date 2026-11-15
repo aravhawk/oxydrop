@@ -1,0 +1,127 @@
+<!-- GENERATED from docs/templates/WHITEPAPER.md.in by scripts/render_docs.py. Edit the template, not this file. -->
+# OxyDrop: a personalised physiology-plus-CNN check for a drop in blood oxygen from phone-camera video
+
+*Evaluated with an open, pre-registered, leave-one-person-out audit. Arav Jain and team, Veritas AI Hackathon 2026, Health track. Research prototype, not a medical device.*
+
+## Abstract
+
+A person with COVID-19, COPD, asthma or at altitude who owns a phone but no pulse oximeter has no way to notice a fall in blood oxygen. OxyDrop covers the rear camera and flash with a fingertip, learns that person's own normal from the first 60 seconds, and then answers every 2 seconds with one of three states: *Normal vs your baseline*, *Possible low oxygen: re-check with a pulse oximeter*, or *Unsure, re-measure*. It shows heart rate and a quality score and never shows an SpO2 number. The deployed model is a hybrid: a physiological logistic chain (heart rate, ratio-of-ratios and pulse-shape features relative to the person's baseline) plus a residual learned by a {{v:params}}-parameter 1D CNN that runs in dependency-free JavaScript. We evaluate with leave-one-person-out (LOSO) cross-validation, nested selection and person-level bootstrap intervals, under a protocol committed before any CNN result existed (commit `{{v:prereg_commit}}`). **The pre-registered primary metric, P1 (time-matched balanced accuracy for SpO2 < 90 on the six people of the UW Hoffman data), was not beaten:** the hybrid scores {{hy:HYBRID_FINAL:tm_bacc|full}} against {{b1:chain_v1:tm_bacc|full}} for the best baseline, the shipped logistic chain (a tie, difference {{pd1:HYBRID_FINAL/chain_v1|d}}), and a chain refit with the same nested levers and no CNN scores {{hy:CHAIN_SAME_LEVERS:tm_bacc}}. The CNN alone also ties. The clear gains are in heart rate (P2: within 5 bpm {{hp:all/HYBRID_agree:within5_full}} against {{hp:all/v2_spectral_acf__forced:within5_full}}, paired difference {{hpd:all/v2_spectral_acf__forced|d}}, a design choice made after seeing the pooled table) and in what the OpenOximetry warm-up buys the network. Absolute SpO2 on a normoxic phone dataset is not better than predicting the training mean (P3). We state where the model ties or loses, and what only six hypoxic phone-camera people can and cannot show.
+
+## 1. Problem and user
+
+Low blood oxygen often feels like nothing, and the people most exposed (home COVID-19 or COPD patients, asthmatics, hikers and skiers at altitude, low-resource clinics) are often far from an oximeter while a phone is in their pocket. The design scenario is a person resting who wants to decide "should I re-check with a real oximeter, or go down?". **Input:** 30 to 60 s of fingertip video, reduced on the phone to per-frame mean R, G, B and frame timestamps (no pixels leave the device). **Output:** a three-state result every 2 s after a 60 s personal calibration (first answer at 70 s), plus heart rate and signal quality. Because the comparison is with the person's own first minute, the app cannot know whether they were already low during that minute ("oxygen status at start unknown"). This is a scenario, not evidence of efficacy: nothing here was tested at altitude or with patients.
+
+## 2. Related work and what is new
+
+Camera-based low-oxygen detection is established. Hoffman et al. [1] ran an induced-hypoxemia study with a smartphone and flash, released the data we use (MIT), and reported 81% sensitivity and 79% specificity for SpO2 < 90 with 5.00 SpO2 MAE using a deep model under their own protocol (not a head-to-head comparison with ours). MTHS (Samavati et al. [2]) provides 62 normoxic smartphone videos with oximeter references and an end-to-end network for vital signs. Sun et al. [3] and Tian et al. [4] developed ratio-of-ratios methods with calibration and heart-rate-adaptive filtering for camera oximetry. The ratio-of-ratios rule itself is classical pulse-oximetry optics. Pulse oximeters over-read oxygen in darker skin at low saturation (Bickler et al. [5]; Sjoding et al. [6]), which is why we report skin-tone analysis on a contact dataset and state that no phone-camera fairness claim is possible with the data that exist.
+
+**What we claim.** (i) A personalised chain-plus-residual-CNN hybrid that runs on the device with abstention; (ii) an open, pre-registered, nested leave-one-person-out audit that reports ties and losses next to wins; (iii) OpenOximetry-based pretraining and a fairness analysis. **What we do not claim:** to be the first camera hypoxemia detector, a new sensing principle, accuracy beyond the engineered chain, a device-agnostic-augmentation benefit (the ablation does not support it), or any phone SpO2 accuracy.
+
+## 3. Method
+
+![Architecture and deployed hybrid.](docs/figures/ml_architecture.png)
+
+**Data pipeline.** Per-frame mean RGB is resampled onto a causal 30 Hz grid (gaps are recorded, not hidden), band-passed causally (0.7 to 4 Hz, no zero-phase filtering), cut into 10 s windows with a 2 s hop, and compared with the person's own first minute (label-free). Training pools four sources: UW Hoffman (6 people, phone, SpO2 down to 70), MTHS (62, phone, normoxic), BUT PPG (38 smartphone PPG clips with ECG heart rate) and OpenOximetry (contact red/infrared PPG with arterial-blood-gas SaO2, Daytona only, aggregates only). Windows used: {{v:n_windows_p1}} (P1), {{v:n_windows_p2}} (P2), {{v:n_windows_p3}} (P3).
+
+**Self-supervised pretraining and OpenOximetry warm-up.** SimCLR-style contrastive pretraining on {{v:ssl_rows}} unlabeled windows from {{v:ssl_subjects}} people disjoint from every test person (loss {{v:ssl_first}} to {{v:ssl_last}}, top-1 positive retrieval {{v:ssl_top1}}), followed by a supervised warm-up on OpenOximetry rows only (stage B). {{v:ssl_excluded}} OpenOximetry people are held out of everything for later tests. A Kaggle pretraining on HealthRing PPG tied training from scratch and could not initialise our network (SpO2 MAE {{v:hr_pre_mae}} against {{v:hr_scr_mae}}).
+
+**Physics-informed multi-task CNN (OxyNet).** Input: 10 channels by 300 samples (ac R, G, B, frame-time delta, per-beat ratio-of-ratios R/G and R/B relative to the person's baseline, beat mask, baseline-relative log DC), plus nine baseline-relative side features. A channel-shared stem feeds four stages of two residual blocks (widths 24, 40, 56, 80), global average and max pooling and a 64-d embedding. Heads: heart rate (141 bins, 40 to 180 bpm), SpO2 with log-variance (experimental, never shown), a low-oxygen logit on (embedding minus the person's baseline embedding), and a quality logit. Parameters: {{v:params}}, under a 300,000 budget asserted in a test. JavaScript output matches PyTorch to better than 1e-4 on fixtures.
+
+**Device augmentation.** Per-channel gain and gamma, colour-matrix jitter, DC steps, baseline wander, frame-rate jitter, dropped frames, saturation and motion bursts. No augmentation parameter and no threshold is fit to any particular phone. The ablation below shows the benefit is within noise, so we make no claim for it.
+
+**Per-user calibration, distillation and the hybrid.** Per-person baselines (first minute) condition the network and are the comparison for the low-oxygen decision. Three ways of combining the chain and the CNN were pre-declared (Amendment 2): the plain CNN (P), a residual network that learns a correction to the chain logit (R), and a student distilled from the chain (D); stacking meta-learners combine their logits. All choices (source, per-user score calibration, number of windows averaged) are made by inner folds on the training people only. The deployed pipeline is chosen by the same rule on the six out-of-fold tables: source R, no score calibration, one window, with logit = {{v:deploy_intercept}} + {{v:deploy_coef}} x (r - {{v:deploy_mean}}) / {{v:deploy_scale}}, where r is the chain logit plus the mean correction of three seeds (inner-CV score {{v:deploy_inner_cv}}; this is selected with all six people in view, so the honest estimate of the procedure is the nested {{hy:HYBRID_FINAL:tm_bacc}}).
+
+**Conformal 3-state output.**
+
+{{@conformal}}
+
+{{@app_state}}
+
+## 4. Experiments
+
+**Pre-registration and protocol.** `python/oxydrop_ml/PREREGISTRATION.md` was committed in `{{v:prereg_commit}}` before any learned-model result. Primary metrics: **P1** Hoffman time-matched balanced accuracy at full coverage (6 people, {{v:n_windows_p1}} windows, majority class {{v:majority_share}}); **P2** share of windows within 5 bpm of the reference on BUT PPG plus MTHS (100 people); **P3** SpO2 MAE on MTHS ({{v:n_people_p3}} people with a scored window). All numbers are LOSO with both hands and all recordings of a person held out together. Hyperparameters, thresholds, stacking and the choice of levers are selected by nested CV on training people only; pretraining uses only people who are never test people. We report mean, SD across folds, 95% person-bootstrap intervals (2000 resamples of people), seeds and a train-versus-test gap. A "win" requires the paired person-bootstrap interval of the difference to the *best* honest baseline to exclude zero. Four amendments are on file (`python/oxydrop_ml/amendments/` and the end of the pre-registration), each stating what had been seen when it was written: Amendment 1 discloses deviations in the core CNN run (recipe chosen over all outer folds, seed counts, grouped folds for ablations); Amendment 3 records that the P2 rule was chosen after the pooled table was seen.
+
+**Baselines (same folds, windows and calibration).** Majority class, clock-only (elapsed time), textbook and personally calibrated ratio-of-ratios, XGBoost and LightGBM on handcrafted features, the v1 and v2 logistic chains. Time-matched accuracy is used because the Hoffman protocol lowers oxygen steadily, so elapsed time alone predicts the label: the clock scores {{b1:clock:acc}} accuracy but {{b1:clock:tm_bacc}} time-matched.
+
+## 5. Results
+
+### 5.1 P1: low-oxygen detection (primary, pre-registered)
+
+{{@p1_main}}
+
+*TM = time-matched. Gap = mean over folds of the fold model's score on its own pooled training people minus the pooled held-out score (positive = optimistic). Per-person values are the mean and SD of the six held-out people.* **The CNN does not beat the chain.** The three CNN seeds score {{cp:P1/0/chain_v1|cnn}}, {{cp:P1/1/chain_v1|cnn}} and {{cp:P1/2/chain_v1|cnn}} (seed SD {{ab:full/p23:p1_tm_bacc|seedsd}}); seed 1 alone loses to the chain ({{cp:P1/1/chain_v1|d}}), the 3-seed ensemble ties ({{cp:P1/-1/chain_v1|d}}). The hybrid ties the chain ({{pd1:HYBRID_FINAL/chain_v1|d}}). A chain refit with the same nested levers and threshold calibration reaches {{hy:CHAIN_SAME_LEVERS:tm_bacc}}, at least as good as every CNN candidate, and the hybrid minus this control is {{pd1:HYBRID_FINAL/CHAIN_SAME_LEVERS|d}}. Against the weak baselines (ratio-of-ratios, clock) the CNN and hybrid are clearly better; these are not pre-registered wins. The people are complementary (the CNN is better on person 6, clearly worse on person 1) but no combiner learned from five people exploits it:
+
+{{@p1_per_person}}
+
+![Accuracy on answered windows versus coverage, and the share of all hypoxic windows alerted (descriptive).](docs/figures/ml_coverage_accuracy.png)
+
+At the coverage of the v1 shipped band (coverage {{v:v1_cov}}, accuracy {{v:v1_acc_band}}) the other models answer less accurately than the chain (descriptive, confidence ranking, no cutoff tuned):
+
+{{@matched_coverage}}
+
+### 5.2 P2: heart rate and P3: absolute SpO2
+
+{{@p2_main}}
+
+The hybrid rule `agree` (mean of CNN and v2 spectral estimate if within 5 bpm, else CNN) beats the best baseline on the pre-registered rule ({{hpd:all/v2_spectral_acf__forced|d}}). It was chosen among CNN-containing rules on Hoffman inner folds after the pooled table had been seen (Amendment 3); the Hoffman people alone would choose the spectral estimator ({{hr:spec:within5_full}} against {{hr:agree:within5_full}} for `agree`). The gain comes from BUT PPG (noisy ear and motion clips); on MTHS the spectral estimator is as good or better ({{hpd:mths/v2_spectral_acf__forced|d}}). The CNN alone ties.
+
+{{@p3_main}}
+
+MTHS is normoxic (median reference {{v:p3_ref_median}}, minimum {{v:p3_ref_min}}, {{v:p3_below95}} of windows below 95, {{v:p3_windows_below90}} windows from {{v:p3_people_below90}} person below 90), so the train-mean predictor is near optimal and **no model beats it** ({{cp:P3/-1/train_mean|d}} for the CNN). MTHS is not evidence about hypoxemia, so SpO2 is not headlined and is not shown to users.
+
+### 5.3 Ablations and the lever ledger
+
+Each lever is reported with its measured effect on held-out people and the decision. Ablation rows with several variants on six people carry selection optimism; single-seed rows compare with the matching seed-0 row (full table in `MODEL.md`).
+
+{{@levers}}
+
+![Ablation, P1 and P2, 95% person-bootstrap intervals.](docs/figures/ml_ablation.png)
+
+**The OpenOximetry warm-up is the main source of skill in the CNN:** without it P1 falls from {{ab:full/p23:p1_tm_bacc}} to {{ab:no_openox/p23k:p1_tm_bacc}}, and with no pretraining at all to {{ab:no_pretrain/p23k:p1_tm_bacc}}. SSL on top of it is a small, uncertain gain.
+
+### 5.4 Spread and train-versus-test gap
+
+{{@gap}}
+
+Per-fold spread (mean ± SD over the six held-out people) is in the P1 table; the CNN's seed SD is {{ab:full/p23:p1_tm_bacc|seedsd}}. The plain CNN shows no over-fitting at its fixed 0.5 threshold, while the selected hybrid has a pooled gap of {{hg:HYBRID_FINAL:gap_pooled|sgn}} (per person {{hg:HYBRID_FINAL|gapci}}) against {{hg:CHAIN_SAME_LEVERS:gap_pooled|sgn}} for the chain: a likely reason (Amendment 4, not tested) is that fine-tuning a whole network on at most five hypoxic people costs generalisation, which favours the simple chain when the two tie.
+
+## 6. Fairness
+
+{{@openox}}
+
+On Hoffman there is one dark-skinned participant ({{@skin_hoffman}}), which supports no fairness conclusion. BUT PPG and MTHS publish no skin tone. The reference oximeters themselves are biased in darker skin at low saturation [5, 6], so any label derived from a pulse oximeter inherits that bias: we therefore anchor the OpenOximetry analysis to arterial blood gas SaO2, and we do not claim the phone result is fair or unfair.
+
+## 7. Failure modes
+
+![Failure modes: synthetic schematics of the mechanisms and real out-of-fold scores.](docs/figures/ml_failure_modes.png)
+
+* **Motion, cold fingers and poor perfusion, saturated red channel:** the pulse lock, quality score or saturation gate fails and the app answers *Unsure*. The gates are heuristics checked only on a synthetic camera and on recorded data, not on live phones.
+* **Far-flash phones** (flash several centimetres from the lens): weaker, diffuse signal. A runtime lens probe and adaptive exposure try to compensate. Such phones are absent from every training and evaluation set.
+* **Dark skin:** pulse-oximeter references over-read at low saturation [5, 6]; our evidence is the contact dataset only (section 6).
+* **Already low at the start:** the output is relative to the first minute, so low oxygen present during calibration is invisible.
+* **Untested low SpO2 in the wild:** only **six hypoxic phone-camera people** exist in open data, all one phone (Nexus 6P), induced desaturation at rest. The model has never been evaluated on a person who is hypoxic outside that protocol.
+* **Slow pulse and exercise:** person 4 (43 bpm) is below the heart-rate floor of the v2 estimator. Exercise raises heart rate without low oxygen and the heart-rate-rise signal then false-alarms (see `docs/ENGINEERED_CHAIN.md`).
+* **Seed instability:** one of three CNN seeds loses to the chain on P1, and that seed almost never alerts for person 1.
+
+## 8. Limitations and not a medical device
+
+OxyDrop is a research prototype and **not a medical device**. It does not diagnose, must not replace a pulse oximeter or a clinician, and "Normal" is never reassurance. P1 has six people, so intervals are wide and a "tie" mostly means "cannot distinguish". The weights shipped in the app are fit on all people, so every reported number comes from held-out folds and no in-sample number is quoted. **The app is built to work on every phone and is not tuned to any specific phone**: no threshold, gain or model behaviour is fit to any device, and the lens probe, adaptive gain, quality gating and augmentation are device-agnostic. The team's iPhone 13, iPhone 17 and iPhone 18 Pro serve only as a held-out sanity check, never as a tuning set. **Untested Android phones and other phones are a limitation**: no phone other than the Hoffman devices contributes to P1, and no live-phone accuracy is claimed. Further limits: MTHS licence (CC BY-NC-ND, non-commercial research; weights trained on it are flagged in `DATA_LICENSES.md`), OpenOximetry is contact red/infrared PPG and cannot validate phone SpO2, the three-seed members are about three times the cost of one (a single member runs in 17 to 18 ms per window on a development laptop; the phone cost is PENDING in `docs/APP_INTEGRATION.md`), and several pre-declared levers were exploratory.
+
+## 9. Ethics
+
+No video, pixel or identifier leaves the device. The datasets are public (MIT, CC BY 4.0), non-commercial (MTHS) or credentialed (OpenOximetry, derived aggregates only, never redistributed, never uploaded to Kaggle). The costs of a false "Normal" (delayed care) are higher than those of a false alarm, so the interface abstains rather than guessing and states what it cannot know. Skin-tone gaps are reported where data allow and withheld where they do not. AI tools (Claude) assisted with code, analysis and drafting; the team reviewed the work.
+
+## 10. Reproducibility
+
+Every number in this paper is generated from `results/ml/*.csv` by `python scripts/render_docs.py` and checked by `python scripts/check_claims.py`; figures by `python scripts/make_ml_figs.py`. Pipeline stages: `bash scripts/reproduce_ml.sh <stage>` (`baselines`, `core-*`, `hybrid-*`, `docs`). Tests: `python -m pytest python/oxydrop_ml/tests`, `npm test`.
+
+## References
+
+1. Hoffman JS, Viswanath VK, Tian C, et al. Smartphone camera oximetry in an induced hypoxemia study. *npj Digital Medicine* 5:146 (2022). doi:10.1038/s41746-022-00665-y
+2. Samavati et al. Efficient deep learning-based estimation of the vital signs on smartphones (MTHS dataset). arXiv:2204.08989 (2022).
+3. Sun Z, He Q, Li Y, Wang W, Wang RK. Robust non-contact peripheral oxygenation saturation measurement using smartphone-enabled imaging photoplethysmography. *Biomedical Optics Express* 12:1746 (2021). PMC7984770.
+4. Tian X, Wong C-W, Ranadive SM, Wu M. A multi-channel ratio-of-ratios method for noncontact hand video based SpO2 monitoring using smartphone cameras. *IEEE J. Sel. Topics Signal Process.* 16(2):197-207 (2022). doi:10.1109/JSTSP.2022.3152352
+5. Bickler PE, Feiner JR, Severinghaus JW. Effects of skin pigmentation on pulse oximeter accuracy at low saturation. *Anesthesiology* 102:715-719 (2005).
+6. Sjoding MW, Dickson RP, Iwashyna TJ, Gay SE, Valley TS. Racial bias in pulse oximetry measurement. *N Engl J Med* 383:2477-2478 (2020).
+7. Chen T, Kornblith S, Norouzi M, Hinton G. A simple framework for contrastive learning of visual representations (SimCLR). *ICML* (2020).
+8. Wolpert DH. Stacked generalization. *Neural Networks* 5(2) (1992). Varma S, Simon R. Bias in error estimation when using cross-validation for model selection. *BMC Bioinformatics* 7:91 (2006).

@@ -81,3 +81,19 @@ fi
 if [ "$STAGE" = "hybrid-export" ]; then
   (cd python && "$PY" -m oxydrop_ml.export_hybrid --runs "$HYB" --seeds 0 1 2 --final-dir "$HYBF" --out-dir ../app/data --fixture ../tests/fixtures/hybrid_ref.json)
 fi
+
+# ===================================================================================================== FEAT-010: figures, README / MODEL.md / WHITEPAPER.md / WRITEUP, PDF, claim check
+# Every number in the documents is read from results/ml/*.csv|json by scripts/ml_numbers.py; the Markdown sources are docs/templates/*.md.in.
+# Sections that depend on FEAT-007 outputs (results/ml/conformal*.csv, openox_spo2*.csv, hr_vote*.csv, and the matching CONFORMAL.md, OPENOX_SPO2.md, HR_VOTE.md)
+# render a marked PENDING block until those files exist. After merging FEAT-007 (and the app integration), refresh everything with ONE command:
+#     bash scripts/reproduce_ml.sh docs
+#   docs      figures (scripts/make_ml_figs.py) -> render README.md, MODEL.md, WHITEPAPER.md, docs/WRITEUP.md (scripts/render_docs.py)
+#             -> WHITEPAPER.pdf (scripts/build_whitepaper_pdf.sh: pandoc + headless Chromium, no LaTeX) -> scripts/check_claims.py (must print CHECK CLAIMS PASS; the PDF must be 4 to 6 pages)
+#   docs-md   same without the PDF
+if [ "$STAGE" = "docs" ] || [ "$STAGE" = "docs-md" ]; then
+  export PATH="$PATH:/home/linuxbrew/.linuxbrew/bin"
+  "$PY" scripts/make_ml_figs.py
+  "$PY" scripts/render_docs.py
+  if [ "$STAGE" = "docs" ]; then bash scripts/build_whitepaper_pdf.sh; fi
+  "$PY" scripts/check_claims.py
+fi

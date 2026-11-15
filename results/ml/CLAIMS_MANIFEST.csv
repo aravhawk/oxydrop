@@ -1,0 +1,175 @@
+document,token,rendered_value
+README.md,v:params,"167,588"
+README.md,v:prereg_commit,3e708fe
+README.md,@p1_main,<block 1882 chars>
+README.md,hy:HYBRID_FINAL:tm_bacc|full,"0.779 [0.638, 0.831]"
+README.md,b1:chain_v1:tm_bacc|full,"0.796 [0.635, 0.856]"
+README.md,hy:CHAIN_SAME_LEVERS:tm_bacc,0.816
+README.md,hp:all/HYBRID_agree:within5_full|full,"0.480 [0.429, 0.534]"
+README.md,hp:all/v2_spectral_acf__forced:within5_full|full,"0.419 [0.366, 0.481]"
+README.md,hpd:all/v2_spectral_acf__forced|d,"+0.061 [0.013, 0.107]"
+README.md,hpd:mths/v2_spectral_acf__forced|d,"-0.039 [-0.102, 0.017]"
+README.md,ab:full/p23:p3_mae,1.457
+README.md,b3:train_mean:mae,1.354
+README.md,ab:full/p23:p1_tm_bacc,0.739
+README.md,ab:no_openox/p23k:p1_tm_bacc,0.577
+README.md,@pending_summary,<block 318 chars>
+MODEL.md,v:params,"167,588"
+MODEL.md,v:params,"167,588"
+MODEL.md,v:member_kb,0.90 MB
+MODEL.md,v:members_mb,2.7 MB
+MODEL.md,v:onnx_kb,728 KB
+MODEL.md,v:n_windows_p1,"5,644"
+MODEL.md,v:ssl_excluded,34
+MODEL.md,v:ssl_rows,"299,754"
+MODEL.md,v:ssl_subjects,212
+MODEL.md,v:ssl_steps,"2,500"
+MODEL.md,v:ssl_sha,ccdb6a75eae9
+MODEL.md,@ssl,<block 215 chars>
+MODEL.md,v:hr_pre_mae,4.25
+MODEL.md,v:hr_scr_mae,4.33
+MODEL.md,v:hr_frz_mae,5.42
+MODEL.md,ab:no_aug/p23k:p1_tm_bacc,0.720
+MODEL.md,ab:full/p23:p1_tm_bacc,0.739
+MODEL.md,ab:full/p23:p1_tm_bacc|seedsd,0.019
+MODEL.md,v:prereg_commit,3e708fe
+MODEL.md,v:n_people_p3,61
+MODEL.md,@p1_main_full,<block 2771 chars>
+MODEL.md,v:majority_share,57.48%
+MODEL.md,b1:chain_v1:tm_bacc|full,"0.796 [0.635, 0.856]"
+MODEL.md,b1:chain_v1:acc|full,"0.875 [0.844, 0.905]"
+MODEL.md,cp:P1/0/chain_v1|cnn,0.752
+MODEL.md,cp:P1/1/chain_v1|cnn,0.717
+MODEL.md,cp:P1/2/chain_v1|cnn,0.748
+MODEL.md,cp:P1/1/chain_v1|d,"-0.079 [-0.217, -0.021]"
+MODEL.md,cp:P1/-1/chain_v1|cnn,0.754
+MODEL.md,cp:P1/-1/chain_v1|d,"-0.042 [-0.131, 0.005]"
+MODEL.md,pd1:HYBRID_FINAL/chain_v1|d,"-0.017 [-0.103, 0.069]"
+MODEL.md,hy:CHAIN_SAME_LEVERS:tm_bacc|full,"0.816 [0.674, 0.869]"
+MODEL.md,@p1_per_person,<block 646 chars>
+MODEL.md,@p1_seeds,<block 541 chars>
+MODEL.md,v:sel_R,3
+MODEL.md,v:sel_cp,2
+MODEL.md,v:sel_P,1
+MODEL.md,@selection,<block 344 chars>
+MODEL.md,@matched_coverage,<block 447 chars>
+MODEL.md,v:v1_cov,84.4%
+MODEL.md,v:v1_acc_band,93.9%
+MODEL.md,v:v1_alert_band,80.5%
+MODEL.md,v:v2_cov,68.0%
+MODEL.md,v:v2_acc_band,94.7%
+MODEL.md,v:v2_alert_band,71.8%
+MODEL.md,@conformal,<block 577 chars>
+MODEL.md,@p2_main,<block 904 chars>
+MODEL.md,hr:spec:within5_full,0.883
+MODEL.md,hr:agree:within5_full,0.826
+MODEL.md,hr:guard:within5_full,0.811
+MODEL.md,hr:gate:within5_full,0.814
+MODEL.md,hr:cnn:within5_full,0.803
+MODEL.md,hpd:all/v2_spectral_acf__forced|d,"+0.061 [0.013, 0.107]"
+MODEL.md,@hrvote,<block 505 chars>
+MODEL.md,@p3_main,<block 941 chars>
+MODEL.md,cp:P3/-1/train_mean|d,"-0.017 [-0.181, 0.148]"
+MODEL.md,@openox,<block 684 chars>
+MODEL.md,@ablation,<block 1939 chars>
+MODEL.md,@levers,<block 3639 chars>
+MODEL.md,@gap,<block 811 chars>
+MODEL.md,v:deploy_intercept,0.940
+MODEL.md,v:deploy_coef,3.236
+MODEL.md,v:deploy_mean,1.486
+MODEL.md,v:deploy_scale,4.275
+MODEL.md,v:deploy_inner_cv,0.818
+MODEL.md,hy:HYBRID_FINAL:tm_bacc|full,"0.779 [0.638, 0.831]"
+MODEL.md,@app_state,<block 390 chars>
+MODEL.md,b1:ror_textbook_RB:tm_bacc,0.535
+MODEL.md,b1:ror_textbook_RG:tm_bacc,0.498
+MODEL.md,b3:ror_textbook_RB:mae,3.332
+WHITEPAPER.md,v:params,"167,588"
+WHITEPAPER.md,v:prereg_commit,3e708fe
+WHITEPAPER.md,hy:HYBRID_FINAL:tm_bacc|full,"0.779 [0.638, 0.831]"
+WHITEPAPER.md,b1:chain_v1:tm_bacc|full,"0.796 [0.635, 0.856]"
+WHITEPAPER.md,pd1:HYBRID_FINAL/chain_v1|d,"-0.017 [-0.103, 0.069]"
+WHITEPAPER.md,hy:CHAIN_SAME_LEVERS:tm_bacc,0.816
+WHITEPAPER.md,hp:all/HYBRID_agree:within5_full,0.480
+WHITEPAPER.md,hp:all/v2_spectral_acf__forced:within5_full,0.419
+WHITEPAPER.md,hpd:all/v2_spectral_acf__forced|d,"+0.061 [0.013, 0.107]"
+WHITEPAPER.md,v:n_windows_p1,"5,644"
+WHITEPAPER.md,v:n_windows_p2,"5,905"
+WHITEPAPER.md,v:n_windows_p3,"1,141"
+WHITEPAPER.md,v:ssl_rows,"299,754"
+WHITEPAPER.md,v:ssl_subjects,212
+WHITEPAPER.md,v:ssl_first,5.28
+WHITEPAPER.md,v:ssl_last,2.10
+WHITEPAPER.md,v:ssl_top1,0.83
+WHITEPAPER.md,v:ssl_excluded,34
+WHITEPAPER.md,v:hr_pre_mae,4.25
+WHITEPAPER.md,v:hr_scr_mae,4.33
+WHITEPAPER.md,v:params,"167,588"
+WHITEPAPER.md,v:deploy_intercept,0.940
+WHITEPAPER.md,v:deploy_coef,3.236
+WHITEPAPER.md,v:deploy_mean,1.486
+WHITEPAPER.md,v:deploy_scale,4.275
+WHITEPAPER.md,v:deploy_inner_cv,0.818
+WHITEPAPER.md,hy:HYBRID_FINAL:tm_bacc,0.779
+WHITEPAPER.md,@conformal,<block 577 chars>
+WHITEPAPER.md,@app_state,<block 390 chars>
+WHITEPAPER.md,v:prereg_commit,3e708fe
+WHITEPAPER.md,v:n_windows_p1,"5,644"
+WHITEPAPER.md,v:majority_share,57.48%
+WHITEPAPER.md,v:n_people_p3,61
+WHITEPAPER.md,b1:clock:acc,0.828
+WHITEPAPER.md,b1:clock:tm_bacc,0.495
+WHITEPAPER.md,@p1_main,<block 1882 chars>
+WHITEPAPER.md,cp:P1/0/chain_v1|cnn,0.752
+WHITEPAPER.md,cp:P1/1/chain_v1|cnn,0.717
+WHITEPAPER.md,cp:P1/2/chain_v1|cnn,0.748
+WHITEPAPER.md,ab:full/p23:p1_tm_bacc|seedsd,0.019
+WHITEPAPER.md,cp:P1/1/chain_v1|d,"-0.079 [-0.217, -0.021]"
+WHITEPAPER.md,cp:P1/-1/chain_v1|d,"-0.042 [-0.131, 0.005]"
+WHITEPAPER.md,pd1:HYBRID_FINAL/chain_v1|d,"-0.017 [-0.103, 0.069]"
+WHITEPAPER.md,hy:CHAIN_SAME_LEVERS:tm_bacc,0.816
+WHITEPAPER.md,pd1:HYBRID_FINAL/CHAIN_SAME_LEVERS|d,"-0.037 [-0.119, 0.028]"
+WHITEPAPER.md,@p1_per_person,<block 646 chars>
+WHITEPAPER.md,v:v1_cov,84.4%
+WHITEPAPER.md,v:v1_acc_band,93.9%
+WHITEPAPER.md,@matched_coverage,<block 447 chars>
+WHITEPAPER.md,@p2_main,<block 904 chars>
+WHITEPAPER.md,hpd:all/v2_spectral_acf__forced|d,"+0.061 [0.013, 0.107]"
+WHITEPAPER.md,hr:spec:within5_full,0.883
+WHITEPAPER.md,hr:agree:within5_full,0.826
+WHITEPAPER.md,hpd:mths/v2_spectral_acf__forced|d,"-0.039 [-0.102, 0.017]"
+WHITEPAPER.md,@p3_main,<block 941 chars>
+WHITEPAPER.md,v:p3_ref_median,97.0
+WHITEPAPER.md,v:p3_ref_min,88.1
+WHITEPAPER.md,v:p3_below95,14.2%
+WHITEPAPER.md,v:p3_windows_below90,2
+WHITEPAPER.md,v:p3_people_below90,1
+WHITEPAPER.md,cp:P3/-1/train_mean|d,"-0.017 [-0.181, 0.148]"
+WHITEPAPER.md,@levers,<block 3639 chars>
+WHITEPAPER.md,ab:full/p23:p1_tm_bacc,0.739
+WHITEPAPER.md,ab:no_openox/p23k:p1_tm_bacc,0.577
+WHITEPAPER.md,ab:no_pretrain/p23k:p1_tm_bacc,0.550
+WHITEPAPER.md,@gap,<block 811 chars>
+WHITEPAPER.md,ab:full/p23:p1_tm_bacc|seedsd,0.019
+WHITEPAPER.md,hg:HYBRID_FINAL:gap_pooled|sgn,+0.076
+WHITEPAPER.md,hg:HYBRID_FINAL|gapci,"+0.093 ± 0.121 [0.009, 0.180]"
+WHITEPAPER.md,hg:CHAIN_SAME_LEVERS:gap_pooled|sgn,+0.019
+WHITEPAPER.md,@openox,<block 684 chars>
+WHITEPAPER.md,@skin_hoffman,<block 113 chars>
+docs/WRITEUP.md,v:params,"167,588"
+docs/WRITEUP.md,v:ssl_rows,"299,754"
+docs/WRITEUP.md,v:prereg_commit,3e708fe
+docs/WRITEUP.md,hy:HYBRID_FINAL:tm_bacc|full,"0.779 [0.638, 0.831]"
+docs/WRITEUP.md,b1:chain_v1:tm_bacc|full,"0.796 [0.635, 0.856]"
+docs/WRITEUP.md,pd1:HYBRID_FINAL/chain_v1|d,"-0.017 [-0.103, 0.069]"
+docs/WRITEUP.md,hy:CHAIN_SAME_LEVERS:tm_bacc,0.816
+docs/WRITEUP.md,b1:clock:tm_bacc,0.495
+docs/WRITEUP.md,b1:ror_textbook_RB:tm_bacc,0.535
+docs/WRITEUP.md,hp:all/HYBRID_agree:within5_full|full,"0.480 [0.429, 0.534]"
+docs/WRITEUP.md,hp:all/v2_spectral_acf__forced:within5_full|full,"0.419 [0.366, 0.481]"
+docs/WRITEUP.md,hpd:all/v2_spectral_acf__forced|d,"+0.061 [0.013, 0.107]"
+docs/WRITEUP.md,ab:full/p23:p3_mae,1.457
+docs/WRITEUP.md,b3:train_mean:mae,1.354
+docs/WRITEUP.md,ab:no_openox/p23k:p1_tm_bacc,0.577
+docs/WRITEUP.md,ab:full/p23:p1_tm_bacc,0.739
+docs/WRITEUP.md,@pending_summary,<block 318 chars>
