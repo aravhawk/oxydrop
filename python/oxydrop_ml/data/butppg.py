@@ -4,8 +4,9 @@
 
 One clip = one recording = one window (t_start 0; the 5 s warm-up before it is the odd reflection of the clip start). Recordings are NOT
 contiguous video, so the baseline of a person is the first 6 clips in id order (about 60 s of video, scripts/ vlib.py convention) and `eval`
-is every other clip of that person. The prereg cohort for P2 is the 38 subjects with SpO2 (`has_spo2`); the other 12 subjects are kept with
-`prereg_cohort = False` (use them for training only, or drop them). Clips whose header has 300 signals instead of 3 (a different layout) are skipped.
+is every other clip of that person. The prereg cohort for P2 is the 38 subjects with SpO2 (`has_spo2`). The release has 3,888 clips from 50 subjects;
+the 48 clips of the other 12 subjects have a header with 300 signals instead of 3 (a different layout) and are skipped, so the shard has exactly the
+38 prereg people and 3,840 clips (`prereg_cohort` is True for all of them).
 Frame timestamps are NOT in the BUT PPG release (the .hea gives only fs = 30), so dt is nominal 1/30.
 Skin tone: the dataset publishes no per-person tone (Fitzpatrick II-IV overall); ear_finger and motion codes are kept as columns.
 """

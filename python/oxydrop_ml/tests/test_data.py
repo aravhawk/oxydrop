@@ -220,3 +220,23 @@ def test_built_openox_has_hr_sao2_and_skin_tone():
     assert m.has_hr.sum() > 100000 and m.has_sao2.sum() > 100000 and m.has_sao2_draw.sum() > 10000
     assert m.groupby('subject').monk.first().notna().sum() > 100 and (m.domain == 1).all()
     assert m[m.has_sao2].aligned.all()                                      # labels only on clock-aligned encounters
+
+
+def test_pretrain_windows_and_input_tensor():
+    from oxydrop_ml.data import pretrain as P
+    fs_src = 250; n = 40 * fs_src
+    t = np.arange(n) / fs_src
+    red = 50000 * (1 + 0.01 * np.sin(2 * np.pi * 1.2 * t)); ir = 80000 * (1 + 0.02 * np.sin(2 * np.pi * 1.2 * t))
+    a, b = P._to30(red, fs_src), P._to30(ir, fs_src)
+    assert abs(len(a) - 40 * FS) <= 1
+    ac, valid, ts = P._windows_from([a, b], 2)
+    assert ac.dtype == np.float16 and ac.shape[1:] == (WIN, 2) and valid.all() and ts[0] == P.SETTLE
+    # amplitude check: 1 % modulation of red -> peak ~ 0.01 * AC_SCALE; IR is twice that
+    r = np.asarray(ac[3], np.float32)
+    assert 0.8 < np.abs(r[:, 0]).max() < 1.2 and 1.6 < np.abs(r[:, 1]).max() < 2.4
+    one, v1, _ = P._windows_from([a, None], 2)
+    assert v1[:, 0].all() and not v1[:, 1].any()
+    x = P.to_input(ac[:3], valid[:3])
+    assert x.shape == (3, 10, WIN) and np.all(x[:, 2:] == 0) and np.allclose(x[:, 0], np.asarray(ac[:3, :, 0], np.float32))
+    flat, vf, _ = P._windows_from([np.full(40 * FS, 1000.0), np.full(40 * FS, 1000.0)], 5)
+    assert len(flat) == 0
