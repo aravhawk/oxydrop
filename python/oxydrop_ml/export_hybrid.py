@@ -66,6 +66,15 @@ def export_member(ckpt, path, family, seed):
     return g['ckpt_sha256'], Path(path).stat().st_size
 
 
+def engine_v1_weights(chain, shipped):
+    """The chain in the weights format that app/js/engine_v1.js `Chain` takes: {hr:{cols,mu,sd,coef,b}, fusion:{...}} (column NAMES from app/data/weights.json when present)."""
+    names = shipped['fusion']['cols'] if shipped else list(range(19))
+    out = {}
+    for key, m in zip(('hr', 'fusion'), chain.params()):
+        out[key] = dict(cols=[names[i] for i in m['cols']], mu=m['mean'], sd=m['scale'], coef=m['coef'], b=m['intercept'])
+    return out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--runs', required=True); ap.add_argument('--seeds', nargs='+', type=int, default=[0, 1, 2])
@@ -108,7 +117,9 @@ def main(argv=None):
                                  p='mean over p-members of lowox_logit', d='mean over d-members of lowox_logit', corr='mean over R-members of lowox_logit (the residual correction)',
                                  r='c + corr'),
         chain=dict(models=chain.params(), combine='mean_probability_then_logit', clip=1e-6, features='app/js/engine_v1.js FUSION deltas (19), model 0 uses column 0 only',
-                   max_abs_coef_diff_vs_app_weights_json=chain_diff),
+                   engine_v1_weights=engine_v1_weights(chain, shipped),
+                   max_abs_coef_diff_vs_app_weights_json=chain_diff,
+                   note='Refit under the LOSO harness on the 5,644 evaluated Hoffman windows (shipped C 0.01 / 0.1). Slightly different from app/data/weights.json (the pure v1 chain): the hybrid meta-learner was fit on THIS chain, so use these weights for c.'),
         members=members,
         ensemble='mean logit over seeds within a family',
         calibration_definition='feature minus its median over the windows of the same recording that end inside the first 60 s (label free)',
