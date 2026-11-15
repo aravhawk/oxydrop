@@ -49,7 +49,7 @@ def row(name, D, band=None, gate=False):
     if gate: a &= D.valid.values
     if band: a &= np.abs(s - .5) >= band
     r = evalkit.report(D.sid.values, D.t.values, y, s, pred, None if a.all() else a); r['model'] = name; return r
-table = [row('v1 TINY (peak-interval HR), every window', D1), row('v2 TINY (robust HR + gate), every window (no-lock windows scored as predicted)', D2),
+table = [row('v1 TINY (peak-interval HR), every window', D1), row('v2 TINY (robust HR + gate), every window forced to answer (no-lock windows scored with zero deltas)', D2),
          row('v2, no-lock windows abstain', D2, gate=True), row('v1, abstain band 0.10', D1, band=.10), row('v2, no-lock + abstain band 0.10', D2, band=.10, gate=True)]
 print('v2 valid fraction on Hoffman:', round(float(D2.valid.mean()), 4))
 T = pd.DataFrame(table)[['model', 'coverage', 'acc', 'bacc', 'sens', 'spec', 'auc', 'tm_acc', 'worst_person', 'acc_ci']]

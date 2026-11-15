@@ -24,15 +24,29 @@ function trial({ hr, a2, fps, jitterMs, dropP, expStep, noise }) {
   }
   return res;
 }
-const cases = [];
-for (const hr of [55, 70, 85, 100]) for (const a2 of [0.4, 0.8, 1.2]) for (const [fps, jit, drop] of [[30, 3, 0], [60, 4, 0], [60, 6, 0.03], [24, 3, 0]]) cases.push({ hr, a2, fps, jitterMs: jit, dropP: drop, expStep: true, noise: 0.25 });
-const S = { v1: { n: 0, dbl: 0, ok5: 0, err: [] }, v2: { n: 0, dbl: 0, ok5: 0, err: [], valid: 0 } }; let gapsSum = 0;
-for (const c of cases) {
-  const r = trial(c); gapsSum += r.rs.gaps;
-  for (const d of r.v1 || []) { const h = d.hr; if (!Number.isFinite(h)) continue; S.v1.n++; const e = Math.abs(h - c.hr); S.v1.err.push(e); if (e <= 5) S.v1.ok5++; if (Math.abs(h / c.hr - 2) < 0.12) S.v1.dbl++; }
-  for (const d of r.v2 || []) { S.v2.n++; if (!d.valid) continue; S.v2.valid++; const e = Math.abs(d.hrEst - c.hr); S.v2.err.push(e); if (e <= 5) S.v2.ok5++; if (Math.abs(d.hrEst / c.hr - 2) < 0.12) S.v2.dbl++; }
+const GROUPS = {
+  'resting 55-100 bpm': (cs) => { for (const hr of [55, 70, 85, 100]) for (const a2 of [0.4, 0.8, 1.2]) for (const [fps, jit, drop] of [[30, 3, 0], [60, 4, 0], [60, 6, 0.03], [24, 3, 0]]) cs.push({ hr, a2, fps, jitterMs: jit, dropP: drop, expStep: true, noise: 0.25 }); },
+  'fast 110-125 bpm (2nd harmonic 3.7-4.2 Hz, at the edge of the 4 Hz band-pass)': (cs) => { for (const hr of [110, 118, 125]) for (const a2 of [0.8, 1.2, 1.6]) for (const [fps, jit, drop] of [[30, 3, 0], [60, 4, 0], [60, 6, 0.03], [24, 3, 0]]) cs.push({ hr, a2, fps, jitterMs: jit, dropP: drop, expStep: true, noise: 0.25 }); },
+  'fast 130-160 bpm, strong dicrotic 2nd harmonic': (cs) => { for (const hr of [130, 145, 160]) for (const a2 of [0.8, 1.2, 1.6]) for (const [fps, jit, drop] of [[30, 3, 0], [60, 4, 0], [60, 6, 0.03], [24, 3, 0]]) cs.push({ hr, a2, fps, jitterMs: jit, dropP: drop, expStep: true, noise: 0.25 }); },
+  'resting 52-75 bpm, dicrotic 2nd harmonic as strong as or stronger than the fundamental (the field failure: ~75 read as ~150)': (cs) => { for (const hr of [52, 58, 75]) for (const a2 of [1.2, 1.6, 2.0]) for (const [fps, jit, drop] of [[30, 3, 0], [60, 4, 0]]) cs.push({ hr, a2, fps, jitterMs: jit, dropP: drop, expStep: false, noise: 0.25 }); },
+};
+const med = (a) => (a.length ? [...a].sort((x, y) => x - y)[a.length >> 1] : NaN);
+const near = (h, r, k) => Math.abs(h / r - k) < 0.06 * k;       // doubled: |h/true - 2| < 0.12 (as in v2.0 of this test); halved: |h/true - 0.5| < 0.03
+let allOk = true, gapsSum = 0, nTrials = 0;
+for (const [gname, make] of Object.entries(GROUPS)) {
+  const cases = []; make(cases);
+  const S = { v1: { n: 0, dbl: 0, half: 0, ok5: 0, err: [] }, v2: { n: 0, dbl: 0, half: 0, ok5: 0, err: [], valid: 0 } };
+  for (const c of cases) {
+    const r = trial(c); gapsSum += r.rs.gaps; nTrials++;
+    for (const d of r.v1 || []) { const h = d.hr; if (!Number.isFinite(h)) continue; S.v1.n++; const e = Math.abs(h - c.hr); S.v1.err.push(e); if (e <= 5) S.v1.ok5++; if (near(h, c.hr, 2)) S.v1.dbl++; if (near(h, c.hr, 0.5)) S.v1.half++; }
+    for (const d of r.v2 || []) { S.v2.n++; if (!d.valid) continue; S.v2.valid++; const e = Math.abs(d.hrEst - c.hr); S.v2.err.push(e); if (e <= 5) S.v2.ok5++; if (near(d.hrEst, c.hr, 2)) S.v2.dbl++; if (near(d.hrEst, c.hr, 0.5)) S.v2.half++; }
+  }
+  const pc = (a, b) => (b ? (a / b * 100).toFixed(2) : 'n/a') + '%';
+  console.log(`\n== ${gname}: ${cases.length} trials (24/30/60 fps, jitter, drops${cases[0].expStep ? ', exposure step' : ''})`);
+  console.log(`v1 beat-interval HR : windows ${S.v1.n}  median err ${med(S.v1.err).toFixed(1)} bpm  within5 ${pc(S.v1.ok5, S.v1.n)}  DOUBLED ${pc(S.v1.dbl, S.v1.n)}  HALVED ${pc(S.v1.half, S.v1.n)}`);
+  console.log(`v2 robust HR (gated): windows ${S.v2.n}  accepted ${pc(S.v2.valid, S.v2.n)}  median err ${med(S.v2.err).toFixed(1)} bpm  within5 ${pc(S.v2.ok5, S.v2.valid)} of accepted  DOUBLED ${pc(S.v2.dbl, S.v2.valid)} of accepted  HALVED ${pc(S.v2.half, S.v2.valid)} of accepted`);
+  // acceptance criterion: v2 doubling < 1 % of accepted windows in every group
+  if (S.v2.valid && S.v2.dbl / S.v2.valid >= 0.01) { allOk = false; console.log('FAIL: v2 doubling rate >= 1 %'); }
 }
-const med = (a) => a.sort((x, y) => x - y)[a.length >> 1];
-console.log(`trials=${cases.length} (HR 55-100 bpm, dicrotic 2nd-harmonic 0.4-1.2x, 24/30/60 fps, jitter, drops, exposure step)`);
-console.log(`v1 beat-interval HR : windows ${S.v1.n}  median err ${med(S.v1.err).toFixed(1)} bpm  within5 ${(S.v1.ok5 / S.v1.n * 100).toFixed(1)}%  DOUBLED ${(S.v1.dbl / S.v1.n * 100).toFixed(1)}%`);
-console.log(`v2 robust HR (gated): windows ${S.v2.n}  accepted ${(S.v2.valid / S.v2.n * 100).toFixed(1)}%  median err ${med(S.v2.err).toFixed(1)} bpm  within5 ${(S.v2.ok5 / S.v2.valid * 100).toFixed(1)}% of accepted  DOUBLED ${(S.v2.dbl / S.v2.valid * 100).toFixed(2)}% of accepted`);
+console.log(allOk ? '\nCAPTURE SIM OK' : '\nCAPTURE SIM FAIL');
+process.exit(allOk ? 0 : 1);

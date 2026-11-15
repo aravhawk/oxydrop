@@ -1,0 +1,78 @@
+{
+ "F_LO chosen by cross-fit": {
+  "F_LO": 0.85,
+  "SQI_MIN": 0.3,
+  "ACF_MIN": 0.3,
+  "AGREE": 0.15,
+  "why": "folds disagreed; shipped the more conservative (lower acceptance over all clips)",
+  "even": {
+   "F_LO": 0.85,
+   "SQI_MIN": 0.25,
+   "ACF_MIN": 0.3,
+   "AGREE": 0.15
+  },
+  "odd": {
+   "F_LO": 0.85,
+   "SQI_MIN": 0.3,
+   "ACF_MIN": 0.3,
+   "AGREE": 0.15
+  }
+ },
+ "F_LO fixed 0.65": {
+  "F_LO": 0.65,
+  "SQI_MIN": 0.25,
+  "ACF_MIN": 0.3,
+  "AGREE": 0.06,
+  "why": "folds disagreed; shipped the more conservative (lower acceptance over all clips)",
+  "even": {
+   "F_LO": 0.65,
+   "SQI_MIN": 0.25,
+   "ACF_MIN": 0.3,
+   "AGREE": 0.06
+  },
+  "odd": {
+   "F_LO": 0.65,
+   "SQI_MIN": 0.4,
+   "ACF_MIN": 0.3,
+   "AGREE": 0.1
+  }
+ },
+ "F_LO fixed 0.75": {
+  "F_LO": 0.75,
+  "SQI_MIN": 0.3,
+  "ACF_MIN": 0.3,
+  "AGREE": 0.1,
+  "why": "folds disagreed; shipped the more conservative (lower acceptance over all clips)",
+  "even": {
+   "F_LO": 0.75,
+   "SQI_MIN": 0.25,
+   "ACF_MIN": 0.25,
+   "AGREE": 0.06
+  },
+  "odd": {
+   "F_LO": 0.75,
+   "SQI_MIN": 0.3,
+   "ACF_MIN": 0.3,
+   "AGREE": 0.1
+  }
+ },
+ "F_LO fixed 0.85": {
+  "F_LO": 0.85,
+  "SQI_MIN": 0.3,
+  "ACF_MIN": 0.3,
+  "AGREE": 0.15,
+  "why": "folds disagreed; shipped the more conservative (lower acceptance over all clips)",
+  "even": {
+   "F_LO": 0.85,
+   "SQI_MIN": 0.25,
+   "ACF_MIN": 0.3,
+   "AGREE": 0.15
+  },
+  "odd": {
+   "F_LO": 0.85,
+   "SQI_MIN": 0.3,
+   "ACF_MIN": 0.3,
+   "AGREE": 0.15
+  }
+ }
+}

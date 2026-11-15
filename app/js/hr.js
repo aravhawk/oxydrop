@@ -1,6 +1,9 @@
 // Robust heart-rate estimator (v2): JS port of python/oxydrop/hr.py. Spectral harmonic-sum + autocorrelation fundamental, strict validity gate.
-export const FS = 30, NFFT = 4096, F_LO = 0.65, F_HI = 3.0;
-export const GATE = { SQI_MIN: 0.30, ACF_MIN: 0.30, AGREE: 0.10, MIN_SEC: 9.5 };
+export const FS = 30, NFFT = 4096, F_HI = 3.0;
+// Gate chosen by subject-level cross-fit on BUT PPG (scripts/hr_crossfit.py, docs/HR_VALIDATION.md). F_LO = 0.85 Hz: lowest trackable resting HR is 51 bpm.
+export const F_LO = 0.85;
+export const GATE = { F_LO, SQI_MIN: 0.30, ACF_MIN: 0.30, AGREE: 0.15, MIN_SEC: 9.5 };
+export const MIN_TRACKABLE_BPM = Math.ceil(F_LO * 60);
 
 // in-place radix-2 complex FFT (inverse=true scales by 1/n)
 export function fft(re, im, inverse = false) {
@@ -24,7 +27,7 @@ const stdp = (a) => { const m = mean(a); let s = 0; for (const v of a) s += (v -
 
 export function estimateHr(x, fs = FS, gate = GATE) {
   const out = { hr: NaN, hrAcf: NaN, sqi: 0, acf: 0, valid: false };
-  const n = x.length;
+  const fLo = gate.F_LO ?? F_LO, n = x.length;
   if (n < gate.MIN_SEC * fs || stdp(x) < 1e-9) return out;
   const m0 = mean(x), xc = x.map((v) => v - m0);
   const re = new Float64Array(NFFT), im = new Float64Array(NFFT);
@@ -32,11 +35,15 @@ export function estimateHr(x, fs = FS, gate = GATE) {
   fft(re, im);
   const half = NFFT / 2 + 1, P = new Float64Array(half);
   for (let i = 0; i < half; i++) P[i] = Math.hypot(re[i], im[i]);
-  const df = fs / NFFT, k0 = Math.ceil(F_LO / df), k1 = Math.floor(F_HI / df);
+  const df = fs / NFFT, k0 = Math.ceil(fLo / df), k1 = Math.floor(F_HI / df);
   let kb = k0, best = -Infinity;
   for (let k = k0; k <= k1; k++) { const sc = P[k] + 0.7 * P[2 * k]; if (sc > best) { best = sc; kb = k; } }
   let kf = kb;
-  { const a = P[kb - 1], b = P[kb], c = P[kb + 1], d = a - 2 * b + c; kf = kb + (d !== 0 ? 0.5 * (a - c) / d : 0); }
+  // parabolic refinement only if kb is a true local maximum of the spectrum, and never more than half a bin
+  if (kb > 0 && kb < half - 1 && P[kb] >= P[kb - 1] && P[kb] >= P[kb + 1]) {
+    const a = P[kb - 1], b = P[kb], c = P[kb + 1], d = a - 2 * b + c;
+    if (d < 0) kf = kb + Math.min(0.5, Math.max(-0.5, 0.5 * (a - c) / d));
+  }
   const f0 = kf * df;
   let tot = 1e-18; for (let k = Math.ceil(0.65 / df); k <= Math.floor(4.0 / df); k++) tot += P[k] * P[k];
   const w = Math.round(0.10 / df); let near = 0;
@@ -51,19 +58,27 @@ export function estimateHr(x, fs = FS, gate = GATE) {
   for (let i = 0; i < M; i++) { ar[i] = ar[i] * ar[i] + ai[i] * ai[i]; ai[i] = 0; }
   fft(ar, ai, true);
   const r = new Float64Array(n); const r0 = ar[0] + 1e-18; for (let i = 0; i < n; i++) r[i] = ar[i] / r0;
-  const lo = Math.ceil(fs / 3.0), hi = Math.min(Math.floor(fs / 0.65), n - 2);
+  const lo = Math.ceil(fs / 3.0), hi = Math.min(Math.floor(fs / fLo), n - 2);
   const seg = Array.from(r.slice(lo - 1, hi + 2)), pk = [];
   for (let i = 1; i < seg.length - 1; i++) if (seg[i] > seg[i - 1] && seg[i] >= seg[i + 1]) pk.push(i);
   out.hr = 60 * f0; out.sqi = sqi;
   if (!pk.length) return out;
   let rmax = -Infinity; for (const i of pk) rmax = Math.max(rmax, seg[i]);
-  const li = pk.find((i) => seg[i] >= 0.85 * rmax);
+  // fundamental = smallest-lag peak >= 0.85 of the strongest; if every peak is negative that test is never met, so use the strongest
+  let li = pk.find((i) => seg[i] >= 0.85 * rmax);
+  if (li === undefined) { li = pk[0]; for (const i of pk) if (seg[i] > seg[li]) li = i; }
   const a = seg[li - 1], b = seg[li], c = seg[li + 1], d = a - 2 * b + c;
   const lag = (lo - 1) + li + (d !== 0 ? 0.5 * (a - c) / d : 0), fAcf = fs / lag;
   out.hrAcf = 60 * fAcf; out.acf = seg[li];
-  const agree = Math.abs(fAcf - f0) / f0 < gate.AGREE;
-  out.valid = agree && sqi >= gate.SQI_MIN && out.acf >= gate.ACF_MIN;
+  out.valid = gateOk(out, gate);
   return out;
+}
+
+/** Validity gate on a raw estimate. f0 must be positive and finite before the agreement test. */
+export function gateOk(e, gate = GATE) {
+  const h = e.hr, ha = e.hrAcf;
+  if (!(Number.isFinite(h) && Number.isFinite(ha) && h > 0)) return false;
+  return Math.abs(ha - h) / h < gate.AGREE && e.sqi >= gate.SQI_MIN && e.acf >= gate.ACF_MIN;
 }
 
 /** acs: array of 3 arrays (R,G,B band-passed window). Try primary channel first, then others by decreasing amplitude. */

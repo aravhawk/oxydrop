@@ -23,6 +23,10 @@ def deltas(rgb):
             if np.isnan(X[i, j]):
                 X[i, j] = X[i - 1, j]
     base = np.nanmedian(X[t + WIN <= CAL], 0)
+    if np.isnan(base).any():
+        # no baseline for some feature (e.g. the pulse never locked during the 60 s calibration, such as a resting HR below the 51 bpm band edge):
+        # the whole recording is 'nolock' rather than being scored against a missing baseline
+        base = np.where(np.isnan(base), 0.0, base); valid = np.zeros_like(valid)
     return t, np.where(np.isnan(X), base, X) - base, valid, np.array(aux)
 
 

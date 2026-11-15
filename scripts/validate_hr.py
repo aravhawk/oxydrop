@@ -2,14 +2,15 @@
 
 A = OLD peak-interval HR (copied from features.win_feats, trailing 30 s of the causal band-passed channel)
 B = naive spectral argmax (largest FFT peak 0.7-3.5 Hz, primary channel, estimation window)
-C = NEW robust estimator (oxydrop.hr.best_channel_estimate; 'valid' = accepted by the gate)
+C = NEW robust estimator (oxydrop.hr.best_channel_estimate, exactly the shipped code; 'valid' = accepted by the gate)
+The gate (F_LO, SQI_MIN, ACF_MIN, AGREE) is NOT tuned here: it comes from the subject-level cross-fit in scripts/hr_crossfit.py.
 
 Primary channel rule (all estimators): green if std_G > 0.3*std_R else red (std over the last 10 s, as in win_feats).
 Datasets: BUT PPG v2.0 (10 s clips, ECG HR + expert quality), Hoffman 2022 (full length, oximeter pulse),
-MTHS (finger video, oximeter HR at 1 Hz).  Run one stage at a time:  python scripts/validate_hr.py [but|long|synth|all]
+MTHS (finger video, oximeter HR at 1 Hz).  Run one stage at a time:  python scripts/validate_hr.py [but|long|synth|all]   (then scripts/hr_crossfit.py for the held-out gate selection)
 Outputs: results/hr_validation/*.csv
 """
-import os, sys, time, itertools
+import os, sys, time
 import numpy as np, pandas as pd
 from scipy.signal import butter, sosfilt, find_peaks
 
@@ -25,8 +26,7 @@ BUT = '/home/aravhawk/.t3/scratch/veritas/oxy_push/data/butppg/brno-university-o
 HOF = '/home/aravhawk/.t3/scratch/veritas/_feas_photon/repo'
 MTHS = '/home/aravhawk/.t3/scratch/veritas/oxy_push/data/mths/repo/MTHS/Data'
 SEED = 20261114
-REC_FLO = {'v': None}  # lower HR band edge (Hz) of the recommended configuration; set from rec.pkl for the long/synth stages
-CRASHES = {'n': 0}   # channel-windows where hr.py as written raises StopIteration
+TMP = '/home/aravhawk/.t3/scratch/hrval_tmp'   # per-recording feature caches (kept out of the repo)
 
 
 # ---------------------------------------------------------------- estimators
@@ -51,75 +51,21 @@ def naive_hr(x, fs=FS):
     return 60 * fr[b][np.argmax(P[b])]
 
 
-def estimate_hr_patched(x, fs=FS, f_lo=None):
-    """hr.estimate_hr with ONE fix: the parabolic refinement of the spectral peak is applied only when kb is a true local
-    maximum of the spectrum, and the offset is clamped to +-0.5 bin. (As written, a harmonic-sum maximum that sits on a spectral
-    slope gives an unbounded offset, e.g. hr = -35 or +30 bpm, and a negative f0 passes the 'agree' test.)"""
-    f_lo = HR.F_LO if f_lo is None else f_lo
-    x = np.asarray(x, float)
-    out = dict(hr=np.nan, hr_acf=np.nan, sqi=0.0, acf=0.0)
-    n = len(x)
-    if n < HR.MIN_SEC * fs or np.std(x) < 1e-9:
-        return out
-    xc = x - x.mean()
-    P = np.abs(np.fft.rfft(xc * np.hanning(n), n=HR.NFFT))
-    df = fs / HR.NFFT
-    ks = np.arange(int(np.ceil(f_lo / df)), int(np.floor(HR.F_HI / df)) + 1)
-    kb = ks[np.argmax(P[ks] + 0.7 * P[2 * ks])]
-    kf = float(kb)
-    if 0 < kb < len(P) - 1 and P[kb] >= P[kb - 1] and P[kb] >= P[kb + 1]:
-        a, b, c = P[kb - 1], P[kb], P[kb + 1]
-        d = a - 2 * b + c
-        if d < 0:
-            kf = kb + float(np.clip(0.5 * (a - c) / d, -0.5, 0.5))
-    f0 = kf * df
-    P2 = P ** 2
-    tot = P2[int(np.ceil(0.65 / df)):int(np.floor(4.0 / df)) + 1].sum() + 1e-18
-    w = int(round(0.10 / df))
-    near = P2[max(kb - w, 0):kb + w + 1].sum() + P2[max(2 * kb - w, 0):2 * kb + w + 1].sum()
-    sqi = float(near / tot)
-    m = 1 << int(np.ceil(np.log2(2 * n)))
-    r = np.fft.irfft(np.abs(np.fft.rfft(xc, n=m)) ** 2)[:n]
-    r = r / (r[0] + 1e-18)
-    lo, hi = int(np.ceil(fs / 3.0)), min(int(np.floor(fs / f_lo)), n - 2)
-    seg = r[lo - 1:hi + 2]
-    pk = [i for i in range(1, len(seg) - 1) if seg[i] > seg[i - 1] and seg[i] >= seg[i + 1]]
-    if not pk:
-        out.update(hr=60 * f0, sqi=sqi)
-        return out
-    rmax = max(seg[i] for i in pk)
-    # second fix: with all candidate peaks negative, 0.85*rmax > rmax and hr.py's next(...) raises StopIteration
-    lag_i = next((i for i in pk if seg[i] >= 0.85 * rmax), max(pk, key=lambda i: seg[i]))
-    a, b, c = seg[lag_i - 1], seg[lag_i], seg[lag_i + 1]
-    d = a - 2 * b + c
-    lag = (lo - 1) + lag_i + (0.5 * (a - c) / d if d != 0 else 0.0)
-    out.update(hr=60 * f0, hr_acf=60 * fs / lag, sqi=sqi, acf=float(seg[lag_i]))
-    return out
-
-
-def channel_ests(acs, primary, fixed=False, f_lo=None):
-    """Per-channel raw outputs of hr.estimate_hr (or the patched copy) in best_channel_estimate's order (gate re-applied in select())."""
+def channel_ests(acs, primary, f_lo=None):
+    """Per-channel raw outputs of the shipped hr.estimate_hr in best_channel_estimate's order (gate re-applied in select())."""
     sd = acs.std(0)
     order = [primary] + [int(c) for c in np.argsort(-sd) if c != primary]
-    fn = (lambda x, fs: estimate_hr_patched(x, fs, f_lo)) if fixed else HR.estimate_hr
     res = []
     for c in order:
-        try:
-            e = fn(acs[:, c], FS)
-        except StopIteration:                      # hr.py as written crashes here (counted in CRASHES)
-            CRASHES['n'] += 1
-            e = dict(hr=np.nan, hr_acf=np.nan, sqi=0.0, acf=0.0)
+        e = HR.estimate_hr(acs[:, c], FS, f_lo)
         res.append((c,) + tuple(e[k] for k in ('hr', 'hr_acf', 'sqi', 'acf')))
     return res
 
 
-def select(ch, sqi_min=None, acf_min=None, agree=None, fixed=False):
+def select(ch, sqi_min=None, acf_min=None, agree=None):
     """Re-implementation of best_channel_estimate for arbitrary gate thresholds -> (hr, valid, channel)."""
-    sqi_min = HR.SQI_MIN if sqi_min is None else sqi_min
-    acf_min = HR.ACF_MIN if acf_min is None else acf_min
-    agree = HR.AGREE if agree is None else agree
     for c, h, ha, s, a in ch:
-        if np.isfinite(h) and np.isfinite(ha) and (h > 0 or not fixed) and (abs(ha - h) / h < agree) and s >= sqi_min and a >= acf_min:
+        if HR.gate_ok(dict(hr=h, hr_acf=ha, sqi=s, acf=a), sqi_min, acf_min, agree):
             return h, True, c
     c, h, ha, s, a = ch[0]
     return h, False, c
@@ -136,9 +82,7 @@ def eval_window(ac, te, L):
     primary = 1 if sdw[1] > 0.3 * sdw[0] else 0
     rowA = old_hr(a30, sd10)
     rowB = naive_hr(w[:, primary])
-    chF = channel_ests(w, primary, fixed=True)
-    chR = channel_ests(w, primary, fixed=True, f_lo=REC_FLO['v']) if REC_FLO['v'] is not None else chF
-    return rowA, rowB, channel_ests(w, primary), chF, chR
+    return rowA, rowB, channel_ests(w, primary)
 
 
 def bandpass_from_rgb(rgb, mirror=False):
@@ -215,34 +159,25 @@ def stage_but():
     t0 = time.time()
     clips = load_but()
     print('BUT clips', len(clips), flush=True)
-    rows, chs, wins = [], [], []
-    chk = 0
+    rows, wins = [], []
     for rid, ref, qual, ef, mot, rgb in clips:
         ac = bandpass_from_rgb(rgb, mirror=True)           # mirrored pre-pad (as t11), scored window = last 10 s
         te = len(ac)
-        A, B, ch, chF, _ = eval_window(ac, te, 10)
+        A, B, ch = eval_window(ac, te, 10)
         h, v, c = select(ch)
-        hF, vF, cF = select(chF, fixed=True)
-        wins.append(ac[te - 300:te])
-        if chk < 300:                                      # cross-check re-implementation vs the real function (where it does not crash)
-            wn = ac[te - 300:te]
-            try:
-                e, cc = HR.best_channel_estimate(wn, 1 if wn.std(0)[1] > 0.3 * wn.std(0)[0] else 0)
-                assert bool(e['valid']) == v and cc == c and (np.isclose(e['hr'], h) or (np.isnan(h) and np.isnan(e['hr']))), (rid, e, h, v)
-            except StopIteration:
-                pass
-            chk += 1
+        w = ac[te - 300:te]
+        e, cc = HR.best_channel_estimate(w, 1 if w.std(0)[1] > 0.3 * w.std(0)[0] else 0)   # the exact shipped function must agree with select()
+        assert bool(e['valid']) == v and cc == c and (np.isclose(e['hr'], h) or (np.isnan(h) and np.isnan(e['hr']))), (rid, e, h, v)
+        wins.append(w)
         rows.append(dict(ID=rid, subj=rid // 1000, ref=ref, q=qual, ef=ef, motion=mot, A_hr=A, B_hr=B, C_hr=h, C_valid=v, C_ch=c,
-                         C_sqi=ch[0][3], C_acf=ch[0][4], P_hr=hF, P_valid=vF, P_ch=cF))
-        chs.append(chF)
+                         C_sqi=ch[0][3], C_acf=ch[0][4]))
     D = pd.DataFrame(rows)
-    # primary-channel raw gate stats for sweep
     D.to_csv(f'{OUT}/but_clips.csv', index=False)
-    print('hr.py StopIteration crashes (channel-windows):', CRASHES['n'], '| negative/odd hr from hr.py as written:', int(((D.C_hr < 39) | (D.C_hr > 181)).sum()), flush=True)
-    pd.to_pickle((D, chs, wins), '/home/aravhawk/.t3/scratch/hrval_tmp/but_cache.pkl')
+    os.makedirs(TMP, exist_ok=True)
+    pd.to_pickle((D, None, wins), TMP + '/but_cache.pkl')
     print('done est', time.time() - t0, flush=True)
     print(D.groupby(['ef', 'motion', 'q']).size())
-    return D, chs, wins
+    return D
 
 
 def subsets_but(D):
@@ -255,35 +190,6 @@ def subsets_but(D):
             'ear': D.ef == 0, 'ear, good': (D.ef == 0) & (D.q == 1), 'motion': ~rest, 'motion, good': ~rest & (D.q == 1)}
 
 
-def sweep_but(D, chs, f_lo):
-    rows = []
-    sqis = [0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60]
-    acfs = [0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60]
-    ref = D.ref.values; good = (D.q == 1).values; bad = ~good
-    for s_, a_, g_ in itertools.product(sqis, acfs, [0.06, 0.10, 0.15]):
-        sel = [select(ch, s_, a_, g_, fixed=True) for ch in chs]
-        h = np.array([x[0] for x in sel], float); v = np.array([x[1] for x in sel], bool)
-        err = np.abs(h - ref); acc = v & np.isfinite(h)
-        wrong = err > 10
-        e = err[acc]; hh = h[acc]; rr = ref[acc]
-        rows.append(dict(F_LO=f_lo, SQI_MIN=s_, ACF_MIN=a_, AGREE=g_, accept_all=acc.mean(), accept_good=acc[good].mean(), accept_bad=acc[bad].mean(),
-                         n_acc=int(acc.sum()), MAE_acc=e.mean() if len(e) else np.nan, w5_acc=(e <= 5).mean() if len(e) else np.nan,
-                         w10_acc=(e <= 10).mean() if len(e) else np.nan,
-                         dbl_acc=(np.abs(hh - 2 * rr) < 0.24 * rr).mean() if len(e) else np.nan,
-                         half_acc=(np.abs(hh - 0.5 * rr) < 0.06 * rr).mean() if len(e) else np.nan,
-                         wrong10_acc=(e > 10).mean() if len(e) else np.nan,
-                         reject_wrong10=(~acc[wrong]).mean(), reject_bad=(~acc[bad]).mean(),
-                         MAE_acc_good=err[acc & good].mean() if (acc & good).any() else np.nan,
-                         w5_acc_good=(err[acc & good] <= 5).mean() if (acc & good).any() else np.nan))
-    return pd.DataFrame(rows)
-
-
-def pick(S):
-    c = S[S.accept_good >= 0.70].copy()
-    c['score'] = c.reject_bad + c.reject_wrong10
-    return c.sort_values(['score', 'MAE_acc'], ascending=[False, True])
-
-
 # ---------------------------------------------------------------- long recordings (Hoffman, MTHS)
 def long_windows(name, rec_id, ac, ref_1hz, L, te_start, step):
     rows = []
@@ -294,12 +200,10 @@ def long_windows(name, rec_id, ac, ref_1hz, L, te_start, step):
         seg = seg[np.isfinite(seg)]
         if len(seg) < max(3, 0.5 * L):
             continue
-        A, B, ch, chF, chR = eval_window(ac, te, L)
+        A, B, ch = eval_window(ac, te, L)
         h, v, c = select(ch)
-        hF, vF, cF = select(chF, fixed=True)
         rows.append(dict(ds=name, rec=rec_id, L=L, t_end=te / FS, ref=float(np.median(seg)), A_hr=A, B_hr=B, C_hr=h, C_valid=v, C_ch=c,
-                         C_sqi=ch[0][3], C_acf=ch[0][4], P_hr=hF, P_valid=vF))
-        rows[-1]['chs'] = chR         # recommended-config channel outputs (patched, recommended f_lo), kept for gating
+                         C_sqi=ch[0][3], C_acf=ch[0][4]))
     return rows
 
 
@@ -331,19 +235,16 @@ def stage_long():
         allr += long_windows('mths', i, ac, ref, 30, 30, 6)
     print('long done', time.time() - t0, flush=True)
     D = pd.DataFrame(allr)
-    pd.to_pickle(D, '/home/aravhawk/.t3/scratch/hrval_tmp/long_cache.pkl')
-    D.drop(columns='chs').to_csv(f'{OUT}/long_windows.csv', index=False)
+    pd.to_pickle(D, TMP + '/long_cache.pkl')
+    D.to_csv(f'{OUT}/long_windows.csv', index=False)
     return D
 
 
-def long_tables(D, rec):
+def long_tables(D):
     rows = []
     for (ds, L), d in D.groupby(['ds', 'L']):
-        for el, ec, vc in (('A old peak', 'A_hr', None), ('B naive FFT', 'B_hr', None), ('C hr.py as written', 'C_hr', 'C_valid'),
-                           ('C patched, default gate', 'P_hr', 'P_valid')):
+        for el, ec, vc in (('A old peak', 'A_hr', None), ('B naive FFT', 'B_hr', None), ('C v2 robust (shipped gate)', 'C_hr', 'C_valid')):
             r = metrics(d[ec].values, d.ref.values, d[vc].values if vc else None, f'{ds} L={L}s'); r['estimator'] = el; rows.append(r)
-        sel = [select(ch, fixed=True, sqi_min=rec['sqi_min'], acf_min=rec['acf_min'], agree=rec['agree']) for ch in d.chs]
-        r = metrics([x[0] for x in sel], d.ref.values, [x[1] for x in sel], f'{ds} L={L}s'); r['estimator'] = 'C patched, recommended gate'; rows.append(r)
     t = pd.DataFrame(rows)
     first = ['subset', 'estimator', 'n', 'coverage', 'valid_frac']
     return t[[c for c in first if c in t] + [c for c in t if c not in first]]
@@ -407,81 +308,60 @@ def stage_synth(n=300):
         ref, meta, rgb = synth_trial(rng)
         ac = bandpass_from_rgb(rgb)
         te = len(ac)
-        A, B, ch, chF, chR = eval_window(ac, te, 10)
+        A, B, ch = eval_window(ac, te, 10)
         h, v, c = select(ch)
-        hF, vF, cF = select(chF, fixed=True)
-        rows.append(dict(trial=k, ref=ref, **{kk: vv for kk, vv in meta.items() if kk != 'f0'}, A_hr=A, B_hr=B, C_hr=h, C_valid=v, C_sqi=ch[0][3], C_acf=ch[0][4],
-                         P_hr=hF, P_valid=vF))
-        rows[-1]['chs'] = chR
+        rows.append(dict(trial=k, ref=ref, **{kk: vv for kk, vv in meta.items() if kk != 'f0'}, A_hr=A, B_hr=B, C_hr=h, C_valid=v, C_sqi=ch[0][3], C_acf=ch[0][4]))
     D = pd.DataFrame(rows)
-    D.drop(columns='chs').to_csv(f'{OUT}/synthetic_trials.csv', index=False)
+    D.to_csv(f'{OUT}/synthetic_trials.csv', index=False)
     return D
 
 
+# ---------------------------------------------------------------- summary in the format of HR_SUMMARY.csv
+def one_estimator(est, ref, accept=None):
+    """n = number of clips in the subset, coverage = share of them for which this estimator outputs a number (accepted ones for 'v2 accepted')."""
+    est = np.asarray(est, float); ref = np.asarray(ref, float)
+    have = np.isfinite(est) & np.isfinite(ref)
+    if accept is not None:
+        have &= np.asarray(accept, bool)
+    e = est[have]; r = ref[have]; err = np.abs(e - r)
+    nz = len(err) > 0
+    return dict(n=len(est), n_scored=int(have.sum()), coverage=have.mean() if len(est) else np.nan, MAE=err.mean() if nz else np.nan,
+                medAE=np.median(err) if nz else np.nan, within5=(err <= 5).mean() if nz else np.nan, within10=(err <= 10).mean() if nz else np.nan,
+                doubling=(np.abs(e - 2 * r) < 0.24 * r).mean() if nz else np.nan, halving=(np.abs(e - 0.5 * r) < 0.06 * r).mean() if nz else np.nan)
+
+
+def hr_summary(D, subsets):
+    rows = []
+    for sname, mask in subsets.items():
+        d = D[mask]
+        for lab, col, acc in (('old peak-interval', 'A_hr', None), ('naive FFT peak', 'B_hr', None), ('v2 all clips (no gate)', 'C_hr', None),
+                              ('v2 accepted (gated)', 'C_hr', d.C_valid.values if len(d) else None)):
+            r = one_estimator(d[col].values, d.ref.values, acc); r.update(subset=sname, estimator=lab); rows.append(r)
+    t = pd.DataFrame(rows)
+    return t[['subset', 'estimator'] + [c for c in t if c not in ('subset', 'estimator')]]
+
+
 # ---------------------------------------------------------------- main
-EST = {'A old peak': ('A_hr', None), 'B naive FFT': ('B_hr', None), 'C hr.py as written': ('C_hr', 'C_valid'),
-       'C patched, default gate': ('P_hr', 'P_valid')}
-
-
 def main():
     stage = sys.argv[1] if len(sys.argv) > 1 else 'all'
-    pc = '/home/aravhawk/.t3/scratch/hrval_tmp/'
-    rec = None
     pd.set_option('display.width', 250); pd.set_option('display.max_columns', 40)
     if stage in ('but', 'all'):
-        D, chs, wins = stage_but()
-        t = table(D, subsets_but(D), EST)
-        t.to_csv(f'{OUT}/summary_but.csv', index=False)
-        print(t.round(3).to_string())
-    if stage in ('flo', 'all'):
-        D, chs, wins = pd.read_pickle(pc + 'but_cache.pkl')
-        sd = np.array([w.std(0) for w in wins])
-        prim = np.where(sd[:, 1] > 0.3 * sd[:, 0], 1, 0)
-        sweeps, rows = [], []
-        for f_lo in (0.65, 0.75, 0.85, 0.95):
-            chF = [channel_ests(w, int(pr), fixed=True, f_lo=f_lo) for w, pr in zip(wins, prim)]
-            S = sweep_but(D, chF, f_lo)
-            sweeps.append(S)
-            sel = [select(ch, fixed=True) for ch in chF]
-            D3 = D.assign(Q_hr=[x[0] for x in sel], Q_valid=[x[1] for x in sel])
-            tt = table(D3, subsets_but(D3), {f'C patched f_lo={f_lo}, default gate': ('Q_hr', 'Q_valid')})
-            rows.append(tt)
-            print('f_lo', f_lo, 'done', flush=True)
-        S = pd.concat(sweeps); S.to_csv(f'{OUT}/but_gate_sweep.csv', index=False)
-        pd.concat(rows).to_csv(f'{OUT}/summary_but_flo_default_gate.csv', index=False)
-        cand = pick(S)
-        cand.groupby('F_LO').head(5).to_csv(f'{OUT}/but_gate_sweep_top.csv', index=False)
-        print(cand.groupby('F_LO').head(3).to_string())
-        r0 = cand.iloc[0]
-        rec = dict(f_lo=float(r0.F_LO), sqi_min=float(r0.SQI_MIN), acf_min=float(r0.ACF_MIN), agree=float(r0.AGREE))
-        print('RECOMMENDED', rec)
-        pd.to_pickle(rec, pc + 'rec.pkl')
-        chR = [channel_ests(w, int(pr), fixed=True, f_lo=rec['f_lo']) for w, pr in zip(wins, prim)]
-        sel = [select(ch, fixed=True, sqi_min=rec['sqi_min'], acf_min=rec['acf_min'], agree=rec['agree']) for ch in chR]
-        D2 = D.assign(Cr_hr=[x[0] for x in sel], Cr_valid=[x[1] for x in sel])
-        sub = subsets_but(D2); sub['subjects even'] = (D2.subj % 2 == 0); sub['subjects odd'] = (D2.subj % 2 == 1)
-        t2 = table(D2, sub, {'C recommended (patched, f_lo, gate)': ('Cr_hr', 'Cr_valid')})
-        t2.to_csv(f'{OUT}/summary_but_recommended.csv', index=False)
-        D2.to_csv(f'{OUT}/but_clips.csv', index=False)
-        print(t2.round(3).to_string())
+        D = stage_but()
+        S = hr_summary(D, subsets_but(D))
+        S.to_csv(f'{OUT}/HR_SUMMARY.csv', index=False)
+        print(S.round(3).to_string())
+        print(f"shipped gate: F_LO {HR.F_LO} SQI_MIN {HR.SQI_MIN} ACF_MIN {HR.ACF_MIN} AGREE {HR.AGREE}")
     if stage in ('long', 'all'):
-        rec = rec or pd.read_pickle(pc + 'rec.pkl'); REC_FLO['v'] = rec['f_lo']
         D = stage_long()
-        t = long_tables(D, rec)
+        t = long_tables(D)
         t.to_csv(f'{OUT}/summary_long.csv', index=False)
-        pd.set_option('display.width', 250); pd.set_option('display.max_columns', 40)
         print(t.round(3).to_string())
     if stage in ('synth', 'all'):
-        rec = rec or pd.read_pickle(pc + 'rec.pkl'); REC_FLO['v'] = rec['f_lo']
         D = stage_synth()
-        selr = [select(ch, fixed=True, sqi_min=rec['sqi_min'], acf_min=rec['acf_min'], agree=rec['agree']) for ch in D.chs]
-        D['R_hr'] = [x[0] for x in selr]; D['R_valid'] = [x[1] for x in selr]
-        D.drop(columns='chs').to_csv(f'{OUT}/synthetic_trials.csv', index=False)
         sub = {'all trials': D.trial >= 0, 'no motion': ~D.motion, 'motion': D.motion, 'dicrotic h2>=0.8': D.h2 >= 0.8, 'dicrotic h2<0.8': D.h2 < 0.8,
                'SNR<5 dB': D.snr_db < 5, 'SNR>=10 dB': D.snr_db >= 10}
-        t = table(D, sub, dict(EST, **{'C patched, recommended gate': ('R_hr', 'R_valid')}))
+        t = hr_summary(D, sub)
         t.to_csv(f'{OUT}/summary_synthetic.csv', index=False)
-        pd.set_option('display.width', 250); pd.set_option('display.max_columns', 40)
         print(t.round(3).to_string())
 
 

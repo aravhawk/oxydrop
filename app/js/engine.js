@@ -151,7 +151,7 @@ export class Chain {
     this.W = weights; this.band = opts.band ?? BAND;
     this.z = [0, 1, 2].map(() => SOS.map(() => [0, 0]));  // sosfilt state per channel/section
     this.lg = [[], [], []]; this.ac = [[], [], []]; this.n = 0;
-    this.last = new Array(FUSION.length).fill(NaN); this.calRows = []; this.calValid = []; this.calHr = []; this.base = null;
+    this.last = new Array(FUSION.length).fill(NaN); this.calRows = []; this.calValid = []; this.calHr = []; this.base = null; this.noBase = false;
   }
   /** push one 30 Hz sample (mean R,G,B on 0..255 scale). Returns a decision object when a new 2 s window completes, else null. */
   push(r, g, b) {
@@ -170,12 +170,17 @@ export class Chain {
     return this._window(this.n);
   }
   _window(te) {
-    const s = te / FS - WIN, f = winFeats(...this.lg, ...this.ac, te), v = f._valid;
+    const s = te / FS - WIN, f = winFeats(...this.lg, ...this.ac, te); let v = f._valid;
     const row = FUSION.map((k, j) => { const val = (v && f[k] !== undefined) ? f[k] : NaN; return Number.isNaN(val) ? this.last[j] : val; });
     this.last = row.slice();                       // causal forward fill (invalid windows contribute nothing)
     const q = { sqi: f._sqi, acf: f._acf, ch: f._ch, sat: f._sat, hrEst: f._hrEst, hrBeat: f._hrBeat, valid: v };
     if (s + WIN <= CAL) { this.calValid.push(v); this.calHr.push(v ? f._hrBeat : NaN); this.calRows.push(row); return { s, calibrating: true, ...q, hr: v ? f._hrEst : NaN }; }
-    if (!this.base) this.base = FUSION.map((_, j) => nanmedian(this.calRows.map((r) => r[j])));
+    if (!this.base) {
+      this.base = FUSION.map((_, j) => nanmedian(this.calRows.map((r) => r[j])));
+      // no baseline for some feature (e.g. the pulse never locked during calibration): everything after is 'nolock'
+      this.noBase = this.base.some(Number.isNaN); if (this.noBase) this.base = this.base.map((b) => (Number.isNaN(b) ? 0 : b));
+    }
+    if (this.noBase) { q.valid = false; v = false; }
     const X = row.map((x, j) => (Number.isNaN(x) ? this.base[j] : x) - this.base[j]);
     if (s < CAL) return { s, calibrating: true, warm: true, ...q, hr: v ? f._hrEst : NaN };
     const p = 0.5 * (lr(this.W.hr, [X[0]]) + lr(this.W.fusion, X));

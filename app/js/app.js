@@ -1,10 +1,11 @@
 import { Chain, FS, CAL, WIN } from './engine.js';
 import { CameraSource, Motion } from './camera.js';
+import { MIN_TRACKABLE_BPM } from './hr.js';
 
 const $ = (id) => document.getElementById(id);
 const SQI_MIN = 0.12;          // rule-based quality gate; Hoffman windows: 1st percentile 0.143, min 0.099
 const MOTION_MAX = 0.35;       // m/s^2 std of |accel| over 3 s: above this we pause decisions
-const MIN_HR = 40, MAX_HR = 110; // plausible *resting* heart rate at calibration
+const MIN_HR = MIN_TRACKABLE_BPM, MAX_HR = 110; // plausible *resting* heart rate at calibration; MIN_HR follows the HR estimator's band edge (F_LO = 0.85 Hz = 51 bpm)
 let mode = null, chain = null, weights = null, cam = null, motion = null, wake = null;
 let replay = null, replayTimer = null, timers = [], strip = [], tally = {}, calSqi = [], calMotion = [], calFailed = false, calChecked = false, lastWave = [];
 
