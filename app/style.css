@@ -621,10 +621,11 @@ select{
   position:fixed;right:10px;bottom:calc(env(safe-area-inset-bottom) + 84px);z-index:10002;
   min-height:34px;padding:6px 11px;font:600 11px/1 -apple-system,system-ui,sans-serif;
   background:var(--surf-3);color:var(--text-2);border:1px solid var(--line-2);border-radius:var(--r-pill);
-  cursor:pointer;opacity:.62;box-shadow:var(--sh-2);
+  cursor:pointer;box-shadow:var(--sh-2);
 }
-/* it floats over the page, so it stays quiet until it is reached for */
-.capture-debug-toggle:active,.capture-debug-toggle:focus-visible,.capture-debug-toggle:hover{opacity:1}
+/* it floats over the page, so it is kept small and low-key. Its weight comes from the surface it sits
+   on, never from opacity: fading the whole button also fades its label (3.64:1 at .62). */
+.capture-debug-toggle:active,.capture-debug-toggle:focus-visible,.capture-debug-toggle:hover{color:var(--text);border-color:var(--text-3)}
 .capture-debug{
   position:fixed;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 130px);
   max-height:44vh;overflow:auto;z-index:10001;text-align:left;pointer-events:auto;
