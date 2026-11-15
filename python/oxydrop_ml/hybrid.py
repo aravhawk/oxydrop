@@ -230,7 +230,8 @@ def run_pipeline_over_folds(F, order, fixed=None, with_train=False):
             tr = d['train']
             sc_tr, _ = apply_pipeline(d['inner'], tr, ch['source'], ch['cal'], ch['k'])
             y, t, s, sub = fold_stats(sc_tr, tr)
-            trains.append(dict(outer=o, train_tm_bacc=tm_bacc(t, y, s)))
+            per = [tm_bacc(t[sub == p], y[sub == p], s[sub == p]) for p in np.unique(sub)]
+            trains.append(dict(outer=o, train_tm_bacc=tm_bacc(t, y, s), train_person_mean=float(np.nanmean(per))))
     return pd.concat(frames, ignore_index=True), pd.DataFrame(choices), pd.DataFrame(trains)
 
 
@@ -350,21 +351,25 @@ def paired_models(fa, fb, B=2000, name_a='', name_b=''):
 
 
 def gap_row(name, frame, train, choices):
-    """Train-vs-test gap of a whole pipeline: (a) resubstitution: the fold's pipeline scored on its own training people with the outer fit's in-sample logits,
-    minus the held-out person's score; (b) inner-CV optimism: the inner CV score used to select minus the held-out score. Means over the 6 folds."""
+    """Train-vs-test gap of a whole pipeline, like with like (PREREGISTRATION.md Amendment 1, item 5):
+    (a) per person: mean over the 5 training people of their own time-matched balanced accuracy (the fold pipeline with the outer fit's in-sample logits) minus the held-out
+        person's; mean +- SD over the 6 folds with a bootstrap CI over folds;
+    (b) pooled: mean over folds of the training people's pooled score minus the pooled held-out score;
+    (c) selection optimism: mean over folds of the inner-CV score the selection used (pooled over the 5 inner people) minus the pooled held-out score.
+    Positive = optimistic."""
     ev = frame[frame['eval'].astype(bool)]
     held = {o: M.time_matched(g.t_start.values, g.low.values.astype(int), (g.score.values > 0).astype(int), g.score.values)['tm_bacc'] for o, g in ev.groupby('outer')}
     o_sorted = sorted(held)
     te = np.array([held[o] for o in o_sorted])
     pooled = M.time_matched(ev.t_start.values, ev.low.values.astype(int), (ev.score.values > 0).astype(int), ev.score.values)['tm_bacc']
-    out = dict(model=name, heldout_pooled=pooled, heldout_fold_mean=float(te.mean()))
+    out = dict(model=name, heldout_pooled=pooled, heldout_person_mean=float(te.mean()))
     if len(train):
-        tr = train.set_index('outer').train_tm_bacc.reindex(o_sorted).values
-        g = M.train_vs_test_gap(tr, te)
-        out.update(train_mean=g['train_mean'], gap_resub=g['gap'], gap_resub_sd=g['gap_sd'], gap_resub_lo=g['gap_lo'], gap_resub_hi=g['gap_hi'], gap_resub_pooled=float(tr.mean() - pooled))
+        tr = train.set_index('outer').reindex(o_sorted)
+        g = M.train_vs_test_gap(tr.train_person_mean.values, te)
+        out.update(train_person_mean=g['train_mean'], gap_person=g['gap'], gap_person_sd=g['gap_sd'], gap_person_lo=g['gap_lo'], gap_person_hi=g['gap_hi'],
+                   train_pooled=float(tr.train_tm_bacc.mean()), gap_pooled=float(tr.train_tm_bacc.mean() - pooled))
     ic = choices.set_index('outer').inner_cv.reindex(o_sorted).values
-    g2 = M.train_vs_test_gap(ic, te)
-    out.update(inner_cv_mean=g2['train_mean'], gap_inner=g2['gap'], gap_inner_sd=g2['gap_sd'], gap_inner_lo=g2['gap_lo'], gap_inner_hi=g2['gap_hi'])
+    out.update(inner_cv_mean=float(ic.mean()), inner_cv_sd=float(ic.std(ddof=1)), gap_inner_pooled=float(ic.mean() - pooled))
     return out
 
 
@@ -399,19 +404,19 @@ def report_cli(a):
         rows.append(r)
     final = pd.DataFrame(rows)
     final['seeds'] = ','.join(map(str, seeds))
-    final.to_csv(os.path.join(out, f'hybrid_p1{tag}.csv'), index=False)
+    final.to_csv(os.path.join(out, f'hybrid_p1_final{tag}.csv'), index=False)
     pairs = [paired_vs_baselines(res['final_scores'], base, a.B, 'HYBRID_FINAL', bname), paired_vs_baselines(res['chain_levers_scores'], base, a.B, 'CHAIN_SAME_LEVERS', bname)]
     pairs.append(pd.DataFrame([paired_models(res['final_scores'], res['chain_levers_scores'], a.B, 'HYBRID_FINAL', 'CHAIN_SAME_LEVERS'),
                                paired_models(res['final_scores'], res['default_scores']['P'], a.B, 'HYBRID_FINAL', 'P_alone_default'),
                                paired_models(res['default_scores']['P'], res['chain_shipped_scores'], a.B, 'P_alone_default', 'CHAIN_SHIPPED')]))
-    pd.concat(pairs, ignore_index=True).to_csv(os.path.join(out, f'hybrid_p1_paired{tag}.csv'), index=False)
+    pd.concat(pairs, ignore_index=True).to_csv(os.path.join(out, f'hybrid_p1_final_paired{tag}.csv'), index=False)
     ch = res['final_choices'].assign(pipeline='HYBRID_FINAL')
     ch = pd.concat([ch, res['chain_levers_choices'].assign(pipeline='CHAIN_SAME_LEVERS')], ignore_index=True)
-    ch.to_csv(os.path.join(out, f'hybrid_p1_choices{tag}.csv'), index=False)
-    res['grid'].to_csv(os.path.join(out, f'hybrid_p1_grid{tag}.csv'), index=False)
+    ch.to_csv(os.path.join(out, f'hybrid_p1_final_choices{tag}.csv'), index=False)
+    res['grid'].to_csv(os.path.join(out, f'hybrid_p1_final_grid{tag}.csv'), index=False)
     gaps = pd.DataFrame([gap_row('HYBRID_FINAL', res['final_scores'], res['final_train'], res['final_choices']),
                          gap_row('CHAIN_SAME_LEVERS', res['chain_levers_scores'], res['chain_levers_train'], res['chain_levers_choices'])])
-    gaps.to_csv(os.path.join(out, f'hybrid_p1_gap{tag}.csv'), index=False)
+    gaps.to_csv(os.path.join(out, f'hybrid_p1_final_gap{tag}.csv'), index=False)
     final_score_frame(res).to_csv(os.path.join(out, 'scores', f'hybrid_final{tag}_hoffman.csv'), index=False)
     # single seeds (exploratory): default levers
     srows = []
@@ -429,7 +434,7 @@ def report_cli(a):
         srows.append(dict(seed=-1, **summarize(fr, B=0, name=nm)))
     fe = fold_ensemble_scores(Fall, 'P')
     srows.append(dict(seed=-1, **summarize(fe, B=0, name='P+fold_ensemble')))
-    pd.DataFrame(srows).to_csv(os.path.join(out, f'hybrid_p1_seeds{tag}.csv'), index=False)
+    pd.DataFrame(srows).to_csv(os.path.join(out, f'hybrid_p1_final_seeds{tag}.csv'), index=False)
     print(final[['model', 'tm_bacc', 'ci_lo', 'ci_hi', 'fold_mean', 'fold_sd', 'tm_auroc']].round(3).to_string())
     print(res['final_choices'][['outer', 'source', 'cal', 'k', 'inner_cv']].to_string())
     p2_report(a, runs, out, tag)
