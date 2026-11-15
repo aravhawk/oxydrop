@@ -192,3 +192,40 @@ def test_meta_scores_are_invariant_to_row_order_of_the_inner_table():
     perm = np.random.default_rng(1).permutation(len(inner))
     sc2, _ = H.apply_pipeline(inner.iloc[perm].reset_index(drop=True), outer, 'c+p', False, 1)
     assert np.allclose(sc, sc2, atol=1e-6)
+
+
+# ------------------------------------------------------------------------------------------------ P2 rules and export
+def test_hr_rules():
+    from oxydrop_ml import hybrid_hr as HH
+    cnn = np.array([140., 71., 90., 60.]); spec = np.array([70., 70., 60., 80.]); valid = np.array([True, False, True, False])
+    assert np.allclose(HH.apply_rule('cnn', cnn, spec), cnn)
+    assert np.allclose(HH.apply_rule('spec', cnn, spec), spec)
+    assert np.allclose(HH.apply_rule('gate', cnn, spec, valid), [70., 71., 60., 60.])
+    assert np.allclose(HH.apply_rule('guard', cnn, spec), [70., 71., 90., 60.])          # 140 = 2 x 70 is a harmonic; 90 is not within 8 of 120 or 30
+    assert np.allclose(HH.apply_rule('agree', cnn, spec), [140., 70.5, 90., 60.])
+    assert np.allclose(HH.apply_rule('gate', cnn, np.array([np.nan] * 4), np.ones(4, bool)), cnn)     # no spectral answer: the CNN answers
+
+
+def test_headline_hr_rule_always_contains_the_cnn():
+    from oxydrop_ml import hybrid_hr as HH
+    r = np.random.default_rng(0)
+    n = 400
+    ref = r.uniform(55, 120, n)
+    runs = pd.DataFrame(dict(family='P', target='inner', outer='o', inner='q', local=np.arange(n), hr=ref + 30 * r.standard_normal(n), hr_ref=ref, subject='q'))
+    spec = ref + 0.5 * r.standard_normal(n)                              # the spectral estimator is nearly perfect, so `spec` alone would win
+    t = HH.hoffman_rule_table(runs, spec, np.ones(n, bool))
+    assert t.loc[t.rule == 'spec', 'within5_full'].iloc[0] == t.within5_full.max()
+    assert t.rule[t.selected].iloc[0] in HH.CNN_RULES and t.selected.sum() == 1
+
+
+def test_deploy_pipeline_is_chosen_by_the_same_rule_on_the_stacked_outer_tables():
+    from oxydrop_ml import export_hybrid as EH
+    inner, outer = synth_tables()
+    rows = []
+    for i in range(4):
+        _, o = synth_tables(seed=10 + i)
+        rows.append(o.assign(subject=f'o{i}', rec=f'o{i}L', target='outer'))
+    w = pd.concat(rows, ignore_index=True)
+    ch, cols, f, oof = EH.deploy_pipeline(w, order=['P', 'c+p'])
+    assert ch['source'] in ('P', 'c+p') and cols == H.CANDS[ch['source']]
+    assert len(f.params['coef']) == len(cols) and set(oof.inner) == set(w.subject)
