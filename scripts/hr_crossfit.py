@@ -18,7 +18,7 @@ from oxydrop import hr as HR  # noqa: E402
 import validate_hr as V  # noqa: E402
 
 OUT = V.OUT
-CACHE = '/home/aravhawk/.t3/scratch/hrval_tmp/but_cache.pkl'
+CACHE = os.path.join(V.TMP, 'but_cache.pkl')
 F_LOS = (0.65, 0.75, 0.85)
 SQIS = (0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60)
 ACFS = (0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60)

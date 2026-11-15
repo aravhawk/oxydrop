@@ -8,6 +8,7 @@ The gate (F_LO, SQI_MIN, ACF_MIN, AGREE) is NOT tuned here: it comes from the su
 Primary channel rule (all estimators): green if std_G > 0.3*std_R else red (std over the last 10 s, as in win_feats).
 Datasets: BUT PPG v2.0 (10 s clips, ECG HR + expert quality), Hoffman 2022 (full length, oximeter pulse),
 MTHS (finger video, oximeter HR at 1 Hz).  Run one stage at a time:  python scripts/validate_hr.py [but|long|synth|all]   (then scripts/hr_crossfit.py for the held-out gate selection)
+Env overrides for the dataset and cache paths: OXY_BUT, OXY_HOF, OXY_MTHS, OXY_HRTMP.
 Outputs: results/hr_validation/*.csv
 """
 import os, sys, time
@@ -22,11 +23,11 @@ OUT = os.path.join(ROOT, 'results', 'hr_validation')
 os.makedirs(OUT, exist_ok=True)
 FS = 30
 SOS = butter(3, [0.7, 4.0], btype='band', fs=FS, output='sos')   # same causal filter as features.SOS_CARDIAC
-BUT = '/home/aravhawk/.t3/scratch/veritas/oxy_push/data/butppg/brno-university-of-technology-smartphone-ppg-database-but-ppg-2.0.0'
-HOF = '/home/aravhawk/.t3/scratch/veritas/_feas_photon/repo'
-MTHS = '/home/aravhawk/.t3/scratch/veritas/oxy_push/data/mths/repo/MTHS/Data'
+BUT = os.environ.get('OXY_BUT', '/home/aravhawk/.t3/scratch/veritas/oxy_push/data/butppg/brno-university-of-technology-smartphone-ppg-database-but-ppg-2.0.0')
+HOF = os.environ.get('OXY_HOF', '/home/aravhawk/.t3/scratch/veritas/_feas_photon/repo')
+MTHS = os.environ.get('OXY_MTHS', '/home/aravhawk/.t3/scratch/veritas/oxy_push/data/mths/repo/MTHS/Data')
 SEED = 20261114
-TMP = '/home/aravhawk/.t3/scratch/hrval_tmp'   # per-recording feature caches (kept out of the repo)
+TMP = os.environ.get('OXY_HRTMP', '/home/aravhawk/.t3/scratch/hrval_tmp')   # per-recording feature caches (kept out of the repo)
 
 
 # ---------------------------------------------------------------- estimators
