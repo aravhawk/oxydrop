@@ -1,6 +1,6 @@
 import { Chain, FS, CAL, WIN } from './engine.js';
 import { CameraSource, Motion, listBackCameras, pickDefault, listCameras, probeCamFactory } from './camera.js';
-import { runProbeLadder, liveQuality, ringState, probeSummary } from './lensprobe.js';
+import { runProbeLadder, liveQuality, ringState, probeSummary, isVirtualCamera } from './lensprobe.js';
 import { MIN_TRACKABLE_BPM, GATE } from './hr.js';
 import { HybridEngine, loadHybridAssets, ENGINE_ID } from './hybrid_engine.js';
 import { HybridWorker, HybridWorkerEngine, loadHybridLite } from './hybrid_async.js';
@@ -163,9 +163,11 @@ function engineLine() {
 }
 function debugText() {
   const L = []; const st = cam ? cam.stats : null;
+  L.push('capture build oxydrop-v3.4-ios-frames');
   L.push(`mode ${mode || '-'} / ${kind || '-'}   samples ${rawN}   t ${(rawN / FS).toFixed(1)} s`);
   L.push(engineLine());
   if (cam && st) {
+    L.push(`capture ${st.captureState || '-'} callbacks native ${st.nativeCallbacks || 0} fallback ${st.fallbackCallbacks || 0} frame errors ${st.frameErrors || 0} ${st.lastFrameError || ''}; video readyState ${st.videoReadyState || 0} ${st.videoWidth || 0}x${st.videoHeight || 0}`);
     L.push(`fps ${st.fps.toFixed(1)}  jitter ${st.jitterMs.toFixed(1)} ms  gaps ${st.gaps} (max ${(st.maxGap * 1000).toFixed(0)} ms)  skipped ${st.skipped}  frames ${st.frames}`);
     L.push(`last frame ${(st.staleMs / 1000).toFixed(1)} s ago  interrupted ${st.interrupted || 'no'}  longest gap in last 30 s ${(cam.rs.gapStats(cam.rs.n - 30 * FS).max * 1000).toFixed(0)} ms`);
     L.push(`lens "${cam.info.lens}"  ${cam.info.width}x${cam.info.height}`);
@@ -224,7 +226,7 @@ async function runProbe(gen) {
   $('probe').hidden = false; $('probe-scores').textContent = ''; probe = null; qual = null;
   const gum = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' } } });   // one grant first: device labels are empty until the camera is allowed
   gum.getTracks().forEach((t) => t.stop());
-  const all = await listCameras(), pd = pickDefault(all.back), back = [...all.back].sort((a, b) => (b === pd) - (a === pd)).slice(0, PROBE_MAX_LENSES);
+  const all = await listCameras(), physical = all.back.filter(c => !isVirtualCamera(c.label)), pd = pickDefault(physical), back = [...physical].sort((a, b) => (b === pd) - (a === pd)).slice(0, PROBE_MAX_LENSES);
   const say = (t) => { $('probe-text').textContent = t; $('cam-state').textContent = t; if (!$('white').hidden) { $('wm-title').textContent = t; $('wm-msg').textContent = ''; } };
   for (let k = GET_READY_S; k > 0; k--) { say(`Lay your finger flat across the whole camera plateau now (lens and flash), light pressure. Testing starts in ${k}…`); await sleep(1000); if (gen !== sessionGen) return null; }
   const video = document.createElement('video'), base = probeCamFactory(video), partial = [];
@@ -233,15 +235,15 @@ async function runProbe(gen) {
   const out = await runProbeLadder(factory, { back, front: all.front }, {
     ambientMax: 1, shouldAbort: () => gen !== sessionGen,
     onProgress: (r, k) => {
-      partial.push(r); $('probe-scores').textContent = probeSummary(partial, null);
-      say(k < back.length ? `Testing lens ${k + 1} of ${back.length}, keep your finger flat across the camera plateau` : 'Back lenses gave no clear pulse. Trying the fallback mode (ambient light, then front camera with white screen)…');
+      partial.push(r); probe = { results: [...partial], choice: null }; $('probe-scores').textContent = probeSummary(partial, null);
+      say(k < back.length ? `Testing lens ${k + 1} of ${back.length}, keep your finger flat across the camera plateau` : 'Rear-camera samples collected. Selecting a lens or continuing live capture…');
     },
     beforeFront: async () => { if (gen !== sessionGen) return; showWhite(); say('Testing the front camera. Cover it with your fingertip.'); await sleep(1200); },
     afterFront: async () => { if (gen === sessionGen) hideWhite(); },   // a stale probe must not hide a newer session's overlay
   });
   if (gen !== sessionGen) return null;
   probe = out; $('probe-scores').textContent = probeSummary(out.results, out.choice);
-  $('probe-text').textContent = out.choice.reason + (out.choice.usable ? '' : ' Re-position your finger and try again, or pick a mode below.');
+  $('probe-text').textContent = out.choice.reason + (out.choice.usable || out.choice.continuous ? '' : ' Re-position your finger and try again, or pick a mode below.');
   return out.choice;
 }
 
@@ -253,7 +255,7 @@ async function startCamera(deviceId) {
   const c = new CameraSource((r, g, b) => { if (gen === camGen) sink(r, g, b); }, (st) => { if (gen === camGen && mode === 'setup' && st.roiChanged && st.frames > 1) resetSetupChain(); });
   cam = c; weakSince = 0; weakNow = false; weakShown = false; qual = null;
   const front = isFront(); if (front) showWhite(); else hideWhite();
-  try { await c.start(document.createElement('video'), { deviceId: front ? null : deviceId, torch: lightMode() === 'flash' ? 'auto' : 'off', facing: front ? 'user' : 'environment' }); }
+  try { await c.start(document.createElement('video'), { deviceId: front ? null : deviceId, torch: lightMode() === 'flash' ? 'auto' : 'off', facing: front ? 'user' : 'environment', allowFrameTimeout: true }); }
   catch (e) { c.stop(); if (cam === c) cam = null; throw e; }
   if (gen !== camGen) { c.stop(); return; }   // cleanup() or a newer startCamera() ran while this camera was opening: release the stream we just got
   camStartedAt = performance.now();

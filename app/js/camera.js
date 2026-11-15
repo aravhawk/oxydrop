@@ -70,28 +70,42 @@ export class CameraSource {
     this.info = { torchSupported: false, torch: false, torchState: 'off', locks: {}, lens: '', width: 0, height: 0, settings: {} };
     this.stopped = false; this.frames = 0; this.t0 = 0; this.stat = { mean: [0, 0, 0], satFrac: 0, channelSat: [0, 0, 0], spatialCV: 0, luma: 0 }; this.roi = null; this.lastMediaTime = null; this.lastPresented = null; this.skipped = 0;
     this.lastFrameAt = 0; this.interrupted = null; this.locked = false;
+    this.nativeCallbacks = 0; this.fallbackCallbacks = 0; this.frameErrors = 0; this.lastFrameError = '';
+    this.captureState = 'idle'; this.lastNativeCallbackAt = null; this.lastDecoded = null; this.lastFrameClock = null;
+    this.firstFrame = new Promise(resolve => { this._firstFrameResolve = resolve; });
+    this.ready = new Promise(resolve => { this._readyResolve = resolve; });
+
   }
-  async start(video, { deviceId = null, torch = 'auto', facing = 'environment' } = {}) {
+  async start(video, { deviceId = null, torch = 'auto', facing = 'environment', firstFrameTimeoutMs = 8000, startupTimeoutMs, allowFrameTimeout = false, shouldAbort } = {}) {
     this.video = video; this.torchMode = torch; this.info.facing = facing;
+    this.shouldAbort = shouldAbort; this.startupTimeoutMs = startupTimeoutMs ?? firstFrameTimeoutMs;
+    this.captureState = 'opening'; this.info.readiness = 'opening';
+    // WebKit can suspend delivery for detached/display:none videos. Keep a small,
+    // rendered inline preview attached throughout capture, including each probe.
+    video.muted = true; video.defaultMuted = true; video.playsInline = true; video.autoplay = true; video.hidden = false;
+    for (const attr of ['muted', 'playsinline', 'webkit-playsinline', 'autoplay']) video.setAttribute?.(attr, '');
+    Object.assign(video.style || {}, { position: 'fixed', right: '8px', top: '8px', bottom: 'auto', width: '32px', height: '24px', display: 'block', visibility: 'visible', opacity: '1', pointerEvents: 'none', zIndex: '10003' });
+    if (!video.isConnected) { document.body.appendChild(video); this.attachedVideo = true; }
+    try {
     const base = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, facingMode = { ideal: facing === 'user' ? 'user' : 'environment' };
     if (facing === 'user') torch = 'off';   // the front camera has no torch; the screen is the light source
     this.info.fallback = '';
     let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: deviceId ? { ...base, deviceId: { exact: deviceId } } : { ...base, facingMode } }); }
+    try { stream = await this._startupWait(navigator.mediaDevices.getUserMedia({ audio: false, video: deviceId ? { ...base, deviceId: { exact: deviceId } } : { ...base, facingMode } }), 'permission', s => s.getTracks().forEach(t => t.stop())); }
     catch (e) {
       // A stale or empty deviceId (ids change after a permission reset, in some browsers per session, and on fake devices) fails with NotFoundError / OverconstrainedError:
       // retry once on the facing mode alone and record why, so the debug view shows that the requested lens was not the one opened.
       if (!deviceId || !isDeviceGone(e)) throw e;
       this.info.fallback = `exact deviceId rejected (${e.name || 'error'}: ${e.message || 'no message'}); reopened by facingMode ${facing === 'user' ? 'user' : 'environment'}`;
-      stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...base, facingMode } });
+      stream = await this._startupWait(navigator.mediaDevices.getUserMedia({ audio: false, video: { ...base, facingMode } }), 'permission', s => s.getTracks().forEach(t => t.stop()));
     }
-    this.stream = stream; video.srcObject = stream; video.muted = true; video.playsInline = true; try { await video.play(); } catch (e) { stream.getTracks().forEach(t => t.stop()); throw e; }
+    this.stream = stream; video.srcObject = stream; this.captureState = 'playing'; this.info.readiness = 'playing'; await this._startupWait(video.play(), 'play');
     this.track = stream.getVideoTracks()[0];
     this.caps = this.track.getCapabilities ? this.track.getCapabilities() : {};
     const st = this.track.getSettings ? this.track.getSettings() : {};
     this.info.lens = this.track.label || ''; this.info.deviceId = st.deviceId; this.info.settings = st; this.info.width = st.width; this.info.height = st.height;
     this.info.torchSupported = !!this.caps.torch;
-    await this.setTorch(torch !== 'off');
+    await this._startupWait(this.setTorch(torch !== 'off'), 'torch');
     this.canvas = document.createElement('canvas'); this.canvas.width = 32; this.canvas.height = 24;
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
     this.t0 = performance.now() / 1000; this.lastFrameAt = performance.now();
@@ -103,7 +117,30 @@ export class CameraSource {
     this.onVis = () => { if (document.hidden) this.interrupted = 'The page was sent to the background.'; else if (this.interrupted === 'The page was sent to the background.') this.interrupted = null; };
     this.track.addEventListener('ended', this.onTrackEnd); this.track.addEventListener('mute', this.onTrackMute); this.track.addEventListener('unmute', this.onTrackUnmute);
     document.addEventListener('visibilitychange', this.onVis);
+    this.captureState = 'waiting'; this.info.readiness = 'waiting';
     this.loop();
+    try { await this._startupWait(this.ready, 'frames'); }
+    catch (e) { if (!(allowFrameTimeout && e.code === 'no_frames')) throw e; this.info.startupError = e.message; }
+    return this.info;
+    } catch (e) { this.info.startupError = e.message || String(e); this.stop(); this.captureState = 'failed'; this.info.readiness = 'failed'; throw e; }
+  }
+  _startupWait(promise, stage, disposeLate) {
+    return new Promise((resolve, reject) => {
+      let finished = false;
+      const fail = (code) => {
+        if (finished) return; finished = true; clearTimeout(timer); clearInterval(poll);
+        const e = new Error(code === 'cancelled' ? 'Camera startup cancelled' : stage === 'frames' ? 'Camera opened but no advancing video frames arrived' : `Camera ${stage} did not become ready`);
+        e.name = 'CameraStartupError'; e.code = code; if (this._startupCancel === cancel) this._startupCancel = null; reject(e);
+      };
+      const cancel = () => fail('cancelled'); this._startupCancel = cancel;
+      const timer = setTimeout(() => fail(stage === 'frames' ? 'no_frames' : `${stage}_timeout`), this.startupTimeoutMs);
+      const poll = setInterval(() => { if (this.stopped || this.shouldAbort?.()) fail('cancelled'); }, 50);
+      Promise.resolve(promise).then(value => {
+        if (finished) { if (disposeLate) disposeLate(value); return; }
+        if (this.stopped || this.shouldAbort?.()) { fail('cancelled'); if (disposeLate) disposeLate(value); return; }
+        finished = true; clearTimeout(timer); clearInterval(poll); if (this._startupCancel === cancel) this._startupCancel = null; resolve(value);
+      }, error => { if (!finished) { finished = true; clearTimeout(timer); clearInterval(poll); if (this._startupCancel === cancel) this._startupCancel = null; reject(error); } });
+    });
   }
   async setTorch(on) {
     this.info.torchRequested = !!on;
@@ -177,23 +214,41 @@ export class CameraSource {
     return a;
   }
   loop() {
-    if (this.stopped) return;
-    if (this.video.requestVideoFrameCallback) this.video.requestVideoFrameCallback((now, meta) => { this.frame(now, meta); this.loop(); });
-    else requestAnimationFrame((now) => { this.frame(now, null); this.loop(); });
+    if (this.stopped || this.loopStarted) return;
+    this.loopStarted = true; this.lastNativeCallbackAt = performance.now();
+    const nativeLoop = () => {
+      if (this.stopped || !this.video.requestVideoFrameCallback) return;
+      try { this.videoCallbackId = this.video.requestVideoFrameCallback((now, meta) => {
+        this.videoCallbackId = null; this.nativeCallbacks++; this.lastNativeCallbackAt = performance.now();
+        try { this.frame(now, meta); } finally { nativeLoop(); }
+      }); } catch (e) { this.lastFrameError = e.message || String(e); }
+    };
+    const fallbackLoop = (now) => {
+      if (this.stopped) return;
+      this.fallbackCallbacks++;
+      try {
+        if (!this.video.requestVideoFrameCallback || performance.now() - this.lastNativeCallbackAt > 250) this.frame(now, null);
+      } finally { if (!this.stopped) this.animationId = requestAnimationFrame(fallbackLoop); }
+    };
+    nativeLoop(); this.animationId = requestAnimationFrame(fallbackLoop);
   }
   frame(now, meta) {
-    const v = this.video; if (this.stopped || !v.videoWidth) return;
-    // Video media time prevents Safari rAF from counting the same camera frame
-    // multiple times. rVFC mediaTime is also independent of main-thread latency.
+    const v = this.video;
+    if (this.stopped || !v.videoWidth || (v.videoHeight !== undefined && !v.videoHeight) || (v.readyState !== undefined && v.readyState < 2)) return false;
+    let decoded = null;
+    try { const n = v.getVideoPlaybackQuality?.().totalVideoFrames ?? v.webkitDecodedFrameCount; if (Number.isFinite(n)) decoded = n; } catch (e) { /* optional counter */ }
+    const presented = Number.isFinite(meta?.presentedFrames) ? meta.presentedFrames : null;
     const mediaTime = Number.isFinite(meta?.mediaTime) ? meta.mediaTime : Number.isFinite(v.currentTime) ? v.currentTime : null;
-    if (mediaTime !== null && mediaTime === this.lastMediaTime) return;
-    if (meta && Number.isFinite(meta.presentedFrames)) {
-      if (this.lastPresented === meta.presentedFrames) return;
-      if (this.lastPresented !== null && meta.presentedFrames - this.lastPresented > 1) this.skipped += meta.presentedFrames - this.lastPresented - 1;
-      this.lastPresented = meta.presentedFrames;
-    }
-    this.lastMediaTime = mediaTime;
-    const t = Number.isFinite(meta?.captureTime) ? meta.captureTime / 1000 : mediaTime ?? now / 1000;
+    // A native presented-frame counter is authoritative. Some Safari versions
+    // repeat mediaTime/currentTime (even zero) while real camera frames advance.
+    if (presented !== null) { if (this.lastPresented !== null && presented <= this.lastPresented) return false; }
+    else if (decoded !== null) { if (this.lastDecoded !== null && decoded <= this.lastDecoded) return false; }
+    else if (mediaTime !== null && mediaTime === this.lastMediaTime) return false;
+    // All accepted frames share one monotonic callback clock. captureTime may
+    // be finite but frozen at zero, so never let it stop the 30 Hz resampler.
+    const t = now / 1000;
+    if (this.lastFrameClock !== null && t <= this.lastFrameClock) return false;
+    try {
     this.ctx.drawImage(v, 0, 0, 32, 24);
     const d = this.ctx.getImageData(0, 0, 32, 24).data;
     // Pick a region once, after exposure settles. Keep it fixed while measuring:
@@ -204,16 +259,29 @@ export class CameraSource {
     }
     const region = regionStats(d, 32, this.roi), { mean } = region;
     const fullMean = regionStats(d, 32, { x: 0, y: 0, w: 32, h: 24 }).mean;
+    if (presented !== null) {
+      if (this.lastPresented !== null && presented - this.lastPresented > 1) this.skipped += presented - this.lastPresented - 1;
+      this.lastPresented = presented;
+    }
+    this.lastDecoded = decoded; this.lastMediaTime = mediaTime; this.lastFrameClock = t;
     this.lastFrameAt = performance.now();
     this.stat = { ...region, fullMean, roi: { ...this.roi }, roiChanged }; this.frames++;
+    if (this.frames === 1) this._firstFrameResolve?.(this.stats);
+    if (this.frames >= 2) { this.captureState = 'ready'; this.info.readiness = 'ready'; this._readyResolve?.(this.stats); }
     this.rs.push(t, mean[0], mean[1], mean[2]); this.onStats(this.stats);
+    return true;
+    } catch (e) { this.frameErrors++; this.lastFrameError = `${e.name || 'FrameError'}: ${e.message || e}`; return false; }
   }
-  get stats() { return { ...this.stat, staleMs: this.staleMs, interrupted: this.interrupted, fps: this.rs.fps, jitterMs: this.rs.jitterMs, gaps: this.rs.gaps, maxGap: this.rs.maxGap, skipped: this.skipped, samples: this.rs.n, frames: this.frames }; }
+  get stats() { return { ...this.stat, captureState: this.captureState, readiness: this.captureState, firstFrame: this.frames > 0, nativeCallbacks: this.nativeCallbacks, fallbackCallbacks: this.fallbackCallbacks, frameErrors: this.frameErrors, lastFrameError: this.lastFrameError, videoReadyState: this.video?.readyState ?? 0, videoWidth: this.video?.videoWidth ?? 0, videoHeight: this.video?.videoHeight ?? 0, staleMs: this.staleMs, interrupted: this.interrupted, fps: this.rs.fps, jitterMs: this.rs.jitterMs, gaps: this.rs.gaps, maxGap: this.rs.maxGap, skipped: this.skipped, samples: this.rs.n, frames: this.frames }; }
   stop() {
-    this.stopped = true;
+    this.stopped = true; this.captureState = 'stopped'; this.info.readiness = 'stopped';
+    this._startupCancel?.();
+    if (this.videoCallbackId != null) { try { this.video?.cancelVideoFrameCallback?.(this.videoCallbackId); } catch (e) { /* already cancelled */ } this.videoCallbackId = null; }
+    if (this.animationId != null) { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.animationId); this.animationId = null; }
     if (this.track && this.onTrackEnd) { this.track.removeEventListener('ended', this.onTrackEnd); this.track.removeEventListener('mute', this.onTrackMute); this.track.removeEventListener('unmute', this.onTrackUnmute); document.removeEventListener('visibilitychange', this.onVis); }
     if (this.track && this.info.torch) { try { this.track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {}); } catch (e) { /* ignore */ } }
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    if (this.video) { try { this.video.pause?.(); this.video.srcObject = null; } catch (e) { /* detached already */ } if (this.attachedVideo) { this.video.remove?.(); this.attachedVideo = false; } }
   }
 }
 

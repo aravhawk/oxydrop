@@ -46,3 +46,40 @@ frameCam.frame(1050, { presentedFrames: 7, mediaTime: 2 });
 frameCam.frame(1066, { presentedFrames: 7, mediaTime: 2.01 });
 assert.equal(frameCam.frames, 3);
 console.log('CAMERA ROI / TORCH / FRAME DEDUP OK');
+
+// WebKit can freeze HTMLVideoElement.currentTime/mediaTime while genuine native
+// callbacks advance. presentedFrames, when available, is the authoritative counter.
+const nativeCam = new CameraSource(() => {});
+nativeCam.video = { videoWidth: 640, videoHeight: 480, currentTime: 0, readyState: 4 };
+nativeCam.ctx = { drawImage() {}, getImageData: () => ({ data: pixels }) };
+nativeCam.frame(2000, { presentedFrames: 1, mediaTime: 0 });
+nativeCam.frame(2033, { presentedFrames: 2, mediaTime: 0 });
+nativeCam.frame(2066, { presentedFrames: 3, mediaTime: 0 });
+assert.equal(nativeCam.frames, 3, 'advancing native counter must override frozen Safari mediaTime/currentTime');
+nativeCam.frame(2080, { presentedFrames: 3, mediaTime: .1 });
+assert.equal(nativeCam.frames, 3, 'same native counter remains a duplicate even if mediaTime moves');
+// First readable frame can lag the callback; one drawImage error cannot kill the loop.
+let transientFailure = true;
+nativeCam.ctx.drawImage = () => { if (transientFailure) { transientFailure = false; throw new Error('video not readable yet'); } };
+assert.doesNotThrow(() => nativeCam.frame(2100, { presentedFrames: 4, mediaTime: 0 }));
+assert.doesNotThrow(() => nativeCam.frame(2133, { presentedFrames: 5, mediaTime: 0 }));
+assert.equal(nativeCam.frames, 4, 'capture resumes after a transient unreadable native frame');
+console.log('SAFARI NATIVE FRAME PROGRESSION / TRANSIENT READABILITY OK');
+
+// Switching from watchdog media-time dedup to native presentedFrames must not
+// reject the first native callback merely because Safari keeps mediaTime at zero.
+const sourceSwitch = new CameraSource(() => {});
+sourceSwitch.video = { videoWidth: 640, videoHeight: 480, readyState: 4, currentTime: 0 };
+sourceSwitch.ctx = { drawImage() {}, getImageData: () => ({ data: pixels }) };
+sourceSwitch.frame(3000, null);
+sourceSwitch.frame(3034, { captureTime: 0, mediaTime: 0, presentedFrames: 1 });
+sourceSwitch.frame(3068, { captureTime: 0, mediaTime: 0, presentedFrames: 2 });
+sourceSwitch.frame(3102, { captureTime: 0, mediaTime: 0, presentedFrames: 3 });
+assert.equal(sourceSwitch.frames, 4, 'authoritative native counter takes over from fallback despite frozen time metadata');
+assert.ok(sourceSwitch.rs.n >= 2, 'finite but constant captureTime=0 must not stall resampling');
+const zeroCaptureTime = new CameraSource(() => {});
+zeroCaptureTime.video = sourceSwitch.video; zeroCaptureTime.ctx = sourceSwitch.ctx;
+for (let i = 0; i < 6; i++) zeroCaptureTime.frame(4000 + i * 34, { captureTime: 0, mediaTime: i / 30, presentedFrames: i + 1 });
+assert.equal(zeroCaptureTime.frames, 6);
+assert.ok(zeroCaptureTime.rs.n >= 4, 'advancing mediaTime and presentedFrames produce samples when captureTime stays zero');
+console.log('SAFARI ZERO CAPTURE TIME / COUNTER SOURCE SWITCH OK');

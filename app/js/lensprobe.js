@@ -1,4 +1,4 @@
-// Model-agnostic lens selection. No phone layout is assumed: every back lens is probed for ~1.5 s with the torch on and the one with the
+// Model-agnostic lens selection. No phone layout is assumed: every physical back lens is probed for >=2.5 s after real frames and warm-up with the torch on and the one with the
 // strongest pulsatile signal wins. If no back lens works, the ladder falls to ambient light, then the front camera with a white screen.
 // Pure ES module (no DOM). The camera is injected as a factory so the same code runs in the browser and in the Node test.
 //
@@ -7,7 +7,7 @@
 import { SOS, SAT_MAX } from './engine.js';
 import { estimateHr, GATE } from './hr.js';
 
-export const FS = 30, PROBE_SEC = 1.5, SETTLE_SEC = 0.5, SCORE_MIN = 35, SAT_LEVEL = 250, DARK_LEVEL = 3;
+export const FS = 30, PROBE_SEC = 2.5, SETTLE_SEC = 1.0, SCORE_MIN = 35, SAT_LEVEL = 250, DARK_LEVEL = 3;
 const NOISE_ACF = 0.40, CLEAN_ACF = 0.75, NOISE_SQI = 0.30, CLEAN_SQI = 0.40;
 const PROBE_GATE = { ...GATE, MIN_SEC: 1.25, F_LO: 0.7, F_HI: 3.5 };              // a 3 s probe is far shorter than the 9.5 s decision gate; used for ranking only
 const mean = (a) => { let s = 0; for (const v of a) s += v; return a.length ? s / a.length : 0; };
@@ -72,19 +72,19 @@ export function scoreSignal(rgb, fs = FS, opts = {}) {
     const e = estimateHr(y, fs, PROBE_GATE);
     // Short probes rank cameras, never authorize an HR reading. Correct ACF's
     // overlap bias so a 1.5 s clean record isn't punished for containing few beats.
-    if (body.length < 2.5 * fs && Number.isFinite(e.hrAcf)) { const lag = fs * 60 / e.hrAcf; e.acf = Math.min(1, e.acf * body.length / Math.max(1, body.length - lag)); }
+    if (body.length <= 3 * fs && Number.isFinite(e.hrAcf)) { const lag = fs * 60 / e.hrAcf; e.acf = Math.min(1, e.acf * body.length / Math.max(1, body.length - lag)); }
     // A 2.5 s window is too short for hr.js's absolute gate: band-passed noise already reaches sqi ~0.3 and acf ~0.4, a clean pulse sqi ~0.4 and acf ~0.75.
     // So the quality is measured above that noise floor, plus the spectral and autocorrelation heart rates must agree (hr.js AGREE).
     const agree = Number.isFinite(e.hr) && Number.isFinite(e.hrAcf) && e.hr > 0 && Math.abs(e.hrAcf - e.hr) / e.hr < GATE.AGREE ? 1 : 0;
     let q = 0.45 * clamp01((e.acf - NOISE_ACF) / (CLEAN_ACF - NOISE_ACF)) + 0.35 * clamp01((e.sqi - NOISE_SQI) / (CLEAN_SQI - NOISE_SQI)) + 0.2 * agree;
-    if (body.length < 2.5 * fs) {
+    if (body.length <= 3 * fs) {
       const fit = shortBandFit(body.map((p) => Math.log(p[c] + 1)), fs);
       q = clamp01((fit.quality - 0.45) / 0.5);
       e.sqi = fit.quality; e.hr = fit.hz * 60;
     }
     if (!best || q > best.q) best = { c, acdc, e, q, sat };
   }
-  if (!best) { res.reason = Math.max(...res.channelSat) > SAT_MAX ? 'saturated' : 'flat'; return res; }
+  if (!best) { res.reason = Math.max(res.sat, ...res.channelSat) > SAT_MAX ? 'saturated' : 'flat'; return res; }
   res.sat = best.sat; res.factor = satFactor(best.sat);
   const amp = clamp01((Math.log10(best.acdc) - Math.log10(2e-4)) / (Math.log10(1e-2) - Math.log10(2e-4)));
   Object.assign(res, { acdc: best.acdc, sqi: best.e.sqi, acf: best.e.acf, snr: best.e.sqi / (1 - best.e.sqi + 1e-9), channel: best.c, hr: best.e.hr });
@@ -98,36 +98,53 @@ export function scoreSignal(rgb, fs = FS, opts = {}) {
  * target = { id, label, mode: 'torch'|'ambient'|'front' }. Never throws: failures come back as { ok:false, error }.
  */
 export async function probeLens(camFactory, target, opts = {}) {
-  const sec = opts.sec ?? PROBE_SEC, settle = opts.settleSec ?? SETTLE_SEC, need = Math.round((sec + settle) * FS), settleN = Math.round(settle * FS);
-  const out = { deviceId: target.id ?? null, label: target.label || '', mode: target.mode || 'torch', ok: false, error: '', fallback: '', torchSupported: false, torchOn: false, samples: 0, score: 0, usable: false, reason: '' };
-  const buf = []; let satSum = 0, satN = 0, cam = null, started = false, timer = null, poll = null, aborted = false, done;
+  const sec = opts.sec ?? PROBE_SEC, settle = opts.settleSec ?? SETTLE_SEC;
+  const need = Math.ceil((sec + settle) * FS), settleN = Math.ceil(settle * FS);
+  const out = { deviceId: target.id ?? null, label: target.label || '', mode: target.mode || 'torch', ok: false, error: '', fallback: '', torchSupported: false, torchOn: false, samples: 0, frames: 0, fps: 0, startupMs: 0, score: 0, usable: false, reason: '' };
+  const buf = []; let satSum = 0, satN = 0, cam = null, timer = null, poll = null, aborted = false, noFrames = false, done;
+  const openedAt = performance.now(); let firstAt = null;
   const abortNow = () => !!(opts.shouldAbort && opts.shouldAbort());
-  const finished = new Promise((r) => { done = r; });
+  const finished = new Promise(r => { done = r; });
+  const sampleDeadline = () => { clearTimeout(timer); timer = setTimeout(done, opts.timeoutMs ?? (sec + settle) * 1000 + 4000); };
   try {
-    cam = camFactory((r, g, b) => { if (buf.length >= need) return; buf.push([r, g, b]); if (buf.length > settleN && cam && Number.isFinite(cam.satFrac)) { satSum += cam.satFrac; satN++; } if (buf.length >= need) done(); });   // saturation is the mean over the body only: the settle frames saturate while auto-exposure converges
-    const wantTorch = out.mode === 'torch';
-    await cam.start({ deviceId: target.id || null, facing: out.mode === 'front' ? 'user' : 'environment', torch: wantTorch ? 'on' : 'off' });
-    started = true;
-    out.torchSupported = !!(cam.info && cam.info.torchSupported); out.torchOn = !!(cam.info && cam.info.torch);
-    if (!out.label && cam.info && cam.info.lens) out.label = cam.info.lens;
-    if (cam.info && cam.info.fallback) { out.fallback = cam.info.fallback; if (cam.info.deviceId) out.deviceId = cam.info.deviceId; }   // the requested id was gone: report the lens that really opened
-    if (wantTorch && !out.torchOn) { out.error = out.torchSupported ? 'torch_apply_failed' : 'torch_unsupported'; out.reason = out.error; return out; }
-    timer = setTimeout(done, opts.timeoutMs ?? (sec + settle) * 1000 + 3000);
+    // The acquisition deadline starts with the first delivered sample, never getUserMedia/play().
+    // Warm-up samples are discarded by scoreSignal; the body still contains >=2.5 s at 30 Hz.
+    timer = setTimeout(() => { noFrames = true; done(); }, opts.firstFrameTimeoutMs ?? 8000);
+    cam = camFactory((r, g, b) => {
+      if (firstAt === null) { firstAt = performance.now(); out.startupMs = firstAt - openedAt; sampleDeadline(); }
+      if (buf.length >= need) return;
+      buf.push([r, g, b]);
+      if (buf.length > settleN && cam && Number.isFinite(cam.satFrac)) { satSum += cam.satFrac; satN++; }
+      if (buf.length >= need) done();
+    });
     if (opts.shouldAbort) poll = setInterval(() => { if (abortNow()) { aborted = true; done(); } }, 100);
+    const wantTorch = out.mode === 'torch';
+    await cam.start({ deviceId: target.id || null, facing: out.mode === 'front' ? 'user' : 'environment', torch: wantTorch ? 'on' : 'off', firstFrameTimeoutMs: opts.firstFrameTimeoutMs ?? 8000, shouldAbort: opts.shouldAbort });
+    out.torchSupported = !!cam.info?.torchSupported; out.torchOn = !!cam.info?.torch; out.torchState = cam.info?.torchState || (out.torchOn ? 'on-unverified' : 'off');
+    if (!out.label && cam.info?.lens) out.label = cam.info.lens;
+    if (cam.info?.fallback) { out.fallback = cam.info.fallback; if (cam.info.deviceId) out.deviceId = cam.info.deviceId; }
     if (abortNow()) { aborted = true; done(); }
     await finished;
+    out.samples = buf.length; out.frames = cam.stats?.frames ?? buf.length; out.fps = cam.stats?.fps || 0;
+    if (!out.fps && firstAt !== null && buf.length > 1) out.fps = (buf.length - 1) * 1000 / Math.max(1, performance.now() - firstAt);
     if (aborted) { out.error = 'cancelled'; out.reason = 'cancelled'; return out; }
-    out.samples = buf.length;
-    const s = scoreSignal(buf, FS, { settleSec: settle, satFrac: satN ? satSum / satN : 0 });
-    Object.assign(out, s, { samples: buf.length, ok: true, reason: s.reason });
+    if (noFrames || !buf.length) { out.error = 'no_frames'; out.reason = 'no_frames'; return out; }
+    if (buf.length < need) { out.reason = 'too_short'; out.error = 'incomplete_capture'; return out; }
+    const measured = scoreSignal(buf, FS, { settleSec: settle, satFrac: satN ? satSum / satN : 0 });
+    Object.assign(out, measured, { samples: buf.length, ok: true, reason: measured.reason });
+    if (wantTorch && !out.torchOn) { out.error = out.torchSupported ? 'torch_apply_failed' : 'torch_unsupported'; out.reason = out.error; out.score = 0; }
     out.usable = out.score >= (opts.scoreMin ?? SCORE_MIN);
   } catch (e) {
-    out.error = (e && (e.name || e.message)) ? `${e.name || ''}${e.name && e.message ? ': ' : ''}${e.message || ''}` : String(e); out.reason = 'open_failed';
+    out.samples = buf.length; out.frames = cam?.stats?.frames ?? 0; out.fps = cam?.stats?.fps || 0;
+    out.error = `${e?.name || 'error'}: ${e?.message || e}`;
+    out.reason = e?.code === 'no_frames' || e?.name === 'FrameStartupTimeout' || (!out.samples && noFrames) ? 'no_frames' : 'open_failed';
   } finally {
-    if (timer) clearTimeout(timer);
-    if (poll) clearInterval(poll);
+    clearTimeout(timer); if (poll) clearInterval(poll);
+    if (firstAt === null) out.startupMs = performance.now() - openedAt;
+    out.torchSupported = !!cam?.info?.torchSupported; out.torchOn = !!cam?.info?.torch;
+    out.torchState = cam?.info?.torchState || (out.torchOn ? 'on-unverified' : 'off');
     if (cam) { try { await cam.stop(); } catch (e) { /* ignore */ } }
-    if (started || cam) await new Promise((r) => setTimeout(r, opts.gapMs ?? 150));   // let the OS release the camera before the next lens opens
+    if (cam) await new Promise(r => setTimeout(r, opts.gapMs ?? 200));
   }
   return out;
 }
@@ -138,6 +155,8 @@ export async function probeAll(camFactory, targets, opts = {}) {
   for (const t of targets) { if (opts.shouldAbort && opts.shouldAbort()) break; res.push(await probeLens(camFactory, t, opts)); if (opts.onProgress) opts.onProgress(res[res.length - 1], res.length, targets.length); }
   return res.sort((a, b) => b.score - a.score);
 }
+
+export const isVirtualCamera = label => /dual|triple|virtual|fusion|logical|multi.?cam/i.test(label || '');
 
 const bestOf = (rs, min) => rs.filter((r) => r.ok && r.score >= min).sort((a, b) => b.score - a.score)[0] || null;
 
@@ -174,11 +193,19 @@ export function chooseMode(results, ctx = {}) {
  * opts.beforeFront / afterFront: hooks to switch the full-white screen on/off around the front-camera probe.
  */
 export async function runProbeLadder(camFactory, targets, opts = {}) {
-  const back = targets.back || [], results = [];
+  const back = (targets.back || []).filter(c => !isVirtualCamera(c.label)), results = [];
   results.push(...await probeAll(camFactory, back.map((c) => ({ ...c, mode: 'torch' })), opts));
   const cancelled = () => !!(opts.shouldAbort && opts.shouldAbort());
   let choice = chooseMode(results, opts);
   if (choice.usable || cancelled()) return { choice, results, cancelled: cancelled() };
+  // An empty acquisition says nothing about the fingertip. Keep a default rear
+  // stream alive instead of spending more time on empty front/ambient probes.
+  if (!results.length || results.some(r => r.reason === 'no_frames' || r.reason === 'too_short')) {
+    const camera = back[0] || null;
+    choice = { mode: 'torch', deviceId: camera?.id || null, label: camera?.label || 'Default back camera', score: 0, usable: false, continuous: true, reason: 'Probe did not receive enough frames. Continuing on the default back camera with the light on; waiting for live frames.', scores: choice.scores };
+    return { choice, results, cancelled: false };
+  }
+
   const torchWorked = results.some((r) => r.ok && r.torchOn);
   const ambTargets = (torchWorked ? [...results].sort((a, b) => b.score - a.score).map((r) => ({ id: r.deviceId, label: r.label })) : back).slice(0, opts.ambientMax ?? 2);
   const doAmbient = async () => { if (ambTargets.length && !cancelled()) results.push(...await probeAll(camFactory, ambTargets.map((c) => ({ ...c, mode: 'ambient' })), opts)); };
@@ -218,6 +245,6 @@ export function ringState(mean3, satFrac = 0) {
 
 /** Human readable per-lens probe table for the debug view. */
 export function probeSummary(results, choice) {
-  const rows = results.map((r) => `${r.mode.padEnd(7)} ${(r.label || r.deviceId || '?').slice(0, 28).padEnd(28)} score ${r.score.toFixed(1).padStart(5)}  acdc ${(r.acdc * 100).toFixed(2)}%  sqi ${(r.sqi || 0).toFixed(2)}  acf ${(r.acf || 0).toFixed(2)}  sat ${((r.sat || 0) * 100).toFixed(0)}%  ${r.reason || r.error || ''}${r.fallback ? '  [' + r.fallback + ']' : ''}`);
+  const rows = results.map((r) => `${r.mode.padEnd(7)} ${(r.label || r.deviceId || '?').slice(0, 28).padEnd(28)} samples ${r.samples || 0} frames ${r.frames || 0} fps ${(r.fps || 0).toFixed(1)} torch ${r.torchState || (r.torchOn ? 'on-unverified' : 'off')} startup ${((r.startupMs || 0) / 1000).toFixed(1)}s score ${r.score.toFixed(1).padStart(5)}  acdc ${(r.acdc * 100).toFixed(2)}%  sqi ${(r.sqi || 0).toFixed(2)}  acf ${(r.acf || 0).toFixed(2)}  sat ${((r.sat || 0) * 100).toFixed(0)}%  ${r.reason || r.error || ''}${r.fallback ? '  [' + r.fallback + ']' : ''}`);
   return [...rows, choice ? `-> ${choice.mode} ${choice.label || ''}${choice.usable ? '' : ' (nothing reached threshold)'}: ${choice.reason}` : ''].join('\n');
 }
