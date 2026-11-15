@@ -26,7 +26,7 @@ The hop is 2 s, so the model uses about 3 % of one core on this laptop. In the l
 | `js/hybrid_engine.js`, `hybrid_async.js`, `hybrid_worker.js`, `cnn.js`, `cnn_features.js` | 39,000 together | 15,200 |
 | replay demo (2 recordings, `.bin` + `.json`) | 757,980 for the `.bin` files | |
 
-First load downloads about 2.7 MB of model JSON (about 2.0 MB gzipped) once; the service worker (`app/sw.js`, cache `oxydrop-v3.0-hybrid`) keeps all three seed files, the engines and the replay demo for offline use. The model JSON size is below the 1.5 MB per-file target of the plan; the three seeds together are 2.7 MB.
+First load downloads about 2.7 MB of model JSON (about 2.0 MB gzipped) once; the service worker (`app/sw.js`, cache `oxydrop-v3.2-hybrid`) keeps all three seed files, the engines and the replay demo for offline use. The model JSON size is below the 1.5 MB per-file target of the plan; the three seeds together are 2.7 MB.
 
 ## Reproduce
 ```bash

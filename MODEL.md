@@ -38,7 +38,7 @@ People with COVID-19, COPD, asthma or at altitude who own a phone but no pulse o
 | Source | Use | Licence | Notes |
 |---|---|---|---|
 | UW Hoffman 2022 | P1 test (6 people, 5,644 windows), low-oxygen training in each fold | MIT | the only open phone-camera data with SpO2 below 90 |
-| MTHS (Samavati et al.) | P2 and P3 test, normoxic phone video | CC BY-NC-ND 4.0 | non-commercial research; weights trained on it are flagged in `DATA_LICENSES.md`; no raw data or per-window predictions committed |
+| MTHS (Samavati et al.) | P2 and P3 test, normoxic phone video | CC BY-NC-ND 4.0 | non-commercial research; weights trained on it are shared for non-commercial research and education use only, with attribution (`DATA_LICENSES.md`, `app/data/WEIGHTS_LICENSE.md`); no raw data or per-window predictions committed |
 | BUT PPG v2.0 | P2 test, smartphone PPG with ECG heart rate | CC BY 4.0 | spot SpO2 per person used only as a low-weight label |
 | OpenOximetry v1.1.1 | SSL, stage B warm-up, auxiliary head, skin-tone analysis | PhysioNet credentialed | contact red/infrared PPG, not a phone; derived aggregates only; Daytona only, never Kaggle; 34 people held out of everything |
 | Pretraining corpus | SSL: 299,754 windows, 212 people (OpenOximetry, PTT-PPG, moshekam exercise, apnoea, BIDMC) | mixed | disjoint from every Hoffman, MTHS and BUT person |

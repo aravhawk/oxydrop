@@ -99,7 +99,7 @@ tests/      JS parity, flow and e2e tests; docs_claims.mjs guards wording
 
 ## Data and licences
 
-Hoffman (MIT), BUT PPG (CC BY 4.0), MTHS (CC BY-NC-ND 4.0, non-commercial research), OpenOximetry (PhysioNet credentialed, **aggregates only**, never redistributed), plus pretraining sources. **The shipped CNN weights (`app/data/hybrid_R_s*.json`, `oxynet.onnx`) are derived models trained on MTHS and OpenOximetry data: the NoDerivatives and data-use-agreement caveat is flagged for the owner to confirm before release** (see [DATA_LICENSES.md](DATA_LICENSES.md)). No data from users is stored. Code is MIT. AI tools (Claude) assisted with code, analysis and writing; the team reviewed and can explain every component.
+Hoffman (MIT), BUT PPG (CC BY 4.0), MTHS (CC BY-NC-ND 4.0, non-commercial research), OpenOximetry (PhysioNet credentialed, **aggregates only**, never redistributed), plus pretraining sources. **The shipped CNN weights (`app/data/hybrid_R_s*.json`, `oxynet.onnx`) are derived models trained on MTHS and OpenOximetry data. They are NOT under the MIT licence: they are shared for non-commercial, research and education use only, with attribution to MTHS (Samavati et al., CC BY-NC-ND 4.0) and OpenOximetry (PhysioNet)**, under the owner's decision of 2026-11-15, which is not a legal opinion and is not confirmed in writing by the data owners (see [DATA_LICENSES.md](DATA_LICENSES.md) and `app/data/WEIGHTS_LICENSE.md`). No data from users is stored. Code is MIT; the CNN weight files are not (see above). AI tools (Claude) assisted with code, analysis and writing; the team reviewed and can explain every component.
 
 ## Older documentation
 
