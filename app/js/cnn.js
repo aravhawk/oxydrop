@@ -1,5 +1,5 @@
 // OxyNet forward pass in dependency-free JavaScript. Pure ES module (no DOM, no Node APIs), runs in the browser and in Node tests.
-// Reads app/data/cnn_weights.json written by python/oxydrop_ml/export_js.py (BatchNorm already folded into the convs).
+// Reads a member file app/data/hybrid_R_s<k>.json written by python/oxydrop_ml/export_hybrid.py (BatchNorm already folded into the convs; the graph format is defined by export_js.py).
 // Supported ops, exactly the exported set: shared_stem_input, conv1d (stride, dilation, explicit zero padding, optional ReLU),
 // add_domain (per-domain embedding add + ReLU), add (residual + ReLU), pool (global average + max), dense (concat of inputs, optional ReLU), sub.
 // Activations are Float64Array (weights float32), all buffers are allocated once in loadModel(); forward() allocates nothing.

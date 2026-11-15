@@ -487,6 +487,9 @@ CUSTOM = {
     'deploy_win_ms': lambda: _deploy_value(r'full hybrid window[^|]*\|\s*([\d]+ to [\d]+ ms)'),
     'deploy_mb': lambda: f"{sum(os.path.getsize(os.path.join(ROOT, f'app/data/hybrid_R_s{i}.json')) for i in range(3)) / 1e6:.2f} MB",
     'app_state': lambda: 'wired' if _app_state()['wired'] else 'not-wired',
+    'guard_hof': lambda: pct(_row(rd('ood_ac_range.csv'), dataset='hoffman', percentile=0.1).share_below_cut),
+    'guard_mths': lambda: pct(_row(rd('ood_ac_range.csv'), dataset='mths', percentile=0.1).share_below_cut),
+    'guard_but': lambda: pct(_row(rd('ood_ac_range.csv'), dataset='butppg', percentile=0.1).share_below_cut),
     'v1_cov': lambda: pct(b1('chain_v1', 'coverage', 'band_shipped').pooled, 1),
     'v1_acc_band': lambda: pct(b1('chain_v1', 'acc', 'band_shipped').pooled, 1),
     'v1_alert_band': lambda: pct(b1('chain_v1', 'alert_share_all', 'band_shipped').pooled, 1),
@@ -609,17 +612,20 @@ def block_p1_main(short=True) -> str:
     pdp = _row(rd('hybrid_p1_final_paired.csv'), model='HYBRID_FINAL', baseline='P_alone_default')
     rows.append(['CNN alone, 3-seed ensemble through the per-fold recalibration (`default_P`)', f(dp.tm_bacc), ci(dp.ci_lo, dp.ci_hi), pm(dp.fold_mean, dp.fold_sd), f(dp.auroc), 'n/a',
                  'exploratory'])
+    dr = _row(rd('hybrid_p1_final.csv'), model='default_R')
+    rows.append(['**Deployed pipeline R** (the app; chain + CNN residual). Optimistic: chosen after the outer scores were seen', f(dr.tm_bacc), ci(dr.ci_lo, dr.ci_hi),
+                 pm(dr.fold_mean, dr.fold_sd), f(dr.auroc), 'n/a', 'exploratory; interval overlaps the best baseline, no paired test run'])
     h = _row(rd('hybrid_p1_final.csv'), model='HYBRID_FINAL')
     g = _row(rd('hybrid_p1_final_gap.csv'), model='HYBRID_FINAL')
     ph = _row(rd('hybrid_p1_final_paired.csv'), model='HYBRID_FINAL', baseline=best)
-    rows.append(['**Hybrid, selected pipeline** (chain logit + CNN residual, nested selection)', f(h.tm_bacc), ci(h.ci_lo, h.ci_hi), pm(h.fold_mean, h.fold_sd), f(h.auroc),
+    rows.append(['**Hybrid, per-person selected** (nested: unbiased estimate of the selection procedure)', f(h.tm_bacc), ci(h.ci_lo, h.ci_hi), pm(h.fold_mean, h.fold_sd), f(h.auroc),
                  sgn(g.gap_pooled), f'**{_verdict_word(ph["diff"], ph.lo, ph.hi, True)}** with the best baseline ({dstr(ph["diff"], ph.lo, ph.hi)})'])
     cs = _row(rd('hybrid_p1_final.csv'), model='CHAIN_SAME_LEVERS')
     gc = _row(rd('hybrid_p1_final_gap.csv'), model='CHAIN_SAME_LEVERS')
     pc = _row(rd('hybrid_p1_final_paired.csv'), model='CHAIN_SAME_LEVERS', baseline=best)
     rows.append(['Control: chain refit with the same nested levers (no CNN)', f(cs.tm_bacc), ci(cs.ci_lo, cs.ci_hi), pm(cs.fold_mean, cs.fold_sd), f(cs.auroc), sgn(gc.gap_pooled),
                  f'{_verdict_word(pc["diff"], pc.lo, pc.hi, True)} with the best baseline ({dstr(pc["diff"], pc.lo, pc.hi)})'])
-    hdr = ['Model (P1: Hoffman, 6 people, LOSO)', 'TM bal. acc.', '95% CI (person bootstrap)', 'Per person, mean \u00b1 SD', 'AUROC', 'Train-vs-test gap', 'vs best baseline (pre-registered rule)']
+    hdr = ['Model (P1: Hoffman, 6 people, LOSO)', 'TM bal. acc.', '95% CI (person bootstrap)', 'Per person, mean \u00b1 SD', 'Plain AUROC', 'Train-vs-test gap', 'vs best baseline (pre-registered rule)']
     return md_table(hdr, rows, ['l', 'r', 'r', 'r', 'r', 'r', 'l'])
 
 
@@ -630,7 +636,7 @@ def block_p1_per_person() -> str:
     def add(label, vals, mean, sd):
         rows.append([label] + [f(v) for v in vals] + [pm(mean, sd)])
     for lab, mod in (('Logistic chain v1 (shipped)', 'CHAIN_SHIPPED'), ('Chain, same nested levers', 'CHAIN_SAME_LEVERS'), ('CNN alone, 3-seed ensemble (`default_P`)', 'default_P'),
-                     ('Residual hybrid R at default levers', 'default_R'), ('**Hybrid, selected pipeline**', 'HYBRID_FINAL')):
+                     ('**Deployed pipeline R** (default levers, optimistic)', 'default_R'), ('Hybrid, per-person selected pipeline (nested)', 'HYBRID_FINAL')):
         r = _row(rd('hybrid_p1_final.csv'), model=mod)
         add(lab, [r[f'tm_bacc_{h}'] for h in HOF], r.fold_mean, r.fold_sd)
     return md_table(hdr, rows, ['l'] + ['r'] * 7)
@@ -658,7 +664,7 @@ def block_p2_main() -> str:
         c = _row(h2, scope='mths', model=m)
         if m in ('cnn_alone', 'HYBRID_agree'):
             pr = _row(rd('hybrid_p2_paired.csv'), scope='all', model='HYBRID_agree', baseline='v2_spectral_acf__forced')
-            ver = f'**{_verdict_word(pr["diff"], pr.lo, pr.hi, True)}** ({dstr(pr["diff"], pr.lo, pr.hi)})' if m == 'HYBRID_agree' else 'tie (3-seed ensemble)'
+            ver = f'{_verdict_word(pr["diff"], pr.lo, pr.hi, True)} by the rule ({dstr(pr["diff"], pr.lo, pr.hi)}); **post hoc, exploratory, driven by BUT PPG**' if m == 'HYBRID_agree' else 'tie (3-seed ensemble)'
         else:
             ver = 'baseline'
         rows.append([lab, f'{f(a.within5_full)} {ci(a.lo, a.hi)}', f(b.within5_full), f(c.within5_full), f(a.mae, 2), pct(a.doubling, 2), ver])
@@ -676,7 +682,9 @@ def block_p3_main() -> str:
     c = ab('full', 'p23')
     ens = _row(rd('cnn_vs_baselines_paired.csv'), task='P3', seed=-1, baseline='train_mean')
     rows.append(['**CNN alone** (mean of 3 seeds)', f(c.p3_mae), ci(c.p3_mae_lo, c.p3_mae_hi), pm(c.p3_mae_fold_mean, c.p3_mae_fold_sd), 'not reported'])
-    rows.append(['CNN alone, 3-seed ensemble (the interval column is the paired difference to the train-mean predictor, positive = CNN better)', f(ens.cnn), dstr(ens['diff'], ens.lo, ens.hi), '', 'tie'])
+    who = 'CNN better' if ens['diff'] > 0 else 'CNN worse'
+    rows.append(['CNN alone, 3-seed ensemble (interval column: paired difference in MAE points, train-mean MAE minus CNN MAE; a negative value means the CNN is worse)',
+                 f(ens.cnn), dstr(ens['diff'], ens.lo, ens.hi), '', f'tie ({who} by {f(abs(ens["diff"]))}, interval contains zero)'])
     return md_table(hdr, rows, ['l', 'r', 'r', 'r', 'r'])
 
 
@@ -838,7 +846,7 @@ def block_ssl() -> str:
 
 
 # ------------------------------------------------------------------------------------------------------------ FEAT-007 sections (typed tables from conformal_*, openox_spo2_*, hr_vote_*)
-SYS_LABEL = {'final': 'Hybrid (nested pipeline)', 'deployed_R': 'Deployed pipeline R (fixed, exploratory)', 'chain_v1': 'v1 chain alone (control)'}
+SYS_LABEL = {'final': 'Hybrid, per-person selected (nested)', 'deployed_R': '**Deployed pipeline R** (the app; optimistic)', 'chain_v1': 'v1 chain alone (control)'}
 
 
 def _cf_row(system: str, alpha: float, method: str = 'mondrian') -> pd.Series:
@@ -1005,15 +1013,15 @@ def block_conformal(full: bool = False) -> str:
     """Headline table at the declared alpha 0.10, the matched-coverage comparison with v1 and v2, and (full) coverage targets and per person."""
     head = ['Pipeline', 'Coverage (answered)', 'Accuracy on answered', 'All hypoxic windows alerted', 'Hypoxic called Normal', 'Normal / Possible low / Unsure']
     rows = []
-    for s in (('final', 'deployed_R', 'chain_v1') if full else ('final', 'chain_v1')):
+    for s in ('deployed_R', 'final', 'chain_v1'):
         r = _cf_row(s, 0.1)
         rows.append([SYS_LABEL[s], _cf_cell(r, 'coverage', 'pcti'), _cf_cell(r, 'acc', 'pcti'), _cf_cell(r, 'alert_share_all', 'pcti'), pct(r.confident_miss),
                      f'{pct(r.share_normal, 0)} / {pct(r.share_low, 0)} / {pct(r.share_unsure, 0)}'])
-    out = [f'**Held-out conformal output at the declared level alpha = 0.10** (Mondrian, thresholds from the five other people only, {int(_cf_row("final", 0.1).n):,} Hoffman windows after the first minute, 95% person-bootstrap CIs):', '',
+    out = [f'**Held-out conformal output at the declared level alpha = 0.10** (Mondrian, thresholds from the five other people only, {int(_cf_row("final", 0.1).n):,} Hoffman windows after the first minute, 95% person-bootstrap CIs). The deployed pipeline R is the model the app runs; its row is exploratory and optimistic because R was chosen with all six people in view. The per-person selected row is the nested estimate of the selection procedure. The chain-only control has the higher point estimates:', '',
            md_table(head, rows, ['l', 'r', 'r', 'r', 'r', 'r']), '']
     hdr = ['Reference at its own coverage', 'Pipeline (nested Mondrian conformal)', 'Matched coverage', 'Accuracy on answered', 'Reference accuracy', 'Difference, points', 'Verdict']
     mr = []
-    systems = ('final', 'deployed_R', 'chain_v1') if full else ('final', 'chain_v1')
+    systems = ('deployed_R', 'final', 'chain_v1')
     for ref, rl in (('v1', 'v1 shipped band'), ('v2', 'v2 gated band')):
         for s in systems:
             r = _row(rd('conformal_matched.csv'), system=s, reference=ref, variant='conformal_mondrian')
@@ -1024,15 +1032,15 @@ def block_conformal(full: bool = False) -> str:
     if full:
         tg = []
         for a in (0.05, 0.1, 0.15):
-            for s in ('final', 'deployed_R', 'chain_v1'):
+            for s in ('deployed_R', 'final', 'chain_v1'):
                 r = _cf_row(s, a)
                 tg.append([f'{a:.2f}', pct(1 - a, 0), SYS_LABEL[s], _cf_cell(r, 'set_cov_hypoxic', 'pcti'), _cf_cell(r, 'set_cov_normal', 'pcti')])
         out += ['**Empirical set coverage next to the target** (the guarantee is per class and assumes exchangeability; windows of one person overlap by 80% and people differ):', '',
                 md_table(['alpha', 'Target', 'Pipeline', 'Coverage, hypoxic windows', 'Coverage, normal windows'], tg, ['r', 'r', 'l', 'r', 'r']), '']
         pp = rd('conformal_per_person.csv')
-        pp = pp[(pp.system == 'final') & (pp.method == 'mondrian') & np.isclose(pp.alpha.astype(float), 0.1)]
+        pp = pp[(pp.system == 'deployed_R') & (pp.method == 'mondrian') & np.isclose(pp.alpha.astype(float), 0.1)]
         prow = [[p.person.replace('hof_10000', 'person '), f'{int(p.n):,}', pct(p.coverage), pct(p.acc), pct(p.alert_share_all), pct(p.confident_miss), pct(p.set_cov_hypoxic), pct(p.share_unsure)] for p in pp.itertuples()]
-        out += ['**Per person** (hybrid, alpha = 0.10): the pooled guarantee does not hold person by person.', '',
+        out += ['**Per person** (deployed pipeline R, alpha = 0.10): the pooled guarantee does not hold person by person.', '',
                 md_table(['Held-out person', 'Windows', 'Coverage', 'Accuracy on answered', 'Hypoxic alerted', 'Hypoxic called Normal', 'Set coverage, hypoxic', 'Unsure'], prow, ['l', 'r', 'r', 'r', 'r', 'r', 'r', 'r']), '']
         cr = lambda s: _row(rd('conformal_calibration.csv'), system=s)
         cal = ['AUROC over all windows: hybrid ' + f(cr('final').auroc_all) + ', deployed R ' + f(cr('deployed_R').auroc_all) + ', v1 chain ' + f(cr('chain_v1').auroc_all) +
@@ -1122,6 +1130,12 @@ def _deploy_value(label_regex: str) -> str:
     return m.group(1) if m else 'n/a'
 
 
+def guard_sentence() -> str:
+    g = lambda ds: _row(rd('ood_ac_range.csv'), dataset=ds, percentile=0.1).share_below_cut
+    return (f'With the shipped cut (`scripts/ood_range.py`) it would refuse {pct(g("hoffman"))} of Hoffman windows, {pct(g("mths"))} of MTHS windows and {pct(g("butppg"))} of BUT PPG windows (other studies\' phones), '
+            'so a weak-flash phone will see more *Unsure*; the rate on any untested phone is unknown.')
+
+
 def block_app_state() -> str:
     st = _app_state()
     if st['wired']:
@@ -1130,7 +1144,8 @@ def block_app_state() -> str:
         mb = sum(os.path.getsize(os.path.join(ROOT, f'app/data/hybrid_R_s{i}.json')) for i in range(3)) / 1e6
         return ('**What the app runs.** The hybrid is the on-device default path: the v1 physiological chain logit plus the residual of three CNN seeds, then the logistic meta-learner and the conformal three-state rule (`app/js/hybrid_engine.js`, `docs/APP_INTEGRATION.md`). '
                 'The CNN runs in a Web Worker so a forward pass never delays camera frames, with an in-page fallback when module workers are unavailable; the v2 logistic chain stays behind `?engine=logistic`. '
-                'A generic low-amplitude guard (AC/DC below the 0.1th percentile of the Hoffman training windows, ' + pct(_row(rd('ood_ac_range.csv'), dataset='hoffman', percentile=0.1).ac_ratio_percent / 100, 2) + ') answers *Unsure*. '
+                'A generic low-amplitude guard (AC/DC below the 0.1th percentile of the Hoffman training windows, ' + pct(_row(rd('ood_ac_range.csv'), dataset='hoffman', percentile=0.1).ac_ratio_percent / 100, 2) + ') answers *Unsure* and shows the spectral heart rate only. '
+                + guard_sentence() + ' '
                 f'Latency measured on a development laptop (`results/ml/DEPLOY.md`): {fwd} ms for one forward pass, {win} per 2 s window including all three seeds; phones are slower and unmeasured. '
                 f'The three seed files are {mb:.2f} MB together. The replay demo is in-sample for the hybrid (the weights saw those two people) and is labelled demo only in the app.')
     return ('**PENDING (app integration):** in this tree the app still runs the logistic chain v2 (`app/js/hybrid_engine.js` is not wired into `app/js/app.js`).')

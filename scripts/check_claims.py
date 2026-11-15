@@ -123,22 +123,36 @@ def independent_claims() -> list[tuple[str, str, list[str]]]:
     claims.append(('v1 shipped band accuracy', f'{100 * acc:.1f}%', ['MODEL.md', 'WHITEPAPER.md']))
     # ---- conformal, OpenOximetry and HR voting (independent code, straight from the CSVs)
     cc = csv('conformal_curve.csv')
-    r = cc[(cc.system == 'final') & (cc.method == 'mondrian') & ((cc.param - 0.10).abs() < 1e-9)].iloc[0]
-    claims.append(('conformal alpha 0.10 coverage', f'{100 * r.coverage:.1f}% [{100 * r.coverage_lo:.1f}%, {100 * r.coverage_hi:.1f}%]', ['MODEL.md', 'WHITEPAPER.md']))
-    claims.append(('conformal alpha 0.10 coverage (README)', f'{100 * r.coverage:.1f}%', ['README.md']))
-    claims.append(('conformal alpha 0.10 accuracy on answered', f'{100 * r.acc:.1f}% [{100 * r.acc_lo:.1f}%, {100 * r.acc_hi:.1f}%]', ['MODEL.md', 'WHITEPAPER.md']))
-    claims.append(('conformal alpha 0.10 hypoxic alerted', f'{100 * r.alert_share_all:.1f}%', allthree))
-    claims.append(('conformal alpha 0.10 hypoxic called Normal', f'{100 * r.confident_miss:.1f}%', allthree))
+    mdwp = ['MODEL.md', 'WHITEPAPER.md']
+    for sysname, docs_all in (('deployed_R', allthree), ('final', allthree), ('chain_v1', allthree)):
+        r = cc[(cc.system == sysname) & (cc.method == 'mondrian') & ((cc.param - 0.10).abs() < 1e-9)].iloc[0]
+        claims.append((f'conformal alpha 0.10 coverage ({sysname})', f'{100 * r.coverage:.1f}%', docs_all))
+        claims.append((f'conformal alpha 0.10 accuracy on answered ({sysname})', f'{100 * r.acc:.1f}%', docs_all))
+        claims.append((f'conformal alpha 0.10 hypoxic alerted ({sysname})', f'{100 * r.alert_share_all:.1f}%', docs_all))
+        claims.append((f'conformal alpha 0.10 coverage with interval ({sysname})', f'{100 * r.coverage:.1f}% [{100 * r.coverage_lo:.1f}%, {100 * r.coverage_hi:.1f}%]', mdwp))
+        claims.append((f'conformal alpha 0.10 accuracy with interval ({sysname})', f'{100 * r.acc:.1f}% [{100 * r.acc_lo:.1f}%, {100 * r.acc_hi:.1f}%]', mdwp))
+        claims.append((f'conformal alpha 0.10 hypoxic called Normal ({sysname})', f'{100 * r.confident_miss:.1f}%', mdwp + (['README.md'] if sysname == 'deployed_R' else [])))
     cm = csv('conformal_matched.csv')
-    for ref in ('v1', 'v2'):
-        r = cm[(cm.system == 'final') & (cm.reference == ref) & (cm.variant == 'conformal_mondrian')].iloc[0]
-        claims.append((f'matched coverage {ref} hybrid accuracy', f'{100 * r.acc:.1f}%', allthree if ref == 'v1' else ['MODEL.md', 'WHITEPAPER.md']))
-        claims.append((f'matched coverage {ref} hybrid difference', f'{100 * r.diff_acc:+.1f} [{100 * r.diff_lo:+.1f}, {100 * r.diff_hi:+.1f}]', ['MODEL.md', 'WHITEPAPER.md'] + (['README.md'] if ref == 'v1' else [])))
-        r = cm[(cm.system == 'chain_v1') & (cm.reference == ref) & (cm.variant == 'conformal_mondrian')].iloc[0]
-        claims.append((f'matched coverage {ref} chain accuracy', f'{100 * r.acc:.1f}%', allthree))
+    for sysname in ('deployed_R', 'chain_v1', 'final'):
+        for ref in ('v1', 'v2'):
+            r = cm[(cm.system == sysname) & (cm.reference == ref) & (cm.variant == 'conformal_mondrian')].iloc[0]
+            if sysname != 'final' or ref == 'v1':
+                claims.append((f'matched coverage {ref} {sysname} accuracy', f'{100 * r.acc:.1f}%', allthree if (ref == 'v1' and sysname != 'final') else mdwp))
+            claims.append((f'matched coverage {ref} {sysname} difference', f'{100 * r.diff_acc:+.1f} [{100 * r.diff_lo:+.1f}, {100 * r.diff_hi:+.1f}]', mdwp + (['README.md'] if (ref == 'v1' and sysname == 'deployed_R') else [])))
     pp = csv('conformal_per_person.csv')
-    r = pp[(pp.system == 'final') & (pp.method == 'mondrian') & ((pp.alpha - 0.1).abs() < 1e-9) & (pp.person == 'hof_100001')].iloc[0]
-    claims.append(('person 1 hypoxic called Normal', f'{100 * r.confident_miss:.1f}%', allthree))
+    r = pp[(pp.system == 'deployed_R') & (pp.method == 'mondrian') & ((pp.alpha - 0.1).abs() < 1e-9) & (pp.person == 'hof_100001')].iloc[0]
+    claims.append(('person 1 hypoxic called Normal (deployed R)', f'{100 * r.confident_miss:.1f}%', allthree))
+    # the shipped pipeline R and the weak-pulse guard
+    claims.append(('P1 deployed R with interval', f'{f3(h.loc["default_R"].tm_bacc)} [{f3(h.loc["default_R"].ci_lo)}, {f3(h.loc["default_R"].ci_hi)}]', allthree))
+    ood = csv('ood_ac_range.csv')
+    for ds in ('mths', 'butppg'):
+        claims.append((f'guard refusal share {ds}', f'{100 * ood[(ood.dataset == ds) & (ood.percentile == 0.1)].iloc[0].share_below_cut:.1f}%', allthree))
+    hp_ = csv('hybrid_p2_paired.csv')
+    r = hp_[(hp_.scope == 'butppg') & (hp_.model == 'HYBRID_agree') & (hp_.baseline == 'v2_spectral_acf__forced')].iloc[0]
+    claims.append(('P2 paired difference BUT PPG', f'{r["diff"]:+.3f} [{f3(r.lo)}, {f3(r.hi)}]', allthree))
+    rules = csv('hybrid_p2_rules.csv').set_index('rule')
+    claims.append(('P2 Hoffman spectral within 5', f3(rules.loc['spec'].within5_full), allthree))
+    claims.append(('P2 Hoffman agree within 5', f3(rules.loc['agree'].within5_full), allthree))
     ov = csv('openox_spo2_overall.csv')
     for mdl in ('R', 'ror_textbook'):
         r = ov[(ov.label == 'lag_star') & (ov.model == mdl)].iloc[0]
@@ -185,6 +199,53 @@ def check_independent(rendered: dict):
             if expect not in rendered.get(d, read(d)):
                 fail(f'{d}: expected "{expect}" ({label}) not found')
 
+
+
+# ----------------------------------------------------------------------------------------------------------------------- 2b. numbers quoted in the app text (app/index.html)
+def check_app_text():
+    """The results paragraph of the 'How it works' card is typed by hand in app/index.html. Every number in it is recomputed here from results/ml/*.csv and must appear verbatim,
+    so the card cannot drift from the shipped model (review of 2026-11-15: it once quoted the per-person-selected pipeline instead of the shipped pipeline R)."""
+    import html
+    txt = html.unescape(re.sub(r'<[^>]+>', ' ', read('app/index.html')))
+    txt = re.sub(r'\s+', ' ', txt)
+    h = csv('hybrid_p1_final.csv').set_index('model')
+    b = csv('baselines_P1.csv')
+    r1 = b[(b.model == 'chain_v1') & (b.variant == 'full') & (b.metric == 'tm_bacc')].iloc[0]
+    cc = csv('conformal_curve.csv')
+    cf = lambda sysname: cc[(cc.system == sysname) & (cc.method == 'mondrian') & ((cc.param - 0.10).abs() < 1e-9)].iloc[0]
+    d, c, fnl = cf('deployed_R'), cf('chain_v1'), cf('final')
+    h2 = csv('hybrid_p2.csv')
+    p2 = lambda scope, m: h2[(h2.scope == scope) & (h2.model == m)].iloc[0].within5_full
+    rules = csv('hybrid_p2_rules.csv').set_index('rule')
+    ood = csv('ood_ac_range.csv')
+    guard = lambda ds: ood[(ood.dataset == ds) & (ood.percentile == 0.1)].iloc[0].share_below_cut
+    ov = csv('openox_spo2_overall.csv')
+    mae = lambda m: ov[(ov.label == 'lag_star') & (ov.model == m)].iloc[0].mae
+    R = h.loc['default_R']; F = h.loc['HYBRID_FINAL']
+    expect = [
+        f'time-matched balanced accuracy is {R.tm_bacc:.3f} (95% interval {R.ci_lo:.3f} to {R.ci_hi:.3f}), against {r1.pooled:.3f} ({r1.pooled_lo:.3f} to {r1.pooled_hi:.3f}) for the logistic chain alone',
+        f'the nested estimate for the whole selection procedure is {F.tm_bacc:.3f} ({F.ci_lo:.3f} to {F.ci_hi:.3f})',
+        f'A chain refit with the same tuning and no network scores {h.loc["CHAIN_SAME_LEVERS"].tm_bacc:.3f}',
+        f'the chain alone answers {100 * c.coverage:.1f}% of windows at {100 * c.acc:.1f}% accuracy, against {100 * d.coverage:.1f}% of windows at {100 * d.acc:.1f}% accuracy for the hybrid',
+        f'the hybrid answers {100 * d.coverage:.1f}% of windows, {100 * d.acc:.1f}% of those answers are right, and {100 * d.alert_share_all:.1f}% of the windows with low oxygen raise an alert',
+        f'within 5 bpm of the reference in {100 * p2("all", "HYBRID_agree"):.1f}% of windows on 100 people (BUT PPG and MTHS), against {100 * p2("all", "v2_spectral_acf__forced"):.1f}% for the spectral estimator',
+        f'BUT PPG ({100 * p2("butppg", "HYBRID_agree"):.1f}% against {100 * p2("butppg", "v2_spectral_acf__forced"):.1f}%)',
+        f'the spectral estimator alone does better ({100 * rules.loc["spec"].within5_full:.1f}% against {100 * rules.loc["agree"].within5_full:.1f}% for the rule)',
+        f'nominally better ({100 * p2("mths", "v2_spectral_acf__forced"):.1f}% against {100 * p2("mths", "HYBRID_agree"):.1f}%)',
+        f'mean error {mae("R"):.2f} against {mae("ror_textbook"):.2f} points',
+        f'it would refuse {100 * guard("mths"):.1f}% (MTHS) and {100 * guard("butppg"):.1f}% (BUT PPG) of windows, against {100 * guard("hoffman"):.1f}% of the training windows',
+    ]
+    for e in expect:
+        if e not in txt:
+            fail(f'app/index.html: expected text not found (a number drifted from results/ml): "{e}"')
+    # the shipped model is the fixed pipeline R: its numbers must be the ones in conformal.json's own metadata
+    meta = json.load(open(os.path.join(ROOT, 'app/data/conformal.json'))).get('nested_evaluation') or {}
+    for key, row in (('deployed_pipeline_R', d), ('chain_only_control', c), ('per_person_selected_hybrid', fnl)):
+        m = meta.get(key, {})
+        if abs(m.get('coverage', -1) - row.coverage) > 5e-5 or abs(m.get('accuracy_on_answered', -1) - row.acc) > 5e-5 or abs(m.get('share_of_hypoxic_windows_alerted', -1) - row.alert_share_all) > 5e-5:
+            fail(f'app/data/conformal.json nested_evaluation.{key} differs from results/ml/conformal_curve.csv (rebuild with `python -m oxydrop_ml.export_conformal build`)')
+    if '\u2014' in read('app/index.html'):
+        fail('app/index.html contains an em dash')
 
 # ----------------------------------------------------------------------------------------------------------------------- 3. hand-typed numbers in templates
 ALLOW_DECIMALS = {
@@ -332,6 +393,7 @@ def check_pdf():
 def main():
     rendered = check_render()
     check_independent(rendered)
+    check_app_text()
     check_templates()
     check_traceable(rendered)
     check_style()

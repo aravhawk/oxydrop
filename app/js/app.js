@@ -66,6 +66,13 @@ async function loadHybrid(needFull) {
     if (!hybridWorker && !hybridFull) hybridFull = await loadHybridAssets(fetchJson);
   } catch (e) { engineUsed = 'logistic'; engineNote = `hybrid model could not be loaded (${e && e.message ? e.message : e}); using the logistic chain. `; }
 }
+// The hybrid model failing to load must never be silent: the page switched to the logistic chain alone, so the measurement screen says so (text only, no device logic).
+// Not shown when the chain was asked for on purpose (?engine=logistic).
+const FALLBACK_NOTICE = 'Notice: the neural-network part of the model could not be loaded, so these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
+function showEngineNotice() {
+  const el = $('engine-note'), fell = ENGINE_REQ === 'hybrid' && engineUsed === 'logistic';
+  el.hidden = !fell; el.textContent = fell ? FALLBACK_NOTICE : '';
+}
 // a fresh engine for one measurement (calibration restarts get a new one)
 function newMeasureEngine(w) {
   if (engineUsed === 'hybrid' && hybridLite) {
@@ -350,6 +357,7 @@ function startMeasure(k, w) {
   if (k === 'live') { calGaps0 = cam ? cam.stats.gaps : 0; decLog = []; }
   tally = { normal: 0, low: 0, uns: 0, pause: 0, right: 0, wrong: 0 };
   clearTimeout(anywayTimer); show('measure'); $('btn-restart').hidden = k !== 'live'; $('ref-tile').hidden = k !== 'replay'; if (k !== 'replay') $('replay-note').hidden = true;
+  showEngineNotice();
   setStatus('calibrating', '◔', 'Calibrating', 'Rest, keep still. Learning your normal heart-rate and light baseline.');
   $('phase').textContent = 'Calibrating'; $('cal-progress').hidden = false; $('tally').textContent = '';
   $('hr').textContent = '–'; $('dhr').textContent = '–'; $('sig').textContent = '–'; $('sig-u').textContent = '';

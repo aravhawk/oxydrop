@@ -163,7 +163,7 @@ def p3_section():
     S = pd.read_csv(RES / 'baselines_P3.csv'); info = json.load(open(RES / 'baselines_P3_info.json'))
     order = ['train_mean', 'ror_textbook_RB', 'ror_textbook_RG', 'ridge_ratio', 'lgbm_hand26', 'xgb_hand26']
     L = ['## P3: absolute SpO2 on MTHS, leave-one-subject-out', '',
-         f'{info["n_windows"]:,} windows (t >= 30 s) from {info["n_people"]} people (one of the 62 MTHS recordings, `mths_2`, lasts 26 s, so it has no window at t >= 30 s). **MTHS is normoxic**: reference '
+         f'{info["n_windows"]:,} windows (t >= 30 s) from {info["n_people"]} people (one of the 62 MTHS recordings lasts 26 s, so it has no window at t >= 30 s). **MTHS is normoxic**: reference '
          f'SpO2 in the scored windows has median {info["ref_median"]:.0f}, 5th percentile {info["ref_p5"]:.1f}, minimum {info["ref_min"]:.1f}; {info["share_below_95"] * 100:.1f}% of windows are below 95 and '
          f'{info["windows_below_90"]} window(s) below 90 (from {info["people_with_window_below_90"]} person). Predicting the training mean is therefore nearly optimal, and the AUROC columns '
          '(ranking by deviation from the fold training mean) rest on very few positives; the < 90 AUROC is not meaningful with that few windows. Nothing here measures hypoxemia detection. '
@@ -194,7 +194,7 @@ def write(path=None):
          '- CSV schema (long format, one row per task / dataset / model / variant / metric): `pooled`, `pooled_lo`, `pooled_hi` (all out-of-fold windows pooled, 95% person bootstrap), '
          '`fold_mean`, `fold_sd`, `fold_lo`, `fold_hi`, `fold_min`, `fold_max`, `n_folds` (per held-out person), `train_mean`, `test_mean`, `gap`, `gap_sd`, `gap_lo`, `gap_hi` (train minus held-out, '
          'positive = over-fit; undefined for counts and signed bias). Rows named `*_diff_vs_*` / `mae_improvement_vs_train_mean` are paired person-bootstrap differences. '
-         '`*_perperson.csv` holds every fold (selected hyperparameters, thresholds, abstain half-widths).',
+         '`baselines_P1_perperson.csv` (Hoffman, MIT) and `baselines_P2_perperson.csv` (BUT PPG, CC BY) hold every fold (selected hyperparameters, thresholds, abstain half-widths). MTHS is CC BY-NC-ND (aggregates only): its people appear only as the aggregate spread (people, mean, SD, 10/25/50/75/90th percentiles) in `baselines_P2_spread.csv` and `baselines_P3_spread.csv`.',
          '- Variants: `full` forced answer; `band_shipped` / `band_nested` abstention bands; `nolock_*` v2 abstains when the pulse is not locked; `spec90` threshold at 90% specificity on inner scores.',
          '- P2 estimators have no fitted parameters, so their train-vs-held-out gap is sampling noise around zero, not over-fitting.',
          '- The v1 chain refit reproduces `results/eval_v1_vs_v2.csv` (accuracy 0.8754, balanced accuracy 0.8733, AUROC 0.9475, TM accuracy 0.7962).', '']

@@ -4,6 +4,8 @@
 // Regression this guards: startCamera() bumps the camera generation, and the caller then compared it with the value read before the probe, so the
 // setup UI never appeared (REVIEW.md section 3). Cases: (1) cancel during the countdown, (2) full flow, (3) stale deviceId falls back to facingMode.
 // Usage: node tests/flow.mjs        (about 25 s of real time: the app's own 3 s get-ready countdown and 3.5 s lens probe are not mocked)
+//        FLOW_HYBRID_FAIL=1 node tests/flow.mjs   the hybrid model assets fail to load (HTTP 503): the app falls back to the logistic chain and the measurement screen must say so
+//        FLOW_ENGINE=logistic node tests/flow.mjs   the live camera path with ?engine=logistic: the logistic chain runs on purpose, no fallback notice
 //        FLOW_APP=../app/js/app_old.js node tests/flow.mjs    runs another copy of app.js (a path relative to this file, copy placed in app/js/) to show an old version fails
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -87,8 +89,13 @@ const mediaDevices = {
 Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices, userAgent: 'node-flow-test' }, configurable: true });
 globalThis.window = { scrollTo: noop, addEventListener: noop, removeEventListener: noop };
 globalThis.document = document;
-globalThis.location = { search: '' };
-globalThis.fetch = async (url) => ({ ok: true, json: async () => JSON.parse(fs.readFileSync(new URL('../app/' + url, import.meta.url), 'utf8')) });
+const LOGISTIC_REQ = process.env.FLOW_ENGINE === 'logistic';
+globalThis.location = { search: LOGISTIC_REQ ? '?engine=logistic' : '' };
+const HYBRID_FAIL = process.env.FLOW_HYBRID_FAIL === '1';
+globalThis.fetch = async (url) => {
+  if (HYBRID_FAIL && /hybrid_|conformal/.test(url)) return { ok: false, status: 503, json: async () => { throw new Error('unavailable'); } };
+  return { ok: true, json: async () => JSON.parse(fs.readFileSync(new URL('../app/' + url, import.meta.url), 'utf8')) };
+};
 
 await import(process.env.FLOW_APP || '../app/js/app.js');
 
@@ -134,9 +141,25 @@ assert.equal($('status-main').textContent, 'Calibrating');
 await sleep(1500);
 assert.equal($('phase').textContent, 'Calibrating', 'a steady, well-placed finger must not restart the calibration minute');
 await sleep(600);
-assert.match($('dbg-measure').textContent, /engine oxydrop-hybrid-v1: v1 physics chain \+ OxyNet residual CNN, 3 seeds, 167,588 parameters per seed/, 'the default engine in the measurement is the hybrid (CNN)');
-assert.match($('dbg-measure').textContent, /conformal alpha 0\.1 /, 'the conformal level is shown in the debug summary');
-ok('begin -> calibration starts after exposure setup and is not restarted while the finger stays on; the default engine is the hybrid CNN');
+if (LOGISTIC_REQ) {
+  assert.match($('dbg-measure').textContent, /engine logistic chain v2 \(baseline \/ fallback\) \(\?engine=logistic\)/, 'the live path runs the logistic chain when asked for');
+  assert.doesNotMatch($('dbg-measure').textContent, /oxydrop-hybrid-v1/, 'no hybrid engine in this mode');
+  assert.equal($('engine-note').hidden, true, 'no fallback notice when the chain was requested on purpose');
+  assert.equal($('status-main').textContent, 'Calibrating');
+  ok('?engine=logistic on the live camera path: logistic chain, no fallback notice');
+} else if (!HYBRID_FAIL) {
+  assert.match($('dbg-measure').textContent, /engine oxydrop-hybrid-v1: v1 physics chain \+ OxyNet residual CNN, 3 seeds, 167,588 parameters per seed/, 'the default engine in the measurement is the hybrid (CNN)');
+  assert.match($('dbg-measure').textContent, /conformal alpha 0\.1 /, 'the conformal level is shown in the debug summary');
+  assert.equal($('engine-note').hidden, true, 'no fallback notice while the hybrid model runs');
+  ok('begin -> calibration starts after exposure setup and is not restarted while the finger stays on; the default engine is the hybrid CNN');
+} else {
+  assert.match($('dbg-measure').textContent, /engine logistic chain v2 \(baseline \/ fallback\).*hybrid model could not be loaded/, 'the debug text records the load failure');
+  assert.equal($('engine-note').hidden, false, 'the load failure must be visible on the measurement screen, not only in the debug text');
+  assert.match($('engine-note').textContent, /neural-network part of the model could not be loaded.*logistic chain alone/, $('engine-note').textContent);
+  assert.doesNotMatch($('engine-note').textContent, /iPhone|Android|Pixel|Samsung/, 'the notice is device-agnostic');
+  assert.equal($('status-main').textContent, 'Calibrating', 'the measurement itself still runs on the fallback chain');
+  ok('hybrid assets fail to load (HTTP 503): the logistic chain runs and the measurement screen shows a visible, device-agnostic notice');
+}
 
 // lifting the finger for > 2 s inside the calibration minute voids it; putting it back starts the minute again from zero
 fingerOff = true; await sleep(2800);

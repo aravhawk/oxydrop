@@ -165,3 +165,28 @@ def test_v1_refit_reproduces_published_row():
         assert abs(m[k] - pub[pk]) < 6e-4, (k, m[k], pub[pk])
     assert abs(m['tm_bacc'] - pub['tm_acc']) < 2e-3
     assert abs(float(ctx.y.mean()) - 0.5748) < 1e-4                         # majority class share
+
+
+# ---------------------------------------------------------------------------------------------------------------- licence: MTHS (CC BY-NC-ND) people are aggregates only
+def test_split_restricted_replaces_mths_people_by_a_spread(tmp_path):
+    rows = []
+    for i, s in enumerate(['mths_1', 'mths_2', 'mths_3', 'but_1', 'hof_1']):
+        rows.append(dict(task='P3', dataset='x', model='m', variant='full', subject=s, mae=float(i + 1), n=10 + i, hp='{}'))
+    df = pd.DataFrame(rows)
+    keep, spread = C.write_perperson(df, tmp_path, 'bl')
+    assert set(keep.subject) == {'but_1', 'hof_1'}
+    assert not any(str(s).startswith('mths_') for s in pd.read_csv(tmp_path / 'bl_perperson.csv').subject)
+    assert len(spread) == 1 and int(spread.n_people.iloc[0]) == 3
+    assert spread.mae_mean.iloc[0] == pytest.approx(2.0) and spread.mae_sd.iloc[0] == pytest.approx(1.0) and spread.mae_q50.iloc[0] == pytest.approx(2.0)
+    assert 'subject' not in spread.columns and 'mths_1' not in (tmp_path / 'bl_spread.csv').read_text()
+    # a table that holds only MTHS people leaves no per-person file at all
+    C.write_perperson(df[df.subject.str.startswith('mths_')], tmp_path / 'only', 'bl')
+    assert not (tmp_path / 'only' / 'bl_perperson.csv').exists() and (tmp_path / 'only' / 'bl_spread.csv').exists()
+
+
+@pytest.mark.parametrize('name', ['baselines_P1_perperson.csv', 'baselines_P2_perperson.csv', 'hr_vote_per_subject.csv', 'baselines_P2_spread.csv', 'baselines_P3_spread.csv', 'hr_vote_subject_spread.csv'])
+def test_committed_tables_have_no_mths_person_rows(name):
+    p = REPO / 'results' / 'ml' / name
+    assert p.exists(), name
+    assert 'mths_' not in p.read_text(), f'{name} lists MTHS people (CC BY-NC-ND: aggregates only, see DATA_LICENSES.md)'
+    assert not (REPO / 'results' / 'ml' / 'baselines_P3_perperson.csv').exists()

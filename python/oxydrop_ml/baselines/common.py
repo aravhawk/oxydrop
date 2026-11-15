@@ -277,3 +277,51 @@ def write_csv(df, path, float_fmt='%.5g'):
     path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False, float_format=float_fmt)
     return path
+
+
+# ------------------------------------------------------------------------------------------------------------------ licence-safe per-person tables
+# MTHS is CC BY-NC-ND (DATA_LICENSES.md: aggregates only): per-person rows are committed only for the datasets whose licence allows them (Hoffman MIT, BUT PPG CC BY).
+# For MTHS the per-person values are replaced by an aggregate spread (people, mean, SD, quantiles) over the held-out people.
+AGG_QUANTILES = (0.10, 0.25, 0.50, 0.75, 0.90)
+KEY_COLS = ('task', 'dataset', 'model', 'variant')
+
+
+def is_restricted_subject(subject) -> bool:
+    return str(subject).startswith('mths_')
+
+
+def split_restricted(fold_df: pd.DataFrame, subject_col='subject'):
+    """(rows that may be committed per person, spread table of the restricted-licence people).
+    Spread: one row per (task, dataset, model, variant) with n_people and, for every numeric column, mean, SD (ddof 1) and the 10/25/50/75/90th percentiles over people."""
+    mask = fold_df[subject_col].map(is_restricted_subject)
+    keep, hid = fold_df[~mask].copy(), fold_df[mask]
+    keys = [k for k in KEY_COLS if k in fold_df.columns]
+    num = [c for c in fold_df.columns if c not in keys + [subject_col] and pd.api.types.is_numeric_dtype(fold_df[c])]
+    rows = []
+    for key, g in hid.groupby(keys, dropna=False, sort=False):
+        r = dict(zip(keys, key if isinstance(key, tuple) else (key,)))
+        r['n_people'] = int(g[subject_col].nunique())
+        for c in num:
+            v = g[c].dropna().to_numpy(dtype=float)
+            if not len(v):
+                continue
+            r[c + '_mean'] = v.mean(); r[c + '_sd'] = v.std(ddof=1) if len(v) > 1 else np.nan
+            for q in AGG_QUANTILES:
+                r[f'{c}_q{int(round(100 * q)):02d}'] = float(np.quantile(v, q))
+        rows.append(r)
+    return keep, pd.DataFrame(rows)
+
+
+def write_perperson(fold_df: pd.DataFrame, out_dir, name: str, subject_col='subject'):
+    """Write `<name>_perperson.csv` (people of datasets whose licence allows it) and, if any restricted-licence people exist, `<name>_spread.csv` (aggregates over them).
+    A stale per-person file that would be empty is removed."""
+    out_dir = Path(out_dir)
+    keep, spread = split_restricted(fold_df, subject_col)
+    pp = out_dir / f'{name}_perperson.csv'
+    if len(keep):
+        write_csv(keep, pp)
+    elif pp.exists():
+        pp.unlink()
+    if len(spread):
+        write_csv(spread, out_dir / f'{name}_spread.csv')
+    return keep, spread

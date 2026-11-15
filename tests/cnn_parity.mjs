@@ -10,6 +10,12 @@ const model = loadModel(JSON.parse(fs.readFileSync(wpath)));
 const ref = JSON.parse(fs.readFileSync(rpath)), TOL = ref.tolerance ?? 1e-4;
 const f32 = (b64) => new Float32Array(Uint8Array.from(Buffer.from(b64, 'base64')).buffer);
 let fail = false, worst = 0;
+const check0 = (cond, msg) => { if (!cond) { console.log('FAIL', msg); process.exitCode = 1; } };
+if (process.argv[2] === undefined && process.argv[3] === undefined) {   // default files: the fixture must come from the checkpoint of shipped member R_s0
+  const hw = JSON.parse(fs.readFileSync(new URL('../app/data/hybrid_weights.json', import.meta.url)));
+  const m0 = hw.members.find((m) => m.family === 'R' && m.seed === 0);
+  check0(ref.ckpt_sha256 === m0.ckpt_sha256, `cnn_ref.json ckpt_sha256 ${ref.ckpt_sha256} must equal the shipped member R_s0 (${m0.ckpt_sha256})`);
+}
 const check = (cond, msg) => { if (!cond) { console.log('FAIL', msg); fail = true; } };
 
 // ---- 1. every head, every fixture case

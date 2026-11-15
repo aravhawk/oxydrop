@@ -210,6 +210,23 @@ def metric_row(df, est, B, seed=0):
     return row, per
 
 
+def write_subject_tables(subj: pd.DataFrame, res: str):
+    """Per-subject rows only for the datasets whose licence allows it (Hoffman MIT, BUT PPG CC BY): hr_vote_per_subject.csv.
+    MTHS (CC BY-NC-ND, aggregates only) gets the spread over its subjects instead: hr_vote_subject_spread.csv (subjects, mean, SD, 10/25/50/75/90th percentiles, count with MAE < 3 bpm)."""
+    qs = (0.10, 0.25, 0.50, 0.75, 0.90)
+    subj[subj.dataset != 'mths'].to_csv(os.path.join(res, 'hr_vote_per_subject.csv'), index=False)
+    rows = []
+    for (ds, v, sc), g in subj[subj.dataset == 'mths'].groupby(['dataset', 'variant', 'scope'], sort=False):
+        r = dict(dataset=ds, variant=v, scope=sc, n_subjects=int(g.subject.nunique()), n_mae_below_3=int((g.mae < TARGET_MAE).sum()))
+        for c in ('mae', 'within5', 'doubling'):
+            x = g[c].dropna().to_numpy(dtype=float)
+            r[c + '_mean'] = float(x.mean()); r[c + '_sd'] = float(x.std(ddof=1)) if len(x) > 1 else float('nan')
+            for q in qs:
+                r[f'{c}_q{int(round(100 * q)):02d}'] = float(np.quantile(x, q))
+        rows.append(r)
+    pd.DataFrame(rows).to_csv(os.path.join(res, 'hr_vote_subject_spread.csv'), index=False)
+
+
 def run(res, B=2000):
     ins = {ds: pd.read_csv(os.path.join(res, 'scores', f'hr_vote_inputs_{ds}.csv')) for ds in ('butppg', 'hoffman')}
     pm = os.path.join(CACHE, 'scores', 'hr_vote_inputs_mths.csv')
@@ -234,7 +251,7 @@ def run(res, B=2000):
                         subj_rows.append(dict(dataset=ds, variant=v, scope=scope, subject=s, n=int(p.n), mae=p.mae, within5=p.within5, doubling=p.doubling))
     tab = pd.DataFrame(rows)
     tab.to_csv(os.path.join(res, 'hr_vote_summary.csv'), index=False)
-    pd.DataFrame(subj_rows).to_csv(os.path.join(res, 'hr_vote_per_subject.csv'), index=False)
+    write_subject_tables(pd.DataFrame(subj_rows), res)
     # paired person bootstrap of the full rule against the CNN alone and the P2 final rule (all windows, then clean)
     prow = []
     for ds in ('butppg', 'mths', 'butppg+mths', 'hoffman'):

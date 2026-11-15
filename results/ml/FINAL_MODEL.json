@@ -112,7 +112,7 @@
  },
  "conformal": {
   "file": "app/data/conformal.json",
-  "sha256": "ff01655efc06de684776af6ab6d03b23264d06f90d1796351aa7551110293fec",
+  "sha256": "ef6c2f2602460d03495d252b7801624261b93bbbf2b1cc9c4003f676ed09cfae",
   "default_alpha": 0.1,
   "thresholds_default": {
    "t0": 0.389431721484113,
@@ -163,7 +163,12 @@
  "low_amplitude_guard": {
   "lac_max_min": -6.02,
   "ac_dc_ratio_percent": 0.24,
-  "derivation": "0.1th percentile of the largest-channel log AC amplitude over all Hoffman windows (scripts/ood_range.py, results/ml/ood_ac_range.csv); window label low_ac, state Unsure"
+  "derivation": "0.1th percentile of the largest-channel log AC amplitude over all Hoffman windows (scripts/ood_range.py, results/ml/ood_ac_range.csv); window label low_ac, state Unsure",
+  "share_of_windows_refused": {
+   "hoffman": 0.0012,
+   "mths": 0.0673,
+   "butppg": 0.0883
+  }
  },
  "evidence": {
   "p1_hybrid_tm_bacc": "results/ml/hybrid_p1_final.csv",

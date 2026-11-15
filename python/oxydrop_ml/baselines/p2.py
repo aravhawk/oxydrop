@@ -137,7 +137,7 @@ def run(B=1000, log=print, out_dir=None):
     summ = pd.DataFrame(rows).reindex(columns=C.SUMMARY_COLS)
     fold_df = pd.DataFrame(fold_rows)
     od = out_dir or C.RES
-    C.write_csv(summ, od / 'baselines_P2.csv'); C.write_csv(fold_df, od / 'baselines_P2_perperson.csv')
+    C.write_csv(summ, od / 'baselines_P2.csv'); C.write_perperson(fold_df, od, 'baselines_P2')   # MTHS people: aggregate spread only (licence)
     # per-window estimates: BUT PPG (CC BY 4.0) is committed, MTHS (CC BY-NC-ND) stays in the cache
     sc = pd.DataFrame({k: v for k, v in scores.items()})
     base_cols = pd.DataFrame(dict(subject=ctx.subject, rec=ctx.meta.rec.values, t_start=ctx.meta.t_start.values, hr_ref=ctx.ref, ds=ctx.ds))

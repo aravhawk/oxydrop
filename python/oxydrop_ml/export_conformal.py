@@ -60,6 +60,27 @@ def oof_logits(runs_dirs, seeds, res_dir, families=('P', 'R', 'D', 'L')):
     return t
 
 
+def nested_evaluation(res_dir):
+    """Held-out (nested over people) result at the default alpha for the SHIPPED pipeline R, read from conformal_curve.csv, with the optimism caveat and the chain-only control next to it.
+    The app text, README, MODEL.md and WHITEPAPER quote the same rows."""
+    p = os.path.join(res_dir, 'conformal_curve.csv')
+    if not os.path.exists(p):
+        return None
+    d = pd.read_csv(p)
+    out = {}
+    for key, system in (('deployed_pipeline_R', 'deployed_R'), ('chain_only_control', 'chain_v1'), ('per_person_selected_hybrid', 'final')):
+        r = d[(d.system == system) & (d.method == 'mondrian') & ((d.param - DEFAULT_ALPHA).abs() < 1e-9)]
+        if len(r) != 1:
+            return None
+        r = r.iloc[0]
+        out[key] = dict(coverage=round(float(r.coverage), 4), accuracy_on_answered=round(float(r.acc), 4), share_of_hypoxic_windows_alerted=round(float(r.alert_share_all), 4),
+                        hypoxic_called_normal=round(float(r.confident_miss), 4), coverage_ci95=[round(float(r.coverage_lo), 4), round(float(r.coverage_hi), 4)])
+    out['note'] = ('Leave-one-person-out over the 6 Hoffman people, thresholds for each held-out person from the other five only, alpha = ' + str(DEFAULT_ALPHA) + '. deployed_pipeline_R is the pipeline in hybrid_weights.json (the model the app runs); '
+                   'its row is exploratory and optimistic because R was chosen with all six people in view. per_person_selected_hybrid is the nested estimate of the selection procedure. '
+                   'chain_only_control (the v1 logistic chain through the same conformal step, available in the app as ?engine=logistic) has the higher point estimates; all intervals overlap. Source: results/ml/conformal_curve.csv.')
+    return out
+
+
 def build(res_dir, out_json, hybrid_json=None):
     t = pd.read_csv(os.path.join(res_dir, 'scores', 'conformal_deployed_oof_hoffman.csv'))
     z, y = t.z.values.astype(float), t.low.values.astype(int)
@@ -93,6 +114,7 @@ def build(res_dir, out_json, hybrid_json=None):
                calibration=dict(source='out-of-fold logits of the deployed pipeline on all six Hoffman people (scores/conformal_deployed_oof_hoffman.csv), leave-one-person-out meta-learner',
                                 n_people=int(t.subject.nunique()), n_windows=int(len(t)), n_normal=int((y == 0).sum()), n_hypoxic=int((y == 1).sum()), min_t_start_s=float(t.t_start.min())),
                pipeline=pipe,
+               nested_evaluation=nested_evaluation(res_dir),
                examples=[dict(z=zz, state={k: APP_STATE[int(C.states(np.array([zz]), v['t0'], v['t1'])[0][0])] for k, v in alphas.items()}) for zz in EXAMPLE_Z],
                limits='Fit on six people with the Hoffman phones; windows overlap and people differ, so the coverage guarantee is approximate (see results/ml/CONFORMAL.md for the nested evaluation). Other phones are untested.')
     os.makedirs(os.path.dirname(os.path.abspath(out_json)), exist_ok=True)

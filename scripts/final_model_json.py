@@ -22,6 +22,12 @@ def sha(p):
     return hashlib.sha256(open(p, 'rb').read()).hexdigest()
 
 
+def guard_share():
+    import csv
+    rows = list(csv.DictReader(open(ROOT / 'results/ml/ood_ac_range.csv')))
+    return {r['dataset']: float(r['share_below_cut']) for r in rows if float(r['percentile']) == 0.1}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--ckpt-dir', default=os.path.join(os.environ.get('VERITAS', '/home/aravhawk/.t3/scratch/veritas'), 'ml_cache/runs/hyb_final'))
@@ -50,7 +56,8 @@ def main():
         training_subjects=dict(hoffman=subj['hoffman'], n_hoffman=len(subj['hoffman']), n_mths=len(subj['mths']), n_butppg=len(subj['butppg']), n_openox_train=len(subj['openox']),
                                note='The final members are fitted on every Hoffman person plus the MTHS, BUT PPG and OpenOximetry training people (the 34 held-out OpenOximetry people are excluded). One early-stopping validation split per seed is drawn from these people (early_stopping_val_subjects). '
                                     'MTHS (CC BY-NC-ND) and OpenOximetry weights: see DATA_LICENSES.md.'),
-        low_amplitude_guard=dict(lac_max_min=-6.02, ac_dc_ratio_percent=0.24, derivation='0.1th percentile of the largest-channel log AC amplitude over all Hoffman windows (scripts/ood_range.py, results/ml/ood_ac_range.csv); window label low_ac, state Unsure'),
+        low_amplitude_guard=dict(lac_max_min=-6.02, ac_dc_ratio_percent=0.24, derivation='0.1th percentile of the largest-channel log AC amplitude over all Hoffman windows (scripts/ood_range.py, results/ml/ood_ac_range.csv); window label low_ac, state Unsure',
+                                share_of_windows_refused=guard_share()),
         evidence=dict(p1_hybrid_tm_bacc='results/ml/hybrid_p1_final.csv', conformal='results/ml/CONFORMAL.md', hr='results/ml/hybrid_p2.csv', openox_spo2='results/ml/OPENOX_SPO2.md'),
         caveat='The members saw all six Hoffman people, so the replay demo (100001L, 100004R) is in-sample: demo only, not a test. Held-out numbers come from the nested leave-one-person-out runs in results/ml.')
     Path(a.out).write_text(json.dumps(doc, indent=1))

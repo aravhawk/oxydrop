@@ -167,10 +167,10 @@ MAE, difference = baseline minus rule (positive = the rule is better):
 | dataset | subjects with clean windows | mean of per-subject MAE | SD | median | subjects with MAE < 3 bpm | worst three (subject, MAE) |
 |---|---|---|---|---|---|---|
 | BUT PPG v2.0 | 38 | 12.50 | 6.16 | 12.38 | 2 of 38 | but_126 25.56, but_142 24.38, but_148 21.95 |
-| MTHS | 61 | 6.24 | 10.93 | 2.47 | 37 of 61 | mths_6 70.17, mths_50 43.14, mths_48 24.55 |
+| MTHS | 61 | 6.24 | 10.93 | 2.47 | 37 of 61 | not listed (CC BY-NC-ND: aggregates only) |
 | Hoffman | 6 | 1.70 | 1.84 | 0.99 | 5 of 6 | hof_100004 5.42, hof_100003 1.38, hof_100002 1.01 |
 
-Full per-subject tables for the CNN, spectral, P2 rule and full rule: `hr_vote_per_subject.csv`.
+Per-subject tables for the CNN, spectral, P2 rule and full rule on BUT PPG (CC BY) and Hoffman (MIT): `hr_vote_per_subject.csv`. MTHS (CC BY-NC-ND, aggregates only) appears as the spread over its subjects in `hr_vote_subject_spread.csv`.
 
 ## Slow pulse (Hoffman person 4, about 43 to 48 bpm)
 

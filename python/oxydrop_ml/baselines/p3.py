@@ -160,7 +160,7 @@ def run(B=1000, only=None, log=print, out_dir=None):
     summ = pd.DataFrame(rows).reindex(columns=C.SUMMARY_COLS)
     fold_df = pd.DataFrame(fold_rows)
     od = out_dir or C.RES
-    C.write_csv(summ, od / 'baselines_P3.csv'); C.write_csv(fold_df, od / 'baselines_P3_perperson.csv')
+    C.write_csv(summ, od / 'baselines_P3.csv'); C.write_perperson(fold_df, od, 'baselines_P3')   # all P3 people are MTHS: aggregate spread only (licence)
     sc = pd.DataFrame(scores).sort_index()
     key = ctx.meta.loc[sc.index, ['subject', 'rec', 't_start']].reset_index(drop=True)
     C.write_csv(pd.concat([key, pd.Series(ctx.y[sc.index], name='spo2_ref'), sc.reset_index(drop=True)], axis=1), C.CACHE_B / 'scores' / 'baseline_P3_mths.csv')

@@ -47,6 +47,10 @@ const { hybrid, conformal } = assets;
 
 // ---- 3 + 4. streaming engine on the two fixture recordings
 const ref = rd('tests/fixtures/hybrid_engine_ref.json');
+{   // the fixture was generated from exactly the checkpoints whose hashes are recorded in the shipped weights (closes the link checkpoint -> fixture -> app/data)
+  const want = Object.fromEntries(hybrid.members.filter((m) => m.family === 'R').map((m) => [`R_s${m.seed}`, m.ckpt_sha256]));
+  check(Object.keys(want).length === 3 && Object.entries(want).every(([k, v]) => ref.ckpt_sha256 && ref.ckpt_sha256[k] === v), 'hybrid_engine_ref.json ckpt_sha256 must equal the ckpt_sha256 of every shipped member');
+}
 const TOL = { c: 1e-6, corr: 1e-4, hr: 1e-3, z: 5e-4, emb: 1e-4 };
 const lat = [];
 const summary = {}, syncWins = {}, recRows = {};

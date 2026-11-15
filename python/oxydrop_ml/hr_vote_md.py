@@ -101,14 +101,21 @@ def report(res):
     L.append(f'* On the Hoffman phone data the classical estimators are the better ones on clean windows (spectral {f2(h.loc["spec", "mae"])}, autocorrelation {f2(h.loc["acf", "mae"])}, CNN {f2(h.loc["cnn", "mae"])}), and the full rule reaches {f2(h.loc[FULL, "mae"])} bpm. On all windows (clean or not) the rule reaches {f2(t[(t.dataset == "hoffman") & (t.scope == "all") & (t.variant == FULL)].iloc[0].mae)} bpm, {f2(t[(t.dataset == "hoffman") & (t.scope == "all") & (t.variant == "vote+harmonic+octave")].iloc[0].mae)} before the causal median of 5, which costs about 8 s of extra latency; the quality gate matters more than the median.')
     L.append('')
     L.append('## Per-subject spread (full rule)\n')
+    sp_mths = pd.read_csv(os.path.join(res, 'hr_vote_subject_spread.csv'))
     rows = []
     for ds in ('butppg', 'mths', 'hoffman'):
+        if ds == 'mths':
+            d = sp_mths[(sp_mths.variant == FULL) & (sp_mths.scope == 'clean')]
+            if len(d):
+                r = d.iloc[0]
+                rows.append([DS_TEXT[ds].split(' (')[0], int(r.n_subjects), f2(r.mae_mean), f2(r.mae_sd), f2(r.mae_q50), f'{int(r.n_mae_below_3)} of {int(r.n_subjects)}', 'not listed (CC BY-NC-ND: aggregates only)'])
+            continue
         d = ps[(ps.dataset == ds) & (ps.variant == FULL) & (ps.scope == 'clean')].sort_values('mae', ascending=False)
         if len(d):
             worst = ', '.join(f'{r.subject} {f2(r.mae)}' for _, r in d.head(3).iterrows())
             rows.append([DS_TEXT[ds].split(' (')[0], len(d), f2(d.mae.mean()), f2(d.mae.std(ddof=1)), f2(d.mae.median()), f'{int((d.mae < 3).sum())} of {len(d)}', worst])
     L.append(table(rows, ['dataset', 'subjects with clean windows', 'mean of per-subject MAE', 'SD', 'median', 'subjects with MAE < 3 bpm', 'worst three (subject, MAE)']))
-    L.append('\nFull per-subject tables for the CNN, spectral, P2 rule and full rule: `hr_vote_per_subject.csv`.\n')
+    L.append('\nPer-subject tables for the CNN, spectral, P2 rule and full rule on BUT PPG (CC BY) and Hoffman (MIT): `hr_vote_per_subject.csv`. MTHS (CC BY-NC-ND, aggregates only) appears as the spread over its subjects in `hr_vote_subject_spread.csv`.\n')
     L.append('## Slow pulse (Hoffman person 4, about 43 to 48 bpm)\n')
     d = sp[(sp.dataset == 'hoffman')]
     rows = [[V_TEXT[r.variant], f2(r.mae), pct(r.within5), pct(r.doubling), f2(r.mean_estimate)] for _, r in d.iterrows()]

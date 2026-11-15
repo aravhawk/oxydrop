@@ -13,7 +13,9 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -299,7 +301,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument('--ckpt', help='state_dict (.pt) saved by train.py with {"cfg":..., "state":...}; random init if omitted')
     ap.add_argument('--seed', type=int, default=0)
-    ap.add_argument('--weights', default=str(ROOT / 'app/data/cnn_weights.json'))
+    ap.add_argument('--weights', default=os.path.join(os.environ.get('TMPDIR', tempfile.gettempdir()), 'oxynet_single_network_check.json'),
+                    help='single-network JSON used for the parity check only; the shipped members app/data/hybrid_R_s*.json are written by export_hybrid.py (a random-init export must never land in app/data)')
     ap.add_argument('--onnx', default=str(ROOT / 'app/data/oxynet.onnx'))
     ap.add_argument('--fixture', default=str(ROOT / 'tests/fixtures/cnn_ref.json'))
     a = ap.parse_args(argv)
@@ -319,6 +322,8 @@ def main(argv=None):
     print(f'params (no aux head) {graph["params"]}; weights json {Path(a.weights).stat().st_size / 1024:.0f} KB; onnx {Path(a.onnx).stat().st_size / 1024:.0f} KB; max|onnx-torch| = {d:.2e} (excess over rtol {ONNX_RTOL:g}: {ex:.2e})')
     assert ex < ONNX_ATOL, 'ONNX does not match torch'
     fx = make_fixture(net, a.seed)
+    if a.ckpt:
+        fx['ckpt_sha256'] = hashlib.sha256(open(a.ckpt, 'rb').read()).hexdigest()   # tests/cnn_parity.mjs compares it with the hash in app/data/hybrid_weights.json
     Path(a.fixture).parent.mkdir(parents=True, exist_ok=True)
     Path(a.fixture).write_text(json.dumps(fx, separators=(',', ':')))
     print(f'fixture {Path(a.fixture).stat().st_size / 1024:.0f} KB, {len(fx["cases"])} model cases')

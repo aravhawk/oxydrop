@@ -75,6 +75,39 @@
    3.235827469397979
   ]
  },
+ "nested_evaluation": {
+  "deployed_pipeline_R": {
+   "coverage": 0.7447,
+   "accuracy_on_answered": 0.8946,
+   "share_of_hypoxic_windows_alerted": 0.7004,
+   "hypoxic_called_normal": 0.0866,
+   "coverage_ci95": [
+    0.601,
+    0.8401
+   ]
+  },
+  "chain_only_control": {
+   "coverage": 0.9247,
+   "accuracy_on_answered": 0.9029,
+   "share_of_hypoxic_windows_alerted": 0.8428,
+   "hypoxic_called_normal": 0.0996,
+   "coverage_ci95": [
+    0.8694,
+    0.9816
+   ]
+  },
+  "per_person_selected_hybrid": {
+   "coverage": 0.7909,
+   "accuracy_on_answered": 0.8698,
+   "share_of_hypoxic_windows_alerted": 0.7007,
+   "hypoxic_called_normal": 0.1137,
+   "coverage_ci95": [
+    0.6346,
+    0.8988
+   ]
+  },
+  "note": "Leave-one-person-out over the 6 Hoffman people, thresholds for each held-out person from the other five only, alpha = 0.1. deployed_pipeline_R is the pipeline in hybrid_weights.json (the model the app runs); its row is exploratory and optimistic because R was chosen with all six people in view. per_person_selected_hybrid is the nested estimate of the selection procedure. chain_only_control (the v1 logistic chain through the same conformal step, available in the app as ?engine=logistic) has the higher point estimates; all intervals overlap. Source: results/ml/conformal_curve.csv."
+ },
  "examples": [
   {
    "z": -6.0,
