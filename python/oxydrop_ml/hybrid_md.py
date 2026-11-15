@@ -189,13 +189,15 @@ def main(argv=None):
     L += md_table(t2, ['scope', 'model', 'within-5 [95% CI]', 'per-person mean +- SD', 'MAE', 'doubling / halving', 'n_people'], ['scope', 'model', 'within-5 [95% CI]', 'per-person mean +- SD', 'MAE (bpm)', 'doubling / halving', 'people']) + ['']
     pb = p2p[(p2p.model == f'HYBRID_{rule}') & p2p.is_best_baseline]
     L += ['### Paired differences (P2)', ''] + md_table(
-        p2p[p2p.model == f'HYBRID_{rule}'].assign(**{'diff [95% CI]': lambda d: [f'{f3(r.diff)} {ci(r.lo, r.hi)}' for r in d.itertuples()]}), ['scope', 'baseline', 'model_within5', 'baseline_within5', 'diff [95% CI]', 'verdict'],
+        p2p[p2p.model == f'HYBRID_{rule}'].assign(**{'diff [95% CI]': lambda d: [f'{f3(r.diff)} {ci(r.lo, r.hi)}' for r in d.itertuples()], 'model_within5': lambda d: d.model_within5.map(f3), 'baseline_within5': lambda d: d.baseline_within5.map(f3),
+                                                                            'verdict': lambda d: [('better than the CNN alone (exploratory)' if b == 'cnn_alone' and v == 'win' else 'worse than the CNN alone (exploratory)' if b == 'cnn_alone' and v == 'loss' else verdict_text(v, i)) for b, v, i in zip(d.baseline, d.verdict, d.is_best_baseline)]}), ['scope', 'baseline', 'model_within5', 'baseline_within5', 'diff [95% CI]', 'verdict'],
         ['scope', 'baseline', 'hybrid', 'baseline value', 'diff [95% CI]', 'verdict']) + ['']
     L += ['## Reading the results', '']
     ab = pb[pb.scope == 'all'].iloc[0]
     L += [f'* P1: the hybrid is a **{bp.verdict}** with the best baseline (`{bp.baseline}`) by the pre-registered rule: {f3(fin.tm_bacc)} vs {f3(bp.baseline_tm_bacc)}, difference {f3(bp["diff"])} {ci(bp.lo, bp.hi)}.',
           f'* P1 control: re-fitting the chain\'s threshold on inner folds (`CHAIN_SAME_LEVERS`) reaches {f3(cl.tm_bacc)}; the hybrid minus that control is {f3(pc["diff"])} {ci(pc.lo, pc.hi)} ({pc.verdict}). The CNN is kept in the inference path by design (Amendment 2), not because it wins.',
           f'* P2: rule `{rule}` reaches {f3(ab.model_within5)} against {f3(ab.baseline_within5)} for the best baseline `{ab.baseline}`: difference {f3(ab["diff"])} {ci(ab.lo, ab.hi)} ({ab.verdict}). The Hoffman people alone would choose `spec` (see the rule table), the CNN-containing rule is the declared headline (Amendment 3, forking path disclosed).',
+          'P2 per dataset against the best baseline: ' + '; '.join(f'{r.scope} {f3(r.model_within5)} vs {f3(r.baseline_within5)} ({f3(r["diff"])} {ci(r.lo, r.hi)}, {r.verdict})' for _, r in pb.iterrows()) + '. The gain comes from BUT PPG (noisy ear and motion clips); on MTHS the spectral estimator is as good or better.',
           '* Why `default_P` differs from the FEAT-006 raw seed ensemble in `CORE_RESULTS.md`: here every CNN logit passes through the logistic meta-learner fit on the inner out-of-fold windows (a per-fold recalibration of the threshold and scale); FEAT-006 used the raw probability at 0.5. Both are leave-one-person-out.',
           '* No hybrid result here is validated on a phone that is not in the Hoffman, MTHS or BUT PPG data; every interval is wide because P1 has six people.', '']
     wp = os.path.join(R, '..', '..', 'app', 'data', 'hybrid_weights.json')

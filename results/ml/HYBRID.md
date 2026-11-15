@@ -306,30 +306,31 @@ Final HR rule chosen on Hoffman inner out-of-fold windows only (the P2 people ne
 
 | scope | baseline | hybrid | baseline value | diff [95% CI] | verdict |
 |---|---|---|---|---|---|
-| all | fft_plain__forced | 0.4804403048264183 | 0.3822184589331075 | 0.098 [0.053, 0.141] | win |
-| all | v1_peak__forced | 0.4804403048264183 | 0.39678238780694325 | 0.084 [0.040, 0.126] | win |
-| all | v2_spectral_acf__forced | 0.4804403048264183 | 0.4193056731583404 | 0.061 [0.013, 0.107] | win |
-| all | v2_spectral_acf__gate_shipped | 0.4804403048264183 | 0.312108382726503 | 0.168 [0.121, 0.215] | win |
-| all | v2_spectral_acf__gate_nested | 0.4804403048264183 | 0.21371718882303134 | 0.267 [0.221, 0.309] | win |
-| all | cnn_alone | 0.4804403048264183 | 0.468077900084674 | 0.012 [0.006, 0.019] | win |
-| butppg | fft_plain__forced | 0.4192708333333333 | 0.27057291666666666 | 0.149 [0.094, 0.204] | win |
-| butppg | v1_peak__forced | 0.4192708333333333 | 0.31484375 | 0.104 [0.052, 0.157] | win |
-| butppg | v2_spectral_acf__forced | 0.4192708333333333 | 0.30416666666666664 | 0.115 [0.054, 0.177] | win |
-| butppg | v2_spectral_acf__gate_shipped | 0.4192708333333333 | 0.16692708333333334 | 0.252 [0.198, 0.310] | win |
-| butppg | v2_spectral_acf__gate_nested | 0.4192708333333333 | 0.07708333333333334 | 0.342 [0.293, 0.393] | win |
-| butppg | cnn_alone | 0.4192708333333333 | 0.40989583333333335 | 0.009 [0.005, 0.014] | win |
-| mths | fft_plain__forced | 0.5941888619854722 | 0.5898305084745763 | 0.004 [-0.056, 0.069] | tie |
-| mths | v1_peak__forced | 0.5941888619854722 | 0.5491525423728814 | 0.045 [-0.025, 0.125] | tie |
-| mths | v2_spectral_acf__forced | 0.5941888619854722 | 0.6334140435835351 | -0.039 [-0.102, 0.017] | tie |
-| mths | v2_spectral_acf__gate_shipped | 0.5941888619854722 | 0.5820823244552058 | 0.012 [-0.046, 0.066] | tie |
-| mths | v2_spectral_acf__gate_nested | 0.5941888619854722 | 0.46779661016949153 | 0.126 [0.057, 0.194] | win |
-| mths | cnn_alone | 0.5941888619854722 | 0.576271186440678 | 0.018 [0.001, 0.036] | win |
+| all | fft_plain__forced | 0.480 | 0.382 | 0.098 [0.053, 0.141] | better than a weaker baseline (not a pre-registered win) |
+| all | v1_peak__forced | 0.480 | 0.397 | 0.084 [0.040, 0.126] | better than a weaker baseline (not a pre-registered win) |
+| all | v2_spectral_acf__forced | 0.480 | 0.419 | 0.061 [0.013, 0.107] | win |
+| all | v2_spectral_acf__gate_shipped | 0.480 | 0.312 | 0.168 [0.121, 0.215] | better than a weaker baseline (not a pre-registered win) |
+| all | v2_spectral_acf__gate_nested | 0.480 | 0.214 | 0.267 [0.221, 0.309] | better than a weaker baseline (not a pre-registered win) |
+| all | cnn_alone | 0.480 | 0.468 | 0.012 [0.006, 0.019] | better than the CNN alone (exploratory) |
+| butppg | fft_plain__forced | 0.419 | 0.271 | 0.149 [0.094, 0.204] | better than a weaker baseline (not a pre-registered win) |
+| butppg | v1_peak__forced | 0.419 | 0.315 | 0.104 [0.052, 0.157] | better than a weaker baseline (not a pre-registered win) |
+| butppg | v2_spectral_acf__forced | 0.419 | 0.304 | 0.115 [0.054, 0.177] | win |
+| butppg | v2_spectral_acf__gate_shipped | 0.419 | 0.167 | 0.252 [0.198, 0.310] | better than a weaker baseline (not a pre-registered win) |
+| butppg | v2_spectral_acf__gate_nested | 0.419 | 0.077 | 0.342 [0.293, 0.393] | better than a weaker baseline (not a pre-registered win) |
+| butppg | cnn_alone | 0.419 | 0.410 | 0.009 [0.005, 0.014] | better than the CNN alone (exploratory) |
+| mths | fft_plain__forced | 0.594 | 0.590 | 0.004 [-0.056, 0.069] | tie |
+| mths | v1_peak__forced | 0.594 | 0.549 | 0.045 [-0.025, 0.125] | tie |
+| mths | v2_spectral_acf__forced | 0.594 | 0.633 | -0.039 [-0.102, 0.017] | tie |
+| mths | v2_spectral_acf__gate_shipped | 0.594 | 0.582 | 0.012 [-0.046, 0.066] | tie |
+| mths | v2_spectral_acf__gate_nested | 0.594 | 0.468 | 0.126 [0.057, 0.194] | better than a weaker baseline (not a pre-registered win) |
+| mths | cnn_alone | 0.594 | 0.576 | 0.018 [0.001, 0.036] | better than the CNN alone (exploratory) |
 
 ## Reading the results
 
 * P1: the hybrid is a **tie** with the best baseline (`chain_v1`) by the pre-registered rule: 0.779 vs 0.796, difference -0.017 [-0.103, 0.069].
 * P1 control: re-fitting the chain's threshold on inner folds (`CHAIN_SAME_LEVERS`) reaches 0.816; the hybrid minus that control is -0.037 [-0.119, 0.028] (tie). The CNN is kept in the inference path by design (Amendment 2), not because it wins.
 * P2: rule `agree` reaches 0.480 against 0.419 for the best baseline `v2_spectral_acf__forced`: difference 0.061 [0.013, 0.107] (win). The Hoffman people alone would choose `spec` (see the rule table), the CNN-containing rule is the declared headline (Amendment 3, forking path disclosed).
+P2 per dataset against the best baseline: all 0.480 vs 0.419 (0.061 [0.013, 0.107], win); butppg 0.419 vs 0.304 (0.115 [0.054, 0.177], win); mths 0.594 vs 0.633 (-0.039 [-0.102, 0.017], tie). The gain comes from BUT PPG (noisy ear and motion clips); on MTHS the spectral estimator is as good or better.
 * Why `default_P` differs from the FEAT-006 raw seed ensemble in `CORE_RESULTS.md`: here every CNN logit passes through the logistic meta-learner fit on the inner out-of-fold windows (a per-fold recalibration of the threshold and scale); FEAT-006 used the raw probability at 0.5. Both are leave-one-person-out.
 * No hybrid result here is validated on a phone that is not in the Hoffman, MTHS or BUT PPG data; every interval is wide because P1 has six people.
 
