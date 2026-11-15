@@ -1,0 +1,24 @@
+# variant task seed   (priority order; `loso_run queue` runs this worker's share of the folds of each line, resumable)
+full p1 0
+full p23 0
+full p23k 0
+no_ssl p1 0
+no_physics p1 0
+no_openox p1 0
+no_aug p1 0
+no_basecond p1 0
+hr_only p1 0
+win20 p1 0
+adv p1 0
+no_ssl p23k 0
+no_physics p23k 0
+no_openox p23k 0
+no_aug p23k 0
+no_basecond p23k 0
+hr_only p23k 0
+win20 p23k 0
+adv p23k 0
+full p1 1
+full p1 2
+full p23k 1
+full p23k 2

@@ -1,0 +1,11 @@
+# extra seeds for the P1 ablation rows (lowest priority; run on the host while Daytona works through ml_jobs_core.txt)
+no_ssl p1 1
+no_physics p1 1
+no_openox p1 1
+no_aug p1 1
+no_basecond p1 1
+no_ssl p1 2
+no_physics p1 2
+no_openox p1 2
+no_aug p1 2
+no_basecond p1 2
