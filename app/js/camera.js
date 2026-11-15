@@ -31,6 +31,9 @@ export function probeCamFactory(video) {
   };
 }
 
+/** getUserMedia failures that mean 'this deviceId is not available' (as opposed to a denied permission or a busy camera). */
+export const isDeviceGone = (e) => !!e && /^(NotFoundError|OverconstrainedError|DevicesNotFoundError)$/.test(e.name || '');
+
 const LUMA_LO = 90, LUMA_HI = 200, SAT_CAP = 0.10, ADAPT_STEPS = 6;
 export class CameraSource {
   constructor(onSample, onStats) {
@@ -41,10 +44,18 @@ export class CameraSource {
   }
   async start(video, { deviceId = null, torch = 'auto', facing = 'environment' } = {}) {
     this.video = video; this.torchMode = torch; this.info.facing = facing;
-    const v = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } };
-    if (deviceId) v.deviceId = { exact: deviceId }; else v.facingMode = { ideal: facing === 'user' ? 'user' : 'environment' };
+    const base = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, facingMode = { ideal: facing === 'user' ? 'user' : 'environment' };
     if (facing === 'user') torch = 'off';   // the front camera has no torch; the screen is the light source
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: v });
+    this.info.fallback = '';
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: deviceId ? { ...base, deviceId: { exact: deviceId } } : { ...base, facingMode } }); }
+    catch (e) {
+      // A stale or empty deviceId (ids change after a permission reset, in some browsers per session, and on fake devices) fails with NotFoundError / OverconstrainedError:
+      // retry once on the facing mode alone and record why, so the debug view shows that the requested lens was not the one opened.
+      if (!deviceId || !isDeviceGone(e)) throw e;
+      this.info.fallback = `exact deviceId rejected (${e.name || 'error'}: ${e.message || 'no message'}); reopened by facingMode ${facing === 'user' ? 'user' : 'environment'}`;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...base, facingMode } });
+    }
     this.stream = stream; video.srcObject = stream; video.muted = true; video.playsInline = true; await video.play();
     this.track = stream.getVideoTracks()[0];
     this.caps = this.track.getCapabilities ? this.track.getCapabilities() : {};

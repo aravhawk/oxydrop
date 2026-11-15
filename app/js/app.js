@@ -21,7 +21,7 @@ const RAW_MAX = 15 * 60 * FS;   // raw trace ring buffer: 15 minutes at 30 Hz
 
 let mode = null;                // null | 'setup' | 'measure'
 let kind = null;                // 'live' | 'replay'
-let chain = null, weights = null, cam = null, motion = null, wake = null, camGen = 0;
+let chain = null, weights = null, cam = null, motion = null, wake = null, camGen = 0, sessionGen = 0;   // sessionGen: one live setup attempt (bumped only by cleanup()); camGen: one CameraSource instance (bumped by every startCamera and by cleanup())
 let replay = null, replayTimer = null, uiTimer = null, anywayTimer = null, tickN = 0;
 let strip = [], tally = {}, calMotion = [], calFps = [], calWin = [], calGaps0 = 0, calFailed = false, calChecked = false, calOk = true;
 let lockHist = [], lockRun = 0, camStartedAt = 0, place = { level: 'warn', title: '', msg: '' }, fingerHist = [], gapLog = [], lastGaps = 0, lastD = null, lastDecision = null, lastWaveCh = 1;
@@ -40,7 +40,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 async function loadWeights() { if (!weights) weights = await (await fetch('data/weights.json')).json(); return weights; }
 
 function cleanup() {
-  camGen++; clearInterval(replayTimer); clearInterval(uiTimer); clearTimeout(anywayTimer); uiTimer = null;
+  sessionGen++; camGen++; clearInterval(replayTimer); clearInterval(uiTimer); clearTimeout(anywayTimer); uiTimer = null;
   if (cam) { cam.stop(); cam = null; } if (motion) { motion.stop(); motion = null; }
   if (wake) { try { wake.release(); } catch (e) { /* ignore */ } wake = null; }
   hideWhite(); weakSince = 0; weakNow = false; weakShown = false;
@@ -94,6 +94,7 @@ function debugText() {
     L.push(`fps ${st.fps.toFixed(1)}  jitter ${st.jitterMs.toFixed(1)} ms  gaps ${st.gaps} (max ${(st.maxGap * 1000).toFixed(0)} ms)  skipped ${st.skipped}  frames ${st.frames}`);
     L.push(`last frame ${(st.staleMs / 1000).toFixed(1)} s ago  interrupted ${st.interrupted || 'no'}  longest gap in last 30 s ${(cam.rs.gapStats(cam.rs.n - 30 * FS).max * 1000).toFixed(0)} ms`);
     L.push(`lens "${cam.info.lens}"  ${cam.info.width}x${cam.info.height}`);
+    if (cam.info.fallback) L.push(`device fallback: ${cam.info.fallback}`);
     L.push(`torch ${cam.info.torchSupported ? (cam.info.torch ? 'on' : 'off') : 'unsupported'}  locks ${JSON.stringify(cam.info.locks)}`);
     L.push(`mean RGB ${st.mean.map((v) => v.toFixed(1)).join(' / ')}  frame-saturated ${(st.satFrac * 100).toFixed(1)}%  spatialCV ${st.spatialCV.toFixed(3)}  luma ${st.luma.toFixed(1)}`);
     L.push(`placement ${place.level}: ${place.title}`);
@@ -117,21 +118,24 @@ $('btn-live').addEventListener('click', () => { cleanup(); show('setup'); $('set
 
 $('btn-cam').addEventListener('click', async () => {
   $('btn-cam').hidden = true; $('cam-state').textContent = 'Starting camera…';
+  let gen = -1;
   try {
-    cleanup(); motion = new Motion(); const mp = motion.start();   // start the motion permission prompt first: iOS needs it inside the tap
+    cleanup(); gen = sessionGen; motion = new Motion(); const mp = motion.start();   // start the motion permission prompt first: iOS needs it inside the tap
     await loadWeights(); await keepAwake();
     kind = 'live'; mode = 'setup'; startUi();
-    const gen = camGen, choice = await runProbe(gen);
-    if (gen !== camGen) return;
+    const choice = await runProbe(gen);   // session token: startCamera() below bumps camGen on purpose, which must not cancel this flow
+    if (gen !== sessionGen) return;
     const lm = choice.mode === 'torch' ? 'flash' : choice.mode;
     const radio = document.querySelector(`input[name=light][value=${lm}]`); if (radio) radio.checked = true;
     chosenLabel = choice.label || '';
     await startCamera(choice.mode === 'front' ? null : choice.deviceId);
-    if (gen !== camGen) return;
-    await populateLens(); if (choice.mode !== 'front' && choice.deviceId) $('lens').value = choice.deviceId;
+    if (gen !== sessionGen) return;
+    await populateLens(); if (choice.mode !== 'front' && choice.deviceId && !(cam && cam.info.fallback)) $('lens').value = choice.deviceId;
     await mp;
+    if (gen !== sessionGen) return;
     $('setup-live').hidden = false; renderChecks(); renderPlace();
   } catch (e) {
+    if (gen !== -1 && gen !== sessionGen) return;   // this attempt was cancelled; do not tear down the session that replaced it
     cleanup(); $('cam-state').textContent = 'Could not start the camera: ' + (e && e.message ? e.message : e) + '. Allow camera access and reload, or use the recorded demo.';
     $('btn-cam').hidden = false; $('setup-live').hidden = true; $('probe').hidden = true;
   }
@@ -145,20 +149,20 @@ async function runProbe(gen) {
   gum.getTracks().forEach((t) => t.stop());
   const all = await listCameras(), pd = pickDefault(all.back), back = [...all.back].sort((a, b) => (b === pd) - (a === pd)).slice(0, PROBE_MAX_LENSES);
   const say = (t) => { $('probe-text').textContent = t; $('cam-state').textContent = t; if (!$('white').hidden) { $('wm-title').textContent = t; $('wm-msg').textContent = ''; } };
-  for (let k = GET_READY_S; k > 0; k--) { say(`Lay your finger flat across the whole camera plateau now (lens and flash), light pressure. Testing starts in ${k}…`); await sleep(1000); if (gen !== camGen) return null; }
+  for (let k = GET_READY_S; k > 0; k--) { say(`Lay your finger flat across the whole camera plateau now (lens and flash), light pressure. Testing starts in ${k}…`); await sleep(1000); if (gen !== sessionGen) return null; }
   const video = document.createElement('video'), base = probeCamFactory(video), partial = [];
-  const factory = (cb) => { if (gen !== camGen) throw new Error('cancelled'); return base(cb); };
+  const factory = (cb) => { if (gen !== sessionGen) throw new Error('cancelled'); return base(cb); };
   say(`Testing lens 1 of ${back.length}, keep your finger flat across the camera plateau`);
   const out = await runProbeLadder(factory, { back, front: all.front }, {
-    ambientMax: 1, shouldAbort: () => gen !== camGen,
+    ambientMax: 1, shouldAbort: () => gen !== sessionGen,
     onProgress: (r, k) => {
       partial.push(r); $('probe-scores').textContent = probeSummary(partial, null);
       say(k < back.length ? `Testing lens ${k + 1} of ${back.length}, keep your finger flat across the camera plateau` : 'Back lenses gave no clear pulse. Trying the fallback mode (ambient light, then front camera with white screen)…');
     },
-    beforeFront: async () => { if (gen !== camGen) return; showWhite(); say('Testing the front camera. Cover it with your fingertip.'); await sleep(1200); },
-    afterFront: async () => { if (gen === camGen) hideWhite(); },   // a stale probe must not hide a newer session's overlay
+    beforeFront: async () => { if (gen !== sessionGen) return; showWhite(); say('Testing the front camera. Cover it with your fingertip.'); await sleep(1200); },
+    afterFront: async () => { if (gen === sessionGen) hideWhite(); },   // a stale probe must not hide a newer session's overlay
   });
-  if (gen !== camGen) return null;
+  if (gen !== sessionGen) return null;
   probe = out; $('probe-scores').textContent = probeSummary(out.results, out.choice);
   $('probe-text').textContent = out.choice.reason + (out.choice.usable ? '' : ' Re-position your finger and try again, or pick a mode below.');
   return out.choice;
@@ -172,7 +176,9 @@ async function startCamera(deviceId) {
   const c = new CameraSource((r, g, b) => { if (gen === camGen) sink(r, g, b); });
   cam = c; weakSince = 0; weakNow = false; weakShown = false; qual = null;
   const front = isFront(); if (front) showWhite(); else hideWhite();
-  await c.start(document.createElement('video'), { deviceId: front ? null : deviceId, torch: lightMode() === 'flash' ? 'auto' : 'off', facing: front ? 'user' : 'environment' });
+  try { await c.start(document.createElement('video'), { deviceId: front ? null : deviceId, torch: lightMode() === 'flash' ? 'auto' : 'off', facing: front ? 'user' : 'environment' }); }
+  catch (e) { c.stop(); if (cam === c) cam = null; throw e; }
+  if (gen !== camGen) { c.stop(); return; }   // cleanup() or a newer startCamera() ran while this camera was opening: release the stream we just got
   camStartedAt = performance.now();
   clearTimeout(anywayTimer); anywayTimer = setTimeout(() => { if (mode === 'setup' && $('btn-begin').disabled) $('btn-begin-anyway').hidden = false; }, ANYWAY_AFTER_S * 1000);
   $('cam-state').textContent = front ? 'Front camera on, white screen is the light' : c.info.torch ? 'Camera on, flash on' : (lightMode() === 'ambient' ? 'Camera on, flash off (ambient light)' : 'Camera on (flash control not available in this browser)');
