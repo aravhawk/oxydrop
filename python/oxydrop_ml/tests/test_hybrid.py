@@ -265,3 +265,47 @@ def test_frozen_backbone_family_trains_only_the_low_oxygen_head(world):
     after = fr.net.state_dict()
     changed = [k for k in init if not torch.equal(init[k], after[k])]
     assert changed and all(k.startswith('lowox') for k in changed), changed       # BatchNorm statistics and every other weight are untouched
+
+
+def reference_combiner(doc, rows):
+    """The combiner exactly as documented in results/ml/HYBRID.md (what the JS port has to do), in plain Python."""
+    p = doc['pipeline']
+    F = []
+    for r in rows:
+        v = dict(r)
+        v['r'] = v['c'] + v.get('corr', 0.0); v['rL'] = v['c'] + v.get('corrL', 0.0)
+        F.append([v[n] for n in p['features']])
+    F = np.array(F, float)
+    if p['calibration']:
+        base = np.array([r['in_base'] for r in rows], bool)
+        F = F - np.median(F[base], axis=0)
+    k = p['aggregate_windows']
+    if k > 1:
+        F = np.array([F[max(0, i - k + 1):i + 1].mean(0) for i in range(len(F))])
+    m = p['meta']
+    return m['intercept'] + (((F - np.array(m['mean'])) / np.array(m['scale'])) * np.array(m['coef'])).sum(1)
+
+
+def test_documented_combiner_reproduces_the_exported_fixture():
+    root = Path(__file__).resolve().parents[3]
+    wp, fp = root / 'app/data/hybrid_weights.json', root / 'tests/fixtures/hybrid_ref.json'
+    if not (wp.exists() and fp.exists()):
+        pytest.skip('hybrid export not generated')
+    import json
+    doc, fx = json.load(open(wp)), json.load(open(fp))
+    out = reference_combiner(doc, fx['rows'])
+    assert np.allclose(out, fx['expected_logit'], atol=1e-6)
+    assert doc['format'] == 'oxydrop-hybrid-v1' and doc['not_a_medical_device'] is True
+    for m in doc['members']:
+        assert m['weights'] is not None and (root / 'app/data' / m['weights']).exists()
+
+
+def test_documented_combiner_matches_the_pipeline_with_calibration_and_aggregation():
+    inner, outer = synth_tables()
+    outer = outer.assign(in_base=lambda d: d.t_start < 100, **{'eval': lambda d: d.t_start >= 100})
+    inner = inner.assign(in_base=lambda d: d.t_start < 100, **{'eval': lambda d: d.t_start >= 100})
+    for src, cal, k in (('c+p', True, 6), ('P', False, 11), ('c+corr', True, 1)):
+        sc, f = H.apply_pipeline(inner, outer, src, cal, k)
+        doc = dict(pipeline=dict(features=H.CANDS[src], calibration=cal, aggregate_windows=k, meta=f.params))
+        rows = [dict(zip(['c', 'p', 'corr', 'in_base'], v)) for v in zip(outer['c'], outer['p'], outer['corr'], outer['in_base'])]
+        assert np.allclose(reference_combiner(doc, rows), sc, atol=1e-9), (src, cal, k)
