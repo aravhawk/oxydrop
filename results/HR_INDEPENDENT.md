@@ -1,0 +1,5 @@
+- The benchmark includes fingertip and ear clips. The 48 original red-only traces supply both color inputs. [PhysioNet BUT PPG v2.0.0](https://physionet.org/content/butppg/2.0.0/)
+- All clips (3,888) had 560 readings (14.4% coverage), 7.06 bpm MAE, 71.6% within 5 bpm among readings (10.3% of all clips), zero doubles and 18 halves.
+- Quality=1 clips (830) had 372 readings (44.8% coverage), 1.45 bpm MAE, 97.8% within 5 bpm among readings (43.9% of quality=1 clips), zero doubles and zero halves.
+- MAE uses numeric readings. Doubles and halves are readings within 5 bpm of twice or half the ECG reference, respectively.
+- Reproduce with `node scripts/bench_hr_independent.mjs /path/to/extracted/BUT-PPG-2.0.0`. The three seated iPhone readings are pending.
