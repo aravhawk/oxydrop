@@ -27,6 +27,7 @@ export const REASON_TEXT = {
   camera_stalled: 'The camera stopped delivering frames (screen lock, app switch or interruption). Keep the screen on, then re-measure.',
   saturation: 'The image is too bright (saturated). Press more lightly.',
   invalid: 'No clean pulse in this window. Cover the lens and flash fully, press lightly, keep still.',
+  low_ac: 'The pulse signal is weaker than anything this model was trained on (common when the flash is far from the lens). Cover the lens and the flash fully, press lightly, keep still, or try another lens.',
   nolock: 'No steady pulse lock for this window. Cover the lens and flash fully, press lightly, keep still.',
   model_unsure: 'The model is not confident for this window. Keep still; the next reading is 2 seconds away.',
 };
@@ -61,6 +62,7 @@ export function decide(d, ctx = {}) {
   let reason = qualityReason(d, ctx), state = STATE.UNSURE;
   if (!reason) {
     if (d.label === 'nolock') reason = 'nolock';
+    else if (d.label === 'low_ac') reason = 'low_ac';
     else if (d.label === 'unsure') reason = 'model_unsure';
     else if (d.label === 'HYPOXIC') state = STATE.LOW;
     else if (d.label === 'normal') state = STATE.NORMAL;

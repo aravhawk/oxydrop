@@ -1,10 +1,10 @@
 // OxyNet parity: JS forward pass (app/js/cnn.js) vs PyTorch outputs, and streaming input features (app/js/cnn_features.js) vs the numpy reference.
-// Fixtures written by python/oxydrop_ml/export_js.py. Usage: node tests/cnn_parity.mjs [weights.json] [cnn_ref.json]
+// Weights = member 0 of the shipped hybrid (app/data/hybrid_R_s0.json); the fixture is written by python/oxydrop_ml/export_js.py --ckpt R_s0.pt. Usage: node tests/cnn_parity.mjs [weights.json] [cnn_ref.json]
 import fs from 'node:fs';
 import { loadModel, forward, decodeHr } from '../app/js/cnn.js';
 import { windowsFromRgb, N_CH, N_SIDE, WIN } from '../app/js/cnn_features.js';
 
-const wpath = process.argv[2] ?? new URL('../app/data/cnn_weights.json', import.meta.url);
+const wpath = process.argv[2] ?? new URL('../app/data/hybrid_R_s0.json', import.meta.url);
 const rpath = process.argv[3] ?? new URL('./fixtures/cnn_ref.json', import.meta.url);
 const model = loadModel(JSON.parse(fs.readFileSync(wpath)));
 const ref = JSON.parse(fs.readFileSync(rpath)), TOL = ref.tolerance ?? 1e-4;

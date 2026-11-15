@@ -8,9 +8,11 @@ CHROME=/path/to/chromium node tests/e2e/fake_camera.mjs     # serves app/ itself
 ```
 Set `LIVE_URL=https://aravhawk.github.io/oxydrop/index.html` to run the cases against the deployed site instead of the local copy (an earlier note here said the `good` case passed against the live site after the v2 deploy; the review could not reproduce that, the cause was the setup-screen generation-guard bug fixed in this branch, and the live site has to be redeployed from this branch before it is re-run there).
 
-Cases (`CASES=good,bad,replay`, default all):
-* **good**: lens select, ambient/flash toggle, placement reaches "Fingertip detected", Start enables after 3 locked windows, 60 s calibration passes, heart rate 72 +-3, state "Normal vs your baseline", debug CSV download and copy work, zero console errors.
+Cases (`CASES=good,bad,replay,replaylog,stall,calstall`, default all; the default engine is the hybrid CNN, which runs in a Web Worker in the live cases):
+* **good**: lens select, ambient/flash toggle, placement reaches "Fingertip detected", Start enables after 3 locked windows, 60 s calibration passes, the debug view names the hybrid engine (`engine oxydrop-hybrid-v1 ... runs in a Web Worker`, conformal alpha 0.1, latency per window), heart rate 72 +-6 (the CNN heart-rate head reads 4 to 5 bpm high on this synthetic pulse; the spectral estimate alone is exact), state "Normal vs your baseline", debug CSV download and copy work, zero console errors.
 * **bad**: the placement check refuses a grey frame, "Start anyway" appears after 20 s, the result is "Unsure, re-measure" and the heart-rate tile shows an en dash.
-* **replay**: recorded Hoffman demo through the same decision function; participant 4 (resting 43 bpm, below the 51 bpm band edge) must be "unsure" throughout.
+* **replay**: recorded Hoffman demo through the hybrid engine in the page thread; the note must say "Model trained on this person: demo only, not a test" (the final weights saw these participants); participant 4 (resting 43 bpm, below the 51 bpm band edge, so the pulse-lock gate never opens) must be "unsure" throughout.
+* **replaylog**: the same recordings with `?engine=logistic` (v2 logistic chain, weights fitted without that person, the baseline of the comparison).
+* **stall**, **calstall**: a camera stall after calibration flips the answer to Unsure within 2.6 s and recovers; a stall inside the calibration minute rejects it.
 
 Takes about 6 minutes in real time (the camera runs at real speed). If Chromium crashes at start with "disk I/O error", `/tmp` is full: set `TMPDIR` to a directory on disk.

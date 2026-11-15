@@ -87,7 +87,8 @@ const mediaDevices = {
 Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices, userAgent: 'node-flow-test' }, configurable: true });
 globalThis.window = { scrollTo: noop, addEventListener: noop, removeEventListener: noop };
 globalThis.document = document;
-globalThis.fetch = async (url) => ({ json: async () => JSON.parse(fs.readFileSync(new URL('../app/' + url, import.meta.url), 'utf8')) });
+globalThis.location = { search: '' };
+globalThis.fetch = async (url) => ({ ok: true, json: async () => JSON.parse(fs.readFileSync(new URL('../app/' + url, import.meta.url), 'utf8')) });
 
 await import(process.env.FLOW_APP || '../app/js/app.js');
 
@@ -132,7 +133,10 @@ assert.equal($('phase').textContent, 'Calibrating');
 assert.equal($('status-main').textContent, 'Calibrating');
 await sleep(1500);
 assert.equal($('phase').textContent, 'Calibrating', 'a steady, well-placed finger must not restart the calibration minute');
-ok('begin -> calibration starts after exposure setup and is not restarted while the finger stays on');
+await sleep(600);
+assert.match($('dbg-measure').textContent, /engine oxydrop-hybrid-v1: v1 physics chain \+ OxyNet residual CNN, 3 seeds, 167,588 parameters per seed/, 'the default engine in the measurement is the hybrid (CNN)');
+assert.match($('dbg-measure').textContent, /conformal alpha 0\.1 /, 'the conformal level is shown in the debug summary');
+ok('begin -> calibration starts after exposure setup and is not restarted while the finger stays on; the default engine is the hybrid CNN');
 
 // lifting the finger for > 2 s inside the calibration minute voids it; putting it back starts the minute again from zero
 fingerOff = true; await sleep(2800);

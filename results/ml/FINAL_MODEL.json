@@ -1,0 +1,175 @@
+{
+ "name": "oxydrop-hybrid-v1",
+ "not_a_medical_device": true,
+ "description": "v1 physics chain logit + residual correction of a 3-seed OxyNet CNN ensemble -> logistic meta-learner -> Mondrian conformal three-state rule; CNN heart rate with the rule agree",
+ "params_per_member": 167588,
+ "members": [
+  {
+   "family": "R",
+   "seed": 0,
+   "role": "corr",
+   "file": "app/data/hybrid_R_s0.json",
+   "file_sha256": "f9393d8085c2057127d5d7195a4ab7b67e112d9f522fe8f70f356fa47692ec1f",
+   "bytes": 895238,
+   "ckpt_sha256": "5cfa5448edc76a6754e032355cc468f7cf6ddb07582f2b3cba2be62dfc02c8f7",
+   "params_shipped": 167588,
+   "best_step": 300,
+   "early_stopping_val_subjects": [
+    "hof_100006",
+    "mths_12",
+    "mths_27",
+    "mths_4",
+    "mths_3",
+    "mths_14",
+    "mths_46",
+    "but_129",
+    "but_139",
+    "but_133",
+    "but_147"
+   ]
+  },
+  {
+   "family": "R",
+   "seed": 1,
+   "role": "corr",
+   "file": "app/data/hybrid_R_s1.json",
+   "file_sha256": "d93f4e4d01cfd8b96930352d75628e6de1d10b54c5a7670d5b380741d2636c57",
+   "bytes": 895238,
+   "ckpt_sha256": "8944025184513b12cc22c7231da0288d7318c927fa9474a60bce2013553e54e6",
+   "params_shipped": 167588,
+   "best_step": 400,
+   "early_stopping_val_subjects": [
+    "hof_100003",
+    "mths_12",
+    "mths_4",
+    "mths_64",
+    "mths_20",
+    "mths_52",
+    "mths_6",
+    "but_127",
+    "but_121",
+    "but_141",
+    "but_148"
+   ]
+  },
+  {
+   "family": "R",
+   "seed": 2,
+   "role": "corr",
+   "file": "app/data/hybrid_R_s2.json",
+   "file_sha256": "7e76fe14b5e5f821cb437195138df1aa3782b42c4e0e44305cc2f9e07a8a83d5",
+   "bytes": 895238,
+   "ckpt_sha256": "9d6de172e8fb2af8ac889a1216421bdcb63ce8e4567e3a9acee6e9049ffe8558",
+   "params_shipped": 167588,
+   "best_step": 400,
+   "early_stopping_val_subjects": [
+    "hof_100006",
+    "mths_38",
+    "mths_58",
+    "mths_35",
+    "mths_29",
+    "mths_19",
+    "mths_26",
+    "but_118",
+    "but_114",
+    "but_146",
+    "but_144"
+   ]
+  }
+ ],
+ "params_total_members": 502764,
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "chain": {
+  "models": 2,
+  "note": "Refit under the LOSO harness on the 5,644 evaluated Hoffman windows (shipped C 0.01 / 0.1). Slightly different from app/data/weights.json (the pure v1 chain): the hybrid meta-learner was fit on THIS chain, so use these weights for c.",
+  "max_abs_coef_diff_vs_app_weights_json": 0.5833982710832274
+ },
+ "pipeline": {
+  "source": "R",
+  "features": [
+   "r"
+  ],
+  "calibration": false,
+  "aggregate_windows": 1,
+  "threshold": 0.0,
+  "meta": {
+   "mean": [
+    1.486303047101857
+   ],
+   "scale": [
+    4.274973026660331
+   ],
+   "coef": [
+    3.235827469397979
+   ],
+   "intercept": 0.9401707021349072
+  },
+  "inner_cv_tm_bacc": 0.8179160684472753
+ },
+ "conformal": {
+  "file": "app/data/conformal.json",
+  "sha256": "ff01655efc06de684776af6ab6d03b23264d06f90d1796351aa7551110293fec",
+  "default_alpha": 0.1,
+  "thresholds_default": {
+   "t0": 0.389431721484113,
+   "t1": -0.9653109532046704,
+   "normal_below": -0.9653109532046704,
+   "low_above": 0.389431721484113,
+   "past_crossing": false
+  },
+  "calibration": {
+   "source": "out-of-fold logits of the deployed pipeline on all six Hoffman people (scores/conformal_deployed_oof_hoffman.csv), leave-one-person-out meta-learner",
+   "n_people": 6,
+   "n_windows": 5644,
+   "n_normal": 2400,
+   "n_hypoxic": 3244,
+   "min_t_start_s": 60.0
+  }
+ },
+ "files": {
+  "hybrid_weights": {
+   "file": "app/data/hybrid_weights.json",
+   "sha256": "fa7d1b0d4ff9185d140b8b2e4e4b1446f6b73c0eca95776fd891f633e1b3fb3b"
+  },
+  "onnx_member0": {
+   "file": "app/data/oxynet.onnx",
+   "sha256": "4bd0bcee395a46d190d514d47a4d578829b1991ab6a310cdc02de7939c3ae5e4",
+   "bytes": 727702
+  },
+  "v2_quality_chain": {
+   "file": "app/data/weights.json",
+   "sha256": "b8f18089bab97a2c99b5396bcc564f83494c2b9a74db097aa21c2b418429534e"
+  }
+ },
+ "training_subjects": {
+  "hoffman": [
+   "hof_100001",
+   "hof_100002",
+   "hof_100003",
+   "hof_100004",
+   "hof_100005",
+   "hof_100006"
+  ],
+  "n_hoffman": 6,
+  "n_mths": 62,
+  "n_butppg": 38,
+  "n_openox_train": 68,
+  "note": "The final members are fitted on every Hoffman person plus the MTHS, BUT PPG and OpenOximetry training people (the 34 held-out OpenOximetry people are excluded). One early-stopping validation split per seed is drawn from these people (early_stopping_val_subjects). MTHS (CC BY-NC-ND) and OpenOximetry weights: see DATA_LICENSES.md."
+ },
+ "low_amplitude_guard": {
+  "lac_max_min": -6.02,
+  "ac_dc_ratio_percent": 0.24,
+  "derivation": "0.1th percentile of the largest-channel log AC amplitude over all Hoffman windows (scripts/ood_range.py, results/ml/ood_ac_range.csv); window label low_ac, state Unsure"
+ },
+ "evidence": {
+  "p1_hybrid_tm_bacc": "results/ml/hybrid_p1_final.csv",
+  "conformal": "results/ml/CONFORMAL.md",
+  "hr": "results/ml/hybrid_p2.csv",
+  "openox_spo2": "results/ml/OPENOX_SPO2.md"
+ },
+ "caveat": "The members saw all six Hoffman people, so the replay demo (100001L, 100004R) is in-sample: demo only, not a test. Held-out numbers come from the nested leave-one-person-out runs in results/ml."
+}

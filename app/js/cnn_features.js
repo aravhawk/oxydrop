@@ -140,6 +140,7 @@ export class CnnInput {
   reset() {
     this.lr = [0, 1, 2].map(() => new Float64Array(L_BUF)); this.dt = new Float64Array(L_BUF);
     this.n = 0; this.calAbs = []; this.base = null;
+    this.hist = [0, 1, 2].map(() => new Float64Array(BASE_SEC * FS)); this.histDt = new Float64Array(BASE_SEC * FS);   // the first minute, kept to rebuild the baseline windows once the baseline exists
   }
   /** One 30 Hz sample (0..255 scale); dt = source frame interval in seconds (default 1/30). Returns a window object every 2 s once 10 s exist, else null.
    *  Window: {x: Float32Array(10*300), side: Float32Array(9), te, s (start, seconds), calibrating (still collecting the baseline: no baseline channels),
@@ -147,7 +148,9 @@ export class CnnInput {
   push(r, g, b, dt = 1 / FS) {
     const v = [r, g, b], i = this.n % L_BUF;
     for (let c = 0; c < 3; c++) this.lr[c][i] = Math.log(Math.max(v[c], 1e-3) + 1.0);
-    this.dt[i] = dt; this.n++;
+    this.dt[i] = dt;
+    if (this.n < BASE_SEC * FS) { for (let c = 0; c < 3; c++) this.hist[c][this.n] = this.lr[c][i]; this.histDt[this.n] = dt; }
+    this.n++;
     if (this.n < WIN || (this.n - WIN) % HOP !== 0) return null;
     return this._window();
   }
@@ -168,6 +171,31 @@ export class CnnInput {
     return { ...w, te, s: (te - WIN) / FS, calibrating, warm: !calibrating && te - WIN < BASE_SEC * FS, base: this.base };
   }
 }
+
+// numpy.round (half to even) on a non-negative number
+const roundHalfEven = (v) => { const f = Math.floor(v), d = v - f; return d < 0.5 ? f : d > 0.5 ? f + 1 : (f % 2 === 0 ? f : f + 1); };
+
+/** The windows that define the baseline embedding of the low-oxygen head: up to maxRows evenly spaced windows (numpy linspace + round, unique) among those
+ *  that end inside the first minute, REBUILT with the finished personal baseline (training convention, python/oxydrop_ml/train.group_emb).
+ *  Call after the baseline exists (a window ending after 60 s has been pushed). Returns [] when there is no usable baseline. Allocates; once per person. */
+CnnInput.prototype.baselineWindows = function baselineWindows(maxRows = 8) {
+  if (!this.base || !this.base.every(Number.isFinite) || this.n < BASE_SEC * FS) return [];
+  const tes = []; for (let te = WIN; te <= BASE_SEC * FS; te += HOP) tes.push(te);
+  const K = tes.length, m = Math.min(maxRows, K), pick = new Set();
+  for (let i = 0; i < m; i++) pick.add(roundHalfEven(m === 1 ? 0 : (i * (K - 1)) / (m - 1)));
+  const out = [];
+  for (const k of [...pick].sort((a, b) => a - b)) {
+    const te = tes[k], buf = [0, 1, 2].map(() => new Float64Array(L_BUF)), dt = new Float64Array(L_BUF);
+    for (let j = 0; j < L_BUF; j++) {
+      const ii = te - L_BUF + j;
+      if (ii >= 0) { for (let c = 0; c < 3; c++) buf[c][j] = this.hist[c][ii]; dt[j] = this.histDt[ii]; }
+      else { for (let c = 0; c < 3; c++) buf[c][j] = 2 * this.hist[c][0] - this.hist[c][-ii]; dt[j] = this.histDt[0]; }
+    }
+    const w = windowToTensor(buf, dt, this.base, this.mask);
+    out.push({ x: w.x, side: w.side, te });
+  }
+  return out;
+};
 
 /** Offline helper: all windows of an array of [r,g,b] rows (optionally with a dt array). */
 export function windowsFromRgb(rgb, dt, mask) {

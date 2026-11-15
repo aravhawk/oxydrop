@@ -2,6 +2,8 @@ import { Chain, FS, CAL, WIN } from './engine.js';
 import { CameraSource, Motion, listBackCameras, pickDefault, listCameras, probeCamFactory } from './camera.js';
 import { runProbeLadder, liveQuality, ringState, probeSummary } from './lensprobe.js';
 import { MIN_TRACKABLE_BPM } from './hr.js';
+import { HybridEngine, loadHybridAssets, ENGINE_ID } from './hybrid_engine.js';
+import { HybridWorker, HybridWorkerEngine, loadHybridLite } from './hybrid_async.js';
 import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, calibrationInterrupt, calibrationFingerReason, STATE, STATE_TEXT, MOTION_MAX, STALL_MS } from './decision.js';
 
 const $ = (id) => document.getElementById(id);
@@ -18,6 +20,12 @@ const GET_READY_S = 3;          // countdown so the finger is on the plateau bef
 const WEAK_PROMPT_MS = 4000;    // live signal quality must stay in 'reposition' this long before the re-position prompt replaces a reading
 const WEAK_MSG = 'Weak signal: slide your finger so it covers the lens and the flash, press lightly.';
 const RAW_MAX = 15 * 60 * FS;   // raw trace ring buffer: 15 minutes at 30 Hz
+// Engine: the hybrid (v1 physics chain + residual CNN + conformal three-state rule, app/js/hybrid_engine.js) is the main path; ?engine=logistic runs the v2 logistic chain
+// (the baseline of the evaluation). ?alpha=0.05 sets the conformal level (debug; default is the pre-declared 0.10).
+const QS = new URLSearchParams(location.search);
+const ENGINE_REQ = QS.get('engine') === 'logistic' ? 'logistic' : 'hybrid';
+const ALPHA_REQ = QS.get('alpha') ? Number(QS.get('alpha')) : null;
+let engineUsed = ENGINE_REQ, engineNote = '', hybridLite = null, hybridFull = null, hybridWorker = null, hybridAlpha = null;
 
 let mode = null;                // null | 'setup' | 'measure'
 let kind = null;                // 'live' | 'replay'
@@ -38,13 +46,42 @@ $('compat').textContent = hasCam ? '' : 'Camera access is not available in this 
 if (!hasCam) { $('btn-live').disabled = true; $('ack').disabled = true; }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-async function loadWeights() { if (!weights) weights = await (await fetch('data/weights.json')).json(); return weights; }
+const fetchJson = async (rel) => { const r = await fetch(rel); if (!r.ok) throw new Error(`${rel}: HTTP ${r.status}`); return r.json(); };
+async function loadWeights() { if (!weights) weights = await fetchJson('data/weights.json'); return weights; }
+// Hybrid assets. Live: the CNN runs in a module Web Worker (a CNN pass on a slow phone must not delay camera frames); if no worker can be started the same engine
+// runs in the page thread. Any load failure falls back to the logistic chain and says so in the debug text (never silently).
+async function loadHybrid(needFull) {
+  if (ENGINE_REQ !== 'hybrid' || engineUsed !== 'hybrid') return;
+  try {
+    if (!hybridLite) {
+      hybridLite = await loadHybridLite(fetchJson);
+      const a = ALPHA_REQ ?? hybridLite.conformal.default_alpha, t = hybridLite.conformal.alphas[a.toFixed(2)];
+      if (!t || t.past_crossing) { engineNote = `alpha ${ALPHA_REQ} is not available; using ${hybridLite.conformal.default_alpha}. `; hybridAlpha = hybridLite.conformal.default_alpha; } else hybridAlpha = a;
+    }
+    if (needFull) { if (!hybridFull) hybridFull = await loadHybridAssets(fetchJson); return; }
+    if (!hybridWorker && !hybridFull && typeof Worker !== 'undefined') {
+      try { const w = new HybridWorker(new URL('./hybrid_worker.js', import.meta.url), hybridAlpha); await w.ready; hybridWorker = w; hybridWorker.onError = (m) => { engineNote += `model worker error: ${m}. `; }; }
+      catch (e) { engineNote += `model worker unavailable (${e && e.message ? e.message : e}); running the model in the page thread. `; }
+    }
+    if (!hybridWorker && !hybridFull) hybridFull = await loadHybridAssets(fetchJson);
+  } catch (e) { engineUsed = 'logistic'; engineNote = `hybrid model could not be loaded (${e && e.message ? e.message : e}); using the logistic chain. `; }
+}
+// a fresh engine for one measurement (calibration restarts get a new one)
+function newMeasureEngine(w) {
+  if (engineUsed === 'hybrid' && hybridLite) {
+    if (kind === 'live' && hybridWorker) { const e = new HybridWorkerEngine(hybridLite, hybridWorker, hybridAlpha, (d) => { if (chain === e) dispatchWindow(d); }); return e; }
+    if (hybridFull) return new HybridEngine(hybridFull, { alpha: hybridAlpha });
+  }
+  return new Chain(w || weights);
+}
+function dispatchWindow(d) { if (mode === 'setup') onSetupWindow(d); else if (mode === 'measure') onWindow(d); }
 
 function cleanup() {
   sessionGen++; camGen++; clearInterval(replayTimer); clearInterval(uiTimer); clearTimeout(anywayTimer); uiTimer = null;
   if (cam) { cam.stop(); cam = null; } if (motion) { motion.stop(); motion = null; }
   if (wake) { try { wake.release(); } catch (e) { /* ignore */ } wake = null; }
   hideWhite(); weakSince = 0; weakNow = false; weakShown = false;
+  if (chain && chain.close) chain.close();
   replay = null; mode = null; kind = null; chain = null;
 }
 const isFront = () => lightMode() === 'front';
@@ -58,14 +95,15 @@ function startUi() { clearInterval(uiTimer); tickN = 0; uiTimer = setInterval(ui
 // ---------------- raw trace recorder (bounded ring buffer) ----------------
 function resetRecorder() { rawN = 0; decLog = []; lastD = null; lastDecision = null; }
 function record(r, g, b) { const i = (rawN % RAW_MAX) * 3; raw[i] = r; raw[i + 1] = g; raw[i + 2] = b; rawN++; }
-function logDecision(d, dec) { decLog.push({ idx: rawN - 1, d, dec }); if (decLog.length > RAW_MAX / (2 * FS) + 5) decLog.shift(); }
+function logDecision(d, dec) { decLog.push({ idx: (Number.isFinite(d.n) ? d.n : rawN) - 1, d, dec });   // hybrid windows arrive after their last sample: d.n is where they ended
+  if (decLog.length > RAW_MAX / (2 * FS) + 5) decLog.shift(); }
 function buildCsv() {
   const start = Math.max(0, rawN - RAW_MAX), byIdx = new Map(decLog.map((x) => [x.idx, x]));
-  const rows = ['t_s,R,G,B,sqi,acf,hr_est,hr_beat,valid,sat,label,p,state,reason,hr_shown'];
+  const rows = ['t_s,R,G,B,sqi,acf,hr_est,hr_beat,valid,sat,label,p,state,reason,hr_shown,z,cnn_hr,engine'];
   for (let n = start; n < rawN; n++) {
-    const i = (n % RAW_MAX) * 3; let tail = ',,,,,,,,,,';
+    const i = (n % RAW_MAX) * 3; let tail = ',,,,,,,,,,,,,';
     const x = byIdx.get(n);
-    if (x) { const d = x.d, c = x.dec; tail = [f4(d.sqi), f4(d.acf), f2(d.hrEst), f2(d.hrBeat), d.valid ? 1 : 0, f4(d.sat), d.label || (d.calibrating ? 'calibrating' : ''), f4(d.p), c ? c.state : '', c && c.reason ? c.reason : '', c && c.hr != null ? c.hr.toFixed(1) : ''].join(','); }
+    if (x) { const d = x.d, c = x.dec; tail = [f4(d.sqi), f4(d.acf), f2(d.hrEst), f2(d.hrBeat), d.valid ? 1 : 0, f4(d.sat), d.label || (d.calibrating ? 'calibrating' : ''), f4(d.p), c ? c.state : '', c && c.reason ? c.reason : '', c && c.hr != null ? c.hr.toFixed(1) : '', f4(d.z), f2(d.cnnHr), d.engine || 'logistic'].join(','); }
     rows.push(`${(n / FS).toFixed(3)},${raw[i].toFixed(3)},${raw[i + 1].toFixed(3)},${raw[i + 2].toFixed(3)},${tail}`);
   }
   return rows.join('\n') + '\n';
@@ -88,9 +126,16 @@ async function copyDebug(btn) {
 document.querySelectorAll('[data-dl]').forEach((b) => b.addEventListener('click', download));
 document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyDebug(b)));
 
+function engineLine() {
+  const inf = chain && chain.info, lat = chain && chain.latency ? chain.latency() : null, f1 = (v) => (Number.isFinite(v) ? v.toFixed(0) : '-');
+  if (engineUsed !== 'hybrid' || !inf) return `engine ${engineUsed === 'hybrid' ? 'hybrid (only the quality chain runs during setup; the CNN starts with the calibration minute)' : 'logistic chain v2 (baseline / fallback)'}${ENGINE_REQ === 'logistic' ? ' (?engine=logistic)' : ''}${engineNote ? '  ' + engineNote : ''}`;
+  const th = inf.thresholds;
+  return `engine ${ENGINE_ID}: v1 physics chain + ${inf.model}, ${inf.params.toLocaleString('en-US')} parameters per seed (${inf.paramsTotal.toLocaleString('en-US')} total), runs ${chain.worker ? 'in a Web Worker' : 'in the page thread'}; conformal alpha ${inf.alpha} (Normal below z ${th.normal_below.toFixed(3)}, Low above ${th.low_above.toFixed(3)}); latency per 2 s window: ${lat && lat.n ? `last ${f1(lat.last)} ms, median ${f1(lat.median)} ms, p95 ${f1(lat.p95)} ms` + (lat.async ? ` (model ${f1(lat.coreMedian)} ms in the worker, quality chain ${f1(lat.v2Median)} ms on the page)` : '') : 'no window yet'}${engineNote ? '  ' + engineNote : ''}`;
+}
 function debugText() {
   const L = []; const st = cam ? cam.stats : null;
   L.push(`mode ${mode || '-'} / ${kind || '-'}   samples ${rawN}   t ${(rawN / FS).toFixed(1)} s`);
+  L.push(engineLine());
   if (cam && st) {
     L.push(`fps ${st.fps.toFixed(1)}  jitter ${st.jitterMs.toFixed(1)} ms  gaps ${st.gaps} (max ${(st.maxGap * 1000).toFixed(0)} ms)  skipped ${st.skipped}  frames ${st.frames}`);
     L.push(`last frame ${(st.staleMs / 1000).toFixed(1)} s ago  interrupted ${st.interrupted || 'no'}  longest gap in last 30 s ${(cam.rs.gapStats(cam.rs.n - 30 * FS).max * 1000).toFixed(0)} ms`);
@@ -105,6 +150,7 @@ function debugText() {
   if (probe) { L.push('lens probe scores (per lens, 0-100, usable >= 35):'); L.push(probeSummary(probe.results, probe.choice)); } else L.push('lens probe: not run');
   if (lastD) {
     const d = lastD; L.push(`window s=${d.s}  SQI ${f4(d.sqi)}  ACF ${f4(d.acf)}  hrEst ${f2(d.hrEst)}  hrBeat ${f2(d.hrBeat)}  ch ${d.ch}  sat ${f4(d.sat)}  valid ${d.valid}  label ${d.label || 'calibrating'}  p ${f4(d.p)}`);
+    if (Number.isFinite(d.z)) L.push(`hybrid: chain logit c ${f2(d.c)}  CNN correction ${f2(d.corr)}  z ${f2(d.z)}  CNN HR ${f2(d.cnnHr)}  spectral HR ${f2(d.specHr)}  | EXPERIMENTAL SpO2 from the CNN head (not validated, do not use): ${f2(d.spo2Exp)}`);
     if (lastDecision) L.push(`decision ${lastDecision.state}${lastDecision.reason ? ' (' + lastDecision.reason + ')' : ''}  hr shown ${lastDecision.hr != null ? lastDecision.hr.toFixed(1) : '-'}`);
   } else L.push('no window yet');
   L.push(`lock history (last 5): ${lockHist.map((v) => (v ? '1' : '0')).join('') || '-'}  motion ${motion && motion.ok && motion.level(10) != null ? motion.level(10).toFixed(2) + ' m/s2' : 'no sensor'}`);
@@ -122,7 +168,7 @@ $('btn-cam').addEventListener('click', async () => {
   let gen = -1;
   try {
     cleanup(); gen = sessionGen; motion = new Motion(); const mp = motion.start();   // start the motion permission prompt first: iOS needs it inside the tap
-    await loadWeights(); await keepAwake();
+    await loadWeights(); $('cam-state').textContent = 'Loading the on-device model…'; await loadHybrid(false); await keepAwake();
     kind = 'live'; mode = 'setup'; startUi();
     const choice = await runProbe(gen);   // session token: startCamera() below bumps camGen on purpose, which must not cancel this flow
     if (gen !== sessionGen) return;
@@ -217,7 +263,7 @@ function sink(r, g, b) {
   record(r, g, b);
   if (!chain) return;
   const d = chain.push(r, g, b);
-  if (d) { if (mode === 'setup') onSetupWindow(d); else if (mode === 'measure') onWindow(d); }
+  if (d) dispatchWindow(d);
 }
 
 function liveCtx() {
@@ -278,13 +324,16 @@ $('btn-begin-anyway').addEventListener('click', beginLive);
 
 // ---------------- replay flow ----------------
 $('btn-replay').addEventListener('click', async () => {
-  cleanup(); await loadWeights(); show('measure'); kind = 'replay'; resetRecorder();
+  cleanup(); await loadWeights(); await loadHybrid(true); show('measure'); kind = 'replay'; resetRecorder();
   const pick = new URLSearchParams(location.search).get('rec') || (Math.random() < 0.5 ? '100001L' : '100004R');
   const [meta, buf] = await Promise.all([fetch(`data/replay/${pick}.json`).then((r) => r.json()), fetch(`data/replay/${pick}.bin`).then((r) => r.arrayBuffer())]);
   replay = { meta, rgb: new Float32Array(buf), i: 0, speed: 30 };
   startMeasure('replay', meta.weights);
   const note = $('replay-note'); note.hidden = false;
-  note.innerHTML = `Recorded demo: study participant ${meta.person} (UW Hoffman 2022 data, MIT licence). The model used here was fitted <b>without</b> this person, so these are genuinely held-out decisions. Replaying at ${replay.speed}× speed.${meta.person === 4 ? ' <b>This is the hardest person in the study: a resting heart rate of 43 bpm is below the 51 bpm this version can follow, so it correctly answers &ldquo;unsure&rdquo; throughout.</b>' : ''}`;
+  const heldOut = !(chain && chain.core);   // the logistic replay weights are fitted without this person; the hybrid weights are not
+  note.innerHTML = `Recorded demo: study participant ${meta.person} (UW Hoffman 2022 data, MIT licence). ` + (heldOut
+    ? 'The model used here was fitted <b>without</b> this person, so these are genuinely held-out decisions. '
+    : '<b>Model trained on this person: demo only, not a test.</b> The on-device model saw this participant during training, so these answers show how the screen behaves, not how accurate the model is. The held-out results are in the results table (README). ') + `Replaying at ${replay.speed}× speed.${meta.person === 4 ? ' <b>This is the hardest person in the study: a resting heart rate of 43 bpm is below the 51 bpm this version can follow, so it correctly answers &ldquo;unsure&rdquo; throughout.</b>' : ''}`;
   replayTimer = setInterval(() => {
     const per = Math.round(replay.speed * FS * 0.05);
     for (let k = 0; k < per && replay.i < replay.meta.n; k++, replay.i++) { const j = replay.i * 3; sink(replay.rgb[j], replay.rgb[j + 1], replay.rgb[j + 2]); }
@@ -294,7 +343,7 @@ $('btn-replay').addEventListener('click', async () => {
 
 // ---------------- shared measurement logic ----------------
 function startMeasure(k, w) {
-  kind = k; mode = 'measure'; chain = new Chain(w || weights); chain.n = 0;
+  kind = k; mode = 'measure'; if (chain && chain.close) chain.close(); chain = newMeasureEngine(w);
   stalledShown = false; calStartN = cam ? cam.rs.n : 0;
   calFingerGood = 0; calFingerN = 0; calBadSince = 0; calDirty = false; calSig = acquisitionSig();
   calMotion = []; calFps = []; calWin = []; calFailed = false; calChecked = false; calOk = true; strip = []; $('strip').innerHTML = ''; lastD = null; lastDecision = null;
@@ -449,7 +498,7 @@ function onWindow(d) {
   else { tally.uns++; setStatus('uns', '?', dec.text, dec.detail); pushStrip('d-uns', 'unsure: ' + dec.reason); }
   if (ref != null && dec.state !== STATE.UNSURE) { ((dec.state === STATE.LOW) === (ref < 90)) ? tally.right++ : tally.wrong++; }
   const n = tally.normal + tally.low + tally.uns + tally.pause;
-  $('tally').textContent = `${n} readings: ${tally.normal} normal, ${tally.low} possible low oxygen, ${tally.uns + tally.pause} unsure.` + (kind === 'replay' ? ` Against the study reference, ${tally.right} of ${tally.right + tally.wrong} answered readings were correct.` : '');
+  $('tally').textContent = `${n} readings: ${tally.normal} normal, ${tally.low} possible low oxygen, ${tally.uns + tally.pause} unsure.` + (kind === 'replay' ? ` Against the study reference, ${tally.right} of ${tally.right + tally.wrong} answered readings were correct` + (chain && chain.core ? ' (the model saw this person: demo only, not a test).' : '.') : '');
 }
 function setSig(d) {
   const lvl = d.valid ? (d.sqi >= 0.45 ? 'Good' : 'Fair') : 'Poor';

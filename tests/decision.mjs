@@ -21,6 +21,7 @@ t('LOW', () => { const r = decide(good({ label: 'HYPOXIC', p: 0.9 }), ok()); ass
 const cases = [
   ['engine label nolock', good({ label: 'nolock', valid: false, hr: NaN }), ok(), 'invalid'],
   ['engine label nolock with valid flag (inconsistent)', good({ label: 'nolock' }), ok(), 'nolock'],
+  ['engine label low_ac (amplitude below the trained range)', good({ label: 'low_ac' }), ok(), 'low_ac'],
   ['engine label unsure', good({ label: 'unsure', p: 0.52 }), ok(), 'model_unsure'],
   ['unknown label', good({ label: 'whatever' }), ok(), 'invalid'],
   ['d.valid false', good({ valid: false, hr: NaN }), ok(), 'invalid'],

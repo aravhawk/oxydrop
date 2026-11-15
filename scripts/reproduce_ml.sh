@@ -122,3 +122,16 @@ if [ "$STAGE" = "docs" ] || [ "$STAGE" = "docs-md" ]; then
   if [ "$STAGE" = "docs" ]; then bash scripts/build_whitepaper_pdf.sh; fi
   "$PY" scripts/check_claims.py
 fi
+
+# ===================================================================================================== FEAT-009: the app's main path (hybrid on device)
+# The final checkpoints come from `hybrid-final`/`hybrid-export` above; these stages rebuild what the app and its tests derive from them.
+#   app-ref    tests/fixtures/hybrid_engine_ref.json (PyTorch + numpy reference of the streaming engine) and the single-network fixture + ONNX of seed 0
+#   app-model  results/ml/ood_ac_range.csv (low-amplitude guard range) and results/ml/FINAL_MODEL.json (hashes, parameters, seeds, training subjects)
+#   app-test   npm test (decision, parity, hr, capture, stall, lens, flow, cnn, hybrid engine, service-worker assets)
+if [ "$STAGE" = "app-ref" ]; then
+  CK="${CKPT_DIR:-$OXY_CACHE_DIR/runs/hyb_final}"
+  "$PY" python/oxydrop_ml/make_engine_ref.py --ckpt-dir "$CK"
+  (cd python && "$PY" oxydrop_ml/export_js.py --ckpt "$CK/R_s0.pt" --weights "$TMPDIR/R_s0_check.json" --onnx ../app/data/oxynet.onnx --fixture ../tests/fixtures/cnn_ref.json)
+fi
+if [ "$STAGE" = "app-model" ]; then "$PY" scripts/ood_range.py && "$PY" scripts/final_model_json.py; fi
+if [ "$STAGE" = "app-test" ]; then npm test; fi

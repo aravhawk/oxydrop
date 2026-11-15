@@ -2,7 +2,7 @@
 
 Code: `python/oxydrop_ml/model.py` (torch), `python/oxydrop_ml/export_js.py` (BatchNorm folding, ONNX, fixtures), `app/js/cnn.js` (browser forward pass), `app/js/cnn_features.js` (streaming input builder). Input construction is defined by `python/oxydrop_ml/features.py` (`windows_to_tensor`, FEAT-003); the JS port follows it step for step.
 
-This is a research prototype, not a medical device. Nothing here has been trained yet: the committed `app/data/cnn_weights.json` is a **seeded random initialisation** (`"random_init": true`) that exists to test the pipeline.
+This is a research prototype, not a medical device. The shipped weights are the three residual-CNN seeds of the final hybrid (`app/data/hybrid_R_s{0,1,2}.json`, see `results/ml/HYBRID.md`); `app/data/oxynet.onnx` is the ONNX export of seed 0 and `tests/fixtures/cnn_ref.json` its PyTorch reference.
 
 ## Input
 
@@ -53,7 +53,7 @@ Student 167,588 parameters without the training-only head (167,653 with it), 11.
 
 ## Files and how they agree
 
-- `app/data/cnn_weights.json`: `{format:'oxynet-v1', config, input, hr, outputs, params, tensors{name:{shape,b64}}, ops[]}`. BN is folded in float64 and stored as float32.
+- `app/data/hybrid_R_s{0,1,2}.json` (one file per seed, exported by `export_js.py`/`export_hybrid.py`): `{format:'oxynet-v1', config, input, hr, outputs, params, tensors{name:{shape,b64}}, ops[]}`. BN is folded in float64 and stored as float32.
 - `app/data/oxynet.onnx`: eval-mode graph, inputs `x, domain, side, emb_base`, outputs `hr_logits, spo2, spo2_logvar, lowox_logit, sqi_logit, emb`. `onnxruntime` agrees with torch to 1e-5 absolute plus 1e-6 relative (float32 spacing at spo2 near 93 is 7.6e-6).
 - `tests/fixtures/cnn_ref.json`: random, contact-domain and recorded (Hoffman 100001L) inputs with torch outputs for every head, plus streaming feature checks (uniform dt, irregular dt, noise, contact mask). `cnn_parity.mjs` requires JS to match torch to 1e-4 (measured about 1e-5 or better).
 - Regenerate everything from the repo root with `ml_venv/bin/python python/oxydrop_ml/export_js.py` (random init) or `--ckpt model.pt` (a `{cfg, state}` dict from `train.py`). The feature part of the fixture records the sha256 of `features.py` it was built from.
