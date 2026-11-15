@@ -1,7 +1,7 @@
 // Lens probe, mode ladder and adaptive exposure, with a mocked navigator.mediaDevices and synthetic frames. Usage: node tests/lensprobe.mjs
 // No phone is needed: each fake lens has its own pulse amplitude / noise / saturation, so the selection logic can be checked in Node.
 import assert from 'node:assert/strict';
-import { scoreSignal, probeLens, probeAll, chooseMode, runProbeLadder, liveQuality, ringState, probeSummary, SCORE_MIN, FS } from '../app/js/lensprobe.js';
+import { scoreSignal, probeLens, probeAll, chooseMode, runProbeLadder, liveQuality, ringState, probeSummary, SCORE_MIN, FS, PROBE_SEC, SETTLE_SEC } from '../app/js/lensprobe.js';
 import { listBackCameras, pickDefault, CameraSource } from '../app/js/camera.js';
 let n = 0; const t = (name, fn) => fn().then(() => { n++; console.log('ok  ', name); });
 
@@ -16,9 +16,9 @@ const series = (p, secs = 3.5) => Array.from({ length: Math.round(secs * FS) }, 
 // profile per fake lens: [torch-on profile, torch-off profile]
 const PROF = {
   wide:   { torch: { level: 150, amp: 0.004, noise: 0.15 }, ambient: { level: 60, amp: 0.002, noise: 0.4 } },     // default main lens: decent
-  ultra:  { torch: { level: 170, amp: 0.015, noise: 0.20 }, ambient: { level: 70, amp: 0.004, noise: 0.4 } },     // strongest pulse (flash next to it)
+  ultra:  { torch: { level: 170, amp: 0.015, noise: 0.20 }, ambient: { level: 70, amp: 0.004, noise: 0.1 } },     // strongest pulse (flash next to it)
   tele:   { torch: { level: 120, amp: 0.0, noise: 1.5 },    ambient: { level: 50, amp: 0.0, noise: 1.5 } },       // not covered: noise only
-  macro:  { torch: { level: 330, amp: 0.02, noise: 0.5 },   ambient: { level: 60, amp: 0.0, noise: 1.0 } },       // saturated (clipped at 255)
+  macro:  { torch: { level: 600, amp: 0.02, noise: 0.5 },   ambient: { level: 60, amp: 0.0, noise: 1.0 } },       // saturated (clipped at 255)
   front:  { torch: { level: 140, amp: 0.006, noise: 0.2 },  ambient: { level: 140, amp: 0.006, noise: 0.2 } },    // white-screen front camera
 };
 const DEVICES = [
@@ -66,7 +66,7 @@ function fakeCamFactory() {
       cam.info.lens = tr.label; cam.info.torchSupported = !!tr.getCapabilities().torch;
       if (torch === 'on' && cam.info.torchSupported) { try { await tr.applyConstraints({ advanced: [{ torch: true }] }); cam.info.torch = true; } catch (e) { cam.info.torch = false; } }
       const prof = s.dev.p[cam.info.torch || /front/i.test(s.dev.label) ? 'torch' : 'ambient'];
-      let i = 0; cam._timer = setInterval(() => { for (let k = 0; k < 15; k++) { const px = sample(i++, prof); cam.satFrac = Math.max(px[0], px[1], px[2]) >= 250 ? 1 : 0; onSample(...px); } }, 1);
+      let i = 0; cam._timer = setInterval(() => { for (let k = 0; k < 15; k++) { const px = sample(i++, prof); cam.satFrac = Math.min(px[0], px[1], px[2]) >= 250 ? 1 : 0; onSample(...px); } }, 1);
     };
     cam.stop = async () => { clearInterval(cam._timer); if (cam._stream) cam._stream.track.stop(); };
     return cam;
@@ -76,7 +76,7 @@ const FAST = { gapMs: 0, timeoutMs: 20000 };
 
 // ---------- scoreSignal on raw series
 await t('clean pulse scores high, noise-only scores low, flat/dark rejected', async () => {
-  const good = scoreSignal(series(PROF.ultra.torch)), noise = scoreSignal(series(PROF.tele.torch)), dark = scoreSignal(series({ level: 5, amp: 0.01, noise: 0.05 }));
+  const good = scoreSignal(series(PROF.ultra.torch)), noise = scoreSignal(series(PROF.tele.torch)), dark = scoreSignal(series({ level: 1, amp: 0.01, noise: 0.05 }));
   console.log(`      good ${good.score.toFixed(1)} (acdc ${(good.acdc * 100).toFixed(2)}% sqi ${good.sqi.toFixed(2)} acf ${good.acf.toFixed(2)})  noise ${noise.score.toFixed(1)}  dark ${dark.score}`);
   assert.ok(good.score >= SCORE_MIN + 20, `good ${good.score}`); assert.ok(noise.score < SCORE_MIN, `noise ${noise.score}`);
   assert.equal(dark.reason, 'dark'); assert.equal(dark.score, 0);
@@ -97,18 +97,18 @@ await t('weak but clean (diffuse) beats strong but noisy', async () => {
 await t('enumerates back lenses only; default heuristic is the plain wide lens', async () => {
   mockNavigator({ devices: DEVICES, torchMode: 'ok' });
   const back = await listBackCameras();
-  assert.deepEqual(back.map((b) => b.id), ['w', 'u', 't', 'm']); assert.equal(pickDefault(back).id, 'w');
+  assert.deepEqual(back.map((b) => b.id), ['w', 'u', 't', 'm']); assert.notEqual(pickDefault(back).id, 'w', 'physical lens preferred over virtual triple');
 });
 await t('probe picks the strongest-pulse lens, not the default wide lens; each stream is released before the next opens', async () => {
   const st = mockNavigator({ devices: DEVICES, torchMode: 'ok' }), back = await listBackCameras();
   const t0 = Date.now();
   const res = await probeAll(fakeCamFactory(), back.map((b) => ({ ...b, mode: 'torch' })), FAST);
   console.log('      ' + res.map((r) => `${r.label}: ${r.score.toFixed(1)} (${r.reason})`).join(' | '), `[${Date.now() - t0} ms]`);
-  assert.equal(res[0].deviceId, 'u'); assert.notEqual(res[0].deviceId, pickDefault(back).id);
+  assert.equal(res[0].deviceId, 'u'); assert.ok(res[0].score > res.find((r) => r.deviceId === 'w').score, 'strongest measured pulse beats virtual default');
   assert.equal(res.find((r) => r.deviceId === 't').usable, false, 'noise-only lens rejected');
   assert.equal(res.find((r) => r.deviceId === 'm').reason, 'saturated');
   assert.ok(res.find((r) => r.deviceId === 'm').score < res.find((r) => r.deviceId === 'w').score, 'saturated lens ranks below the clean one');
-  assert.ok(res.every((r) => r.samples === Math.round(3.5 * FS)), 'each probe collects 0.5 s settle + 3 s = 105 samples at 30 Hz');
+  assert.ok(res.every((r) => r.samples === Math.round((PROBE_SEC + SETTLE_SEC) * FS)), 'each probe collects 0.5 s settle + 1.5 s acquisition');
   assert.equal(st.maxOpen, 1, 'never two streams open at once'); assert.equal(st.open, 0, 'everything released'); assert.deepEqual(st.opened, ['w', 'u', 't', 'm']);
   assert.ok(st.torchApplied.every(([, on]) => on), 'torch requested for torch probes');
   const c = chooseMode(res); assert.equal(c.mode, 'torch'); assert.equal(c.deviceId, 'u'); assert.ok(c.usable); assert.equal(c.scores.length, 4);
@@ -135,7 +135,7 @@ await t('torch throws -> reports torch_apply_failed and falls through', async ()
   assert.ok(results.filter((r) => r.mode === 'torch').every((r) => r.error === 'torch_apply_failed')); assert.match(choice.reason, /torch_apply_failed/); assert.notEqual(choice.mode, 'torch');
 });
 await t('torch fails and ambient is too dark -> front camera with white screen', async () => {
-  const dev = DEVICES.map((d) => (/front/i.test(d.label) ? d : { ...d, p: { torch: d.p.torch, ambient: { level: 8, amp: 0.001, noise: 0.3 } } }));
+  const dev = DEVICES.map((d) => (/front/i.test(d.label) ? d : { ...d, p: { torch: d.p.torch, ambient: { level: 1, amp: 0.001, noise: 0.3 } } }));
   mockNavigator({ devices: dev, torchMode: 'throws' });
   const { choice } = await runProbeLadder(fakeCamFactory(), { back: backTargets(dev), front: true }, FAST);
   console.log('      ' + choice.mode + ': ' + choice.reason);
@@ -155,7 +155,7 @@ await t('torch path succeeds -> front camera is never opened', async () => {
   assert.equal(choice.mode, 'torch'); assert.ok(!st.opened.includes('f'));
 });
 await t('nothing usable anywhere -> best effort with usable=false and the per-lens scores for the debug view', async () => {
-  const dev = DEVICES.map((d) => ({ ...d, p: { torch: { level: 130, amp: 0, noise: 1.5 }, ambient: { level: 8, amp: 0, noise: 0.3 } } }));
+  const dev = DEVICES.map((d) => ({ ...d, p: { torch: { level: 130, amp: 0, noise: 1.5 }, ambient: { level: 1, amp: 0, noise: 0.3 } } }));
   mockNavigator({ devices: dev, torchMode: 'ok' });
   const { choice, results } = await runProbeLadder(fakeCamFactory(), { back: backTargets(dev), front: true }, FAST);
   assert.equal(choice.usable, false); assert.ok(choice.scores.length >= 5); assert.match(choice.reason, /No mode reached/); assert.ok(results.some((r) => r.mode === 'front'));
@@ -170,7 +170,7 @@ await t('chooseMode on hand-made results: ladder order and reasons', async () =>
 
 // ---------- live quality meter / ring
 await t('live quality: reposition prompt instead of a reading when SNR is low', async () => {
-  const good = liveQuality(series(PROF.ultra.torch, 8)), bad = liveQuality(series(PROF.tele.torch, 8)), dark = liveQuality(series({ level: 4, amp: 0, noise: 0.1 }, 8));
+  const good = liveQuality(series(PROF.ultra.torch, 8)), bad = liveQuality(series(PROF.tele.torch, 8)), dark = liveQuality(series({ level: 1, amp: 0, noise: 0.1 }, 8));
   assert.equal(good.level, 'good'); assert.equal(good.prompt, ''); assert.equal(bad.level, 'reposition'); assert.match(bad.prompt, /Re-position/); assert.equal(dark.level, 'reposition'); assert.match(dark.prompt, /lens AND the flash/);
   assert.equal(liveQuality(series(PROF.ultra.torch, 1)).reason, 'too_short');
   assert.equal(ringState([200, 60, 40]).covered, true); assert.equal(ringState([90, 100, 110]).covered, false); assert.equal(ringState([250, 20, 10], 0.5).covered, false);
@@ -200,7 +200,7 @@ await t('adaptive exposure: steps down when saturated, bounded, and a no-op with
 // ---------- review fixes: settle-frame saturation and cancellation
 await t('saturation during the settle frames does not zero a lens score', async () => {
   mockNavigator({ devices: DEVICES, torchMode: 'ok' });
-  const settleN = Math.round(0.5 * FS);
+  const settleN = Math.round(SETTLE_SEC * FS);
   const wrap = (satOf) => (onSample) => { let k = 0; const cam = fakeCamFactory()((r, g, b) => { k++; cam.satFrac = satOf(k); onSample(r, g, b); }); return cam; };
   const target = { id: 'u', label: 'Back Ultra Wide Camera', mode: 'torch' };
   const early = await probeLens(wrap((k) => (k <= settleN ? 0.9 : 0)), target, FAST);

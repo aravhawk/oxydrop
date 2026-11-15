@@ -1,4 +1,4 @@
-// Model-agnostic lens selection. No phone layout is assumed: every back lens is probed for ~3 s with the torch on and the one with the
+// Model-agnostic lens selection. No phone layout is assumed: every back lens is probed for ~1.5 s with the torch on and the one with the
 // strongest pulsatile signal wins. If no back lens works, the ladder falls to ambient light, then the front camera with a white screen.
 // Pure ES module (no DOM). The camera is injected as a factory so the same code runs in the browser and in the Node test.
 //
@@ -7,9 +7,9 @@
 import { SOS, SAT_MAX } from './engine.js';
 import { estimateHr, GATE } from './hr.js';
 
-export const FS = 30, PROBE_SEC = 3, SETTLE_SEC = 0.5, SCORE_MIN = 35, SAT_LEVEL = 250, DARK_LEVEL = 20;
+export const FS = 30, PROBE_SEC = 1.5, SETTLE_SEC = 0.5, SCORE_MIN = 35, SAT_LEVEL = 250, DARK_LEVEL = 3;
 const NOISE_ACF = 0.40, CLEAN_ACF = 0.75, NOISE_SQI = 0.30, CLEAN_SQI = 0.40;
-const PROBE_GATE = { ...GATE, MIN_SEC: 2 };              // a 3 s probe is far shorter than the 9.5 s decision gate; used for ranking only
+const PROBE_GATE = { ...GATE, MIN_SEC: 1.25, F_LO: 0.7, F_HI: 3.5 };              // a 3 s probe is far shorter than the 9.5 s decision gate; used for ranking only
 const mean = (a) => { let s = 0; for (const v of a) s += v; return a.length ? s / a.length : 0; };
 const stdp = (a) => { const m = mean(a); let s = 0; for (const v of a) s += (v - m) ** 2; return a.length ? Math.sqrt(s / a.length) : 0; };
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
@@ -23,6 +23,24 @@ function bandpass(x) {
     out[i] = v;
   }
   return out;
+}
+
+// A short acquisition probe cannot establish an HR. Rank narrow-band energy
+// against residual energy using a sinusoid fit with linear trend removed.
+function shortBandFit(x, fs) {
+  const n = x.length, center = (n - 1) / 2;
+  const detrend = (v) => { const m = mean(v); let xy = 0, xx = 0; for (let i = 0; i < n; i++) { xy += (i - center) * (v[i] - m); xx += (i - center) ** 2; } return v.map((a, i) => a - m - xy / xx * (i - center)); };
+  const y = detrend(x), power = y.reduce((a, b) => a + b * b, 0); let best = { quality: 0, hz: NaN };
+  for (let hz = 0.7; hz <= 3.5001; hz += 0.05) {
+    const sn = detrend(x.map((_, i) => Math.sin(2 * Math.PI * hz * i / fs))), cs = detrend(x.map((_, i) => Math.cos(2 * Math.PI * hz * i / fs)));
+    let ss = 0, cc = 0, sc = 0, ys = 0, yc = 0;
+    for (let i = 0; i < n; i++) { ss += sn[i] ** 2; cc += cs[i] ** 2; sc += sn[i] * cs[i]; ys += y[i] * sn[i]; yc += y[i] * cs[i]; }
+    const det = ss * cc - sc * sc; if (det <= 1e-12 || power <= 1e-15) continue;
+    const a = (ys * cc - yc * sc) / det, b = (yc * ss - ys * sc) / det;
+    const quality = clamp01((a * ys + b * yc) / power);
+    if (quality > best.quality) best = { quality, hz };
+  }
+  return best;
 }
 
 /** Saturation penalty: 1 up to the engine's SAT_MAX, falling linearly to 0 at 40 % saturated samples. */
@@ -41,21 +59,33 @@ export function scoreSignal(rgb, fs = FS, opts = {}) {
   const body = rgb.slice(settle);
   res.dc = Math.max(mean(body.map((p) => p[0])), mean(body.map((p) => p[1])), mean(body.map((p) => p[2])));
   res.luma = mean(body.map((p) => 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2]));
-  res.sat = Math.max(opts.satFrac ?? 0, body.filter((p) => Math.max(p[0], p[1], p[2]) >= SAT_LEVEL).length / body.length);
+  res.channelSat = [0, 1, 2].map((c) => body.filter((p) => p[c] >= SAT_LEVEL).length / body.length);
+  res.sat = Math.max(opts.satFrac ?? 0, Math.min(...res.channelSat));
   res.factor = satFactor(res.sat);
-  if (res.dc < DARK_LEVEL) { res.reason = 'dark'; return res; }
+  if (res.dc <= DARK_LEVEL) { res.reason = 'dark'; return res; }
   let best = null;
   for (let c = 0; c < 3; c++) {
+    const sat = Math.max(opts.satFrac ?? 0, res.channelSat[c]);
+    if (sat > SAT_MAX || mean(body.map((p) => p[c])) < 5) continue;
     const lg = rgb.map((p) => Math.log(Math.max(p[c], 1e-3) + 1)), m = mean(lg), y = bandpass(lg.map((v) => v - m)).slice(settle);
     const acdc = stdp(y); if (acdc < 1e-5) continue;
     const e = estimateHr(y, fs, PROBE_GATE);
+    // Short probes rank cameras, never authorize an HR reading. Correct ACF's
+    // overlap bias so a 1.5 s clean record isn't punished for containing few beats.
+    if (body.length < 2.5 * fs && Number.isFinite(e.hrAcf)) { const lag = fs * 60 / e.hrAcf; e.acf = Math.min(1, e.acf * body.length / Math.max(1, body.length - lag)); }
     // A 2.5 s window is too short for hr.js's absolute gate: band-passed noise already reaches sqi ~0.3 and acf ~0.4, a clean pulse sqi ~0.4 and acf ~0.75.
     // So the quality is measured above that noise floor, plus the spectral and autocorrelation heart rates must agree (hr.js AGREE).
     const agree = Number.isFinite(e.hr) && Number.isFinite(e.hrAcf) && e.hr > 0 && Math.abs(e.hrAcf - e.hr) / e.hr < GATE.AGREE ? 1 : 0;
-    const q = 0.45 * clamp01((e.acf - NOISE_ACF) / (CLEAN_ACF - NOISE_ACF)) + 0.35 * clamp01((e.sqi - NOISE_SQI) / (CLEAN_SQI - NOISE_SQI)) + 0.2 * agree;
-    if (!best || q > best.q) best = { c, acdc, e, q };
+    let q = 0.45 * clamp01((e.acf - NOISE_ACF) / (CLEAN_ACF - NOISE_ACF)) + 0.35 * clamp01((e.sqi - NOISE_SQI) / (CLEAN_SQI - NOISE_SQI)) + 0.2 * agree;
+    if (body.length < 2.5 * fs) {
+      const fit = shortBandFit(body.map((p) => Math.log(p[c] + 1)), fs);
+      q = clamp01((fit.quality - 0.45) / 0.5);
+      e.sqi = fit.quality; e.hr = fit.hz * 60;
+    }
+    if (!best || q > best.q) best = { c, acdc, e, q, sat };
   }
-  if (!best) { res.reason = 'flat'; return res; }
+  if (!best) { res.reason = Math.max(...res.channelSat) > SAT_MAX ? 'saturated' : 'flat'; return res; }
+  res.sat = best.sat; res.factor = satFactor(best.sat);
   const amp = clamp01((Math.log10(best.acdc) - Math.log10(2e-4)) / (Math.log10(1e-2) - Math.log10(2e-4)));
   Object.assign(res, { acdc: best.acdc, sqi: best.e.sqi, acf: best.e.acf, snr: best.e.sqi / (1 - best.e.sqi + 1e-9), channel: best.c, hr: best.e.hr });
   res.score = 100 * res.factor * best.q * (0.4 + 0.6 * amp);
@@ -123,7 +153,8 @@ export function chooseMode(results, ctx = {}) {
   const torch = by('torch'), amb = by('ambient'), front = by('front');
   const scores = results.map((r) => ({ mode: r.mode, deviceId: r.deviceId, label: r.label, score: Math.round(r.score * 10) / 10, acdc: r.acdc, sqi: r.sqi, acf: r.acf, snr: r.snr, sat: r.sat, reason: r.reason || r.error, fallback: r.fallback || '' }));
   const pack = (r, mode, reason, usable = true) => ({ mode, deviceId: r ? r.deviceId : null, label: r ? r.label : '', score: r ? r.score : 0, usable, reason, scores });
-  const t = bestOf(torch, min);
+  const physical = torch.filter((r) => !/dual|triple|virtual|fusion|logical|multi.?cam/i.test(r.label || ''));
+  const t = bestOf(physical, min) || bestOf(torch, min);
   if (t) return pack(t, 'torch', `Back lens "${t.label || t.deviceId}" had the strongest pulse under the torch (score ${t.score.toFixed(0)}).`);
   const torchWorked = torch.some((r) => r.ok && r.torchOn);
   const why = !torch.length ? 'The torch path was not probed.'
@@ -181,7 +212,7 @@ export function liveQuality(rgb, fs = FS) {
 export function ringState(mean3, satFrac = 0) {
   const [r, g, b] = mean3, tot = r + g + b + 1e-9;
   const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255, redness = r / tot;
-  const covered = redness > 0.5 && brightness > 0.08 && satFrac <= SAT_MAX;
+  const covered = redness > 0.5 && Math.max(r, g, b) > DARK_LEVEL && satFrac <= SAT_MAX;
   return { brightness, redness, covered };
 }
 

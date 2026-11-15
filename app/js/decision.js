@@ -85,7 +85,9 @@ export function assessPlacement(stats, opts = {}) {
   const torch = !!opts.torch;
   if (!stats || !stats.mean || !(stats.frames >= 5)) return { level: 'warn', title: 'Looking for your fingertip…', msg: '' };
   const [R, G, B] = stats.mean;
-  if (R < 50) return torch
+  // Digital near-black floor only: red tissue may have very low green/blue DC.
+  // Pulse quality is checked separately; placement must not require a bright exposure.
+  if (Math.max(R, G, B) <= 3) return torch
     ? { level: 'bad', title: 'Cover the lens AND the flash', msg: 'It is too dark: the flash light is not passing through your fingertip.' }
     : { level: 'bad', title: 'Too dark', msg: 'Face a lamp or window, or switch the flash on, then cover the lens.' };
   if (R < 1.4 * G || R < 1.4 * B) return { level: 'bad', title: 'Cover the lens AND the flash', msg: 'The camera still sees light that has not passed through your fingertip.' };
