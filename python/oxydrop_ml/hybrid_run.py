@@ -1,6 +1,7 @@
 """FEAT-008 fits: the CNN families P (plain), R (residual on the chain logit) and D (chain distillation) for the nested P1 protocol, and the report.
 
     python -m oxydrop_ml.hybrid_run run --families P R D --seeds 0 1 2 --out RUNS/hyb --init ckpt/stageB_full.pt --recipe recipe.json [--shard i/n] [--threads 1]
+    python -m oxydrop_ml.hybrid_run final --families P R --seeds 0 1 2 --out RUNS/hyb_final --init ckpt/stageB_full.pt --recipe recipe.json     # all-people fits for the app
     python -m oxydrop_ml.hybrid_run report --runs RUNS/hyb --out results/ml           (see hybrid.py; heavy part is the bootstrap)
 
 Jobs per (family, seed): 6 outer fits (one Hoffman person o held out; scores o, plus the 5 training people for the train-vs-test gap) and 30 inner fits
@@ -94,6 +95,31 @@ def run_job(pool: Pool, X19, job, family, hp: HP, seed, device, out_dir, log=pri
     return True
 
 
+def final_fit(pool: Pool, X19, family, hp: HP, seed, device, out_dir, log=print):
+    """Deployable fit of one family on every Hoffman person (plus the other training sets): no outer test person. Same recipe as the nested fits.
+    The checkpoint holds the phone input scale folded into the weights (consumes raw features), like train.py --final."""
+    from .model import count_params
+    from .train import fold_norm, save_ckpt
+    cp = os.path.join(out_dir, f'{family}_s{seed}.pt')
+    if os.path.exists(cp):
+        return False
+    t0 = time.time()
+    hof = pool.subjects_of('hoffman')
+    tr, va, vs = fold_rows(pool, [], seed)
+    prior = DS.prior_for_pool(pool, X19, hof, []) if family != 'P' else None
+    with DS.install(family, prior):
+        fr = fit(pool, tr, va, hp, seed, device)
+    folded = fold_norm(fr.net, fr.norm, 0)
+
+    class _F:
+        pass
+    ff = _F(); ff.net, ff.norm, ff.hp, ff.best_step = folded, fr.norm, fr.hp, fr.best_step
+    os.makedirs(out_dir, exist_ok=True)
+    sha = save_ckpt(cp, ff, {'folded_norm_domain': 0, 'val_subjects': vs, 'params_shipped': count_params(folded, include_aux=False), 'seed': seed, 'family': family})
+    log(f'final {family} s{seed} {time.time() - t0:.0f}s best_step {fr.best_step} sha256 {sha}')
+    return True
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sp = ap.add_subparsers(dest='cmd', required=True)
@@ -102,6 +128,10 @@ def main(argv=None):
     r.add_argument('--families', nargs='+', default=['P', 'R', 'D']); r.add_argument('--seeds', nargs='+', type=int, default=[0])
     r.add_argument('--shard', default=None); r.add_argument('--threads', type=int, default=0); r.add_argument('--data', default=None)
     r.add_argument('--steps', type=int, default=None, help='override the fine-tuning steps (smoke tests only)')
+    f = sp.add_parser('final')
+    f.add_argument('--out', required=True); f.add_argument('--init', required=True); f.add_argument('--recipe', default=None)
+    f.add_argument('--families', nargs='+', default=['P', 'R']); f.add_argument('--seeds', nargs='+', type=int, default=[0, 1, 2]); f.add_argument('--threads', type=int, default=0)
+    f.add_argument('--data', default=None)
     p = sp.add_parser('report')
     p.add_argument('--runs', required=True); p.add_argument('--out', required=True); p.add_argument('--B', type=int, default=2000)
     p.add_argument('--seeds', nargs='+', type=int, default=None); p.add_argument('--tag', default='')
@@ -121,6 +151,16 @@ def main(argv=None):
         for k, (f, s, j) in enumerate(allj):
             if k % n == i:
                 run_job(pool, X19, j, f, hp, s, 'cpu', a.out)
+        return
+    if a.cmd == 'final':
+        if a.threads:
+            torch.set_num_threads(a.threads)
+        hp = variant_hp('full', **{**(json.load(open(a.recipe)) if a.recipe else {}), 'init': a.init})
+        pool = Pool(root=a.data, seed=0)
+        X19 = np.load(os.path.join(pool.ws['hoffman'].dir, 'chain19.npy'))
+        for s in a.seeds:
+            for fam in a.families:
+                final_fit(pool, X19, fam, hp, s, 'cpu', a.out)
         return
     from . import hybrid as H
     H.report_cli(a)

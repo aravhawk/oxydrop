@@ -280,6 +280,11 @@ def best_baseline(base):
     return max(out, key=out.get), out
 
 
+def has_cols(w, name):
+    cols = CANDS[name]
+    return cols is None or all(c in w.columns for c in cols)
+
+
 def evaluate(runs, seeds, hof_meta=None, B=2000, base=None, fold_ens=True):
     """Everything for one set of seeds. runs: DataFrame from load_runs. Returns dict of tables and score frames."""
     meta, X19 = hof_meta or hoffman_meta()
@@ -287,7 +292,8 @@ def evaluate(runs, seeds, hof_meta=None, B=2000, base=None, fold_ens=True):
     F = folds(w)
     res = {}
     res['w'] = w
-    sel, ch, tr = run_pipeline_over_folds(F, CNN_ORDER, with_train=True)
+    order = [n for n in CNN_ORDER if has_cols(w, n)]
+    sel, ch, tr = run_pipeline_over_folds(F, order, with_train=True)
     res['final_scores'], res['final_choices'], res['final_train'] = sel, ch, tr
     cs, cch, ctr = run_pipeline_over_folds(F, CHAIN_ORDER, with_train=True)
     res['chain_levers_scores'], res['chain_levers_choices'], res['chain_levers_train'] = cs, cch, ctr
@@ -295,7 +301,7 @@ def evaluate(runs, seeds, hof_meta=None, B=2000, base=None, fold_ens=True):
     res['chain_shipped_scores'] = cr
     # grid of every cell at declared levers (exploratory)
     grid, scores_default = [], {}
-    for name in [n for n in CANDS if n != 'chain_shipped']:
+    for name in [n for n in CANDS if n != 'chain_shipped' and has_cols(w, n)]:
         for cal in (False, True):
             for k in KS:
                 fr, _, _ = run_pipeline_over_folds(F, [name], fixed=(name, cal, k))
