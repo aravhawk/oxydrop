@@ -42,4 +42,16 @@ HR MAE, doubling rate, halving rate, % within 5 bpm; SpO2 MAE and low-SpO2 AUROC
 
 ## Amendments
 
-(none yet)
+### Amendment 1 (Nov 15 2026, written after the core CNN results existed; disclosed deviations of FEAT-006)
+
+None of these changes a pre-registered metric, split or baseline. They are listed because the original text was not followed to the letter.
+
+1. **Recipe selection (rule 2).** Four candidate training recipes were scored by inner folds before any outer comparison (`results/ml/nested_selection.csv`). The choice for each outer Hoffman person uses only its own inner jobs and is leakage free. The single recipe applied to every fold and ablation
+   (`C_lowhi`) was however taken as the best mean over ALL outer folds' inner scores, which scores each of the six Hoffman people as an inner person, and the MTHS (8) and BUT (6) validation people of every selection job are people that are test subjects of P2/P3. This is a mild form of selection on
+   evaluation people. `results/ml/nested_selection_sensitivity.csv` shows that dropping all selection jobs that touch any one Hoffman person never changes the winner (margins between 0.0006 and 0.013 of the composite score); a strictly per-outer choice would change one fold (hof_100002: `D_steps800`).
+   The effect, if any, favours the CNN; the CNN's reported results are ties, not wins, so no conclusion depends on it.
+2. **Seeds (rule 7).** At least 3 seeds exist for P1 and for the grouped P2/P3 protocol of the final model. For the true-LOSO P2/P3 run of the final model the number of seeds is the one stated in `results/ml/CORE_RESULTS.md` (seed 0 only until further seeds finished). Ablation rows have 1 seed for P2/P3.
+3. **Cheaper variants (rule 1).** Ablation rows use 10 subject-grouped folds over the 100 MTHS+BUT people for P2/P3 ("not LOSO", labelled); the final model also has the true LOSO run.
+4. **Input scale and early stopping (rule 4).** The scale-only standardisation is per domain (phone, contact), not per dataset, so it folds exactly into the exported weights. Early stopping uses an inner validation set (1 Hoffman, 6 MTHS, 4 BUT people, identical in every fold) removed from the training people of that fold.
+5. **Gap definition (rule 6).** The train-vs-test gap compares the fold models' scores on their own training rows with the pooled held-out score (not a mean of per-person scores). The P3 training MAE of these runs did not apply the t >= 30 s filter, so no P3 gap is reported.
+6. **Decision threshold.** The low-oxygen decision threshold is the fixed 0.5 of the class-balanced loss, not selected.

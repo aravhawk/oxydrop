@@ -601,11 +601,12 @@ def train_scores(pool, fr: FitResult, device='cpu', cap=1500, seed=0):
         q = rng.choice(q, min(cap, len(q)), replace=False)
         o = predict(fr.net, pool, q, fr.norm, fr.hp, device)
         out['p2'] = M.hr_metrics(o['hr'], pool.hr[q])['within5_full']
-    q = tr[(pool.ds[tr] == 'mths') & pool.has_spo2[tr]]
+    q = tr[(pool.ds[tr] == 'mths') & pool.has_spo2[tr] & pool.eval[tr]]          # same t >= 30 s windows as the held-out P3 score
     if len(q):
         q = rng.choice(q, min(cap, len(q)), replace=False)
         o = predict(fr.net, pool, q, fr.norm, fr.hp, device)
         out['p3'] = M.spo2_metrics(o['spo2'], pool.spo2[q])['mae']
+        out['p3_eval'] = True
     return out
 
 
@@ -622,7 +623,9 @@ def stage_b(pool: Pool, steps=2000, init=None, seed=0, device='cpu', log=None, h
     """Supervised warm-up on OpenOx only (contact PPG): HR (170k labelled windows), low oxygen and the ABG-anchored SaO2 auxiliary head, from the SSL checkpoint
     (or from scratch for the no-SSL ablation). OpenOx people are never outer test subjects of P1/P2/P3 and the held-out OpenOx people are not in the pool,
     so one shared checkpoint is legitimate for every fold. Returns a FitResult."""
-    hp = HP(steps=steps, init=init, p_ds={'openox': 1.0}, w_spo2=0.0, w_low_ox=1.0, w_low=1.0, lr=2e-3, eval_every=max(100, steps // 8), **(hp_over or {}))
+    kw = dict(steps=steps, init=init, p_ds={'openox': 1.0}, w_spo2=0.0, w_low_ox=1.0, w_low=1.0, lr=2e-3, eval_every=max(100, steps // 8))
+    kw.update(hp_over or {})
+    hp = HP(**kw)
     rows = np.nonzero(pool.is_ox)[0]
     assert not set(pool.subject[rows]) & set(pool.ox_holdout)
     return fit(pool, rows, None, hp, seed, device, log=log)

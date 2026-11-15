@@ -132,24 +132,25 @@ def p3_stats(df, B=1000, seed=0):
 
 
 def gaps(folds, st):
-    """Train-vs-test gap per pre-registered metric from the fold JSONs (train score of each fold's model on its own training rows vs its held-out score)."""
+    """Train-vs-test gap with MATCHING aggregation: the mean over folds of each fold model's score on its own training rows (pooled over the training people,
+    same metric as the held-out one) against the held-out score pooled over all held-out people (st['p1'], st['p2'], st['p3']). Positive = over-fitting
+    (train better than held-out; for MAE held-out minus train). The interval is a bootstrap over the folds' training scores only (the held-out pooled score has its own
+    person-bootstrap CI in the table). P3 is reported only when the training MAE was computed with the same t >= 30 s filter as the held-out one (runs before that fix
+    have no `p3_eval` flag and are skipped)."""
     out = {}
-    for key, fk, hib in (('p1', 'p1_fold', True), ('p2', 'p2_fold', True), ('p3', 'p3_fold', False)):
-        per = st.get(fk)
-        if not per:
+    for key, hib in (('p1', True), ('p2', True), ('p3', False)):
+        if st.get(key) is None or not np.isfinite(st.get(key, np.nan)):
             continue
-        tr, te = [], []
-        for j in folds:
-            if key not in j['train']:
-                continue
-            ids = [p for p in j['test'] if p in per and np.isfinite(per[p])]
-            if not ids:
-                continue
-            te.append(float(np.mean([per[p] for p in ids]))); tr.append(j['train'][key])
-        if tr:
-            g = M.train_vs_test_gap(tr, te, higher_is_better=hib)
-            out[key + '_train'] = g['train_mean']; out[key + '_test_foldmean'] = g['test_mean']; out[key + '_gap'] = g['gap']
-            out[key + '_gap_lo'], out[key + '_gap_hi'] = g['gap_lo'], g['gap_hi']
+        rows = [j['train'] for j in folds if key in j['train'] and (key != 'p3' or j['train'].get('p3_eval'))]
+        tr = np.array([r[key] for r in rows], float)
+        if not len(tr):
+            continue
+        sm = M.summarize_folds(tr)
+        te = float(st[key])
+        sgn = 1.0 if hib else -1.0
+        out[key + '_train'] = sm['mean']; out[key + '_test_pooled'] = te
+        out[key + '_gap'] = sgn * (sm['mean'] - te)
+        out[key + '_gap_lo'], out[key + '_gap_hi'] = sorted([sgn * (sm['lo'] - te), sgn * (sm['hi'] - te)])
     return out
 
 
@@ -180,6 +181,7 @@ CANDIDATES = {
     'C_lowhi': dict(w_low=3.0),       # low-oxygen loss weight 3
     'D_steps800': dict(steps=800),    # twice the fine-tuning steps
 }
+N_NESTED_MTHS, N_NESTED_BUT = 8, 6   # MTHS / BUT validation people of every selection job (drawn from the P2/P3 evaluation people: disclosed in PREREGISTRATION.md Amendment 1)
 N_INNER = 2                           # inner held-out Hoffman people per outer fold (random 2 of the 5 remaining; compute budget)
 
 
@@ -208,7 +210,7 @@ def nested_selection(pool: Pool, base_over: dict, variant: str, out_dir, seed, s
         rng = np.random.default_rng(seed)
         others_m = [s for s in pool.subjects_of('mths')]
         others_b = [s for s in pool.subjects_of('butppg')]
-        gm = rng.choice(others_m, 8, replace=False).tolist(); gb = rng.choice(others_b, 6, replace=False).tolist()
+        gm = rng.choice(others_m, N_NESTED_MTHS, replace=False).tolist(); gb = rng.choice(others_b, N_NESTED_BUT, replace=False).tolist()
         excl = [outer, inn] + gm + gb
         tr, va, vs = fold_rows(pool, excl, seed)
         S.assert_no_leak(pool.subject, tr, np.nonzero(np.isin(pool.subject, excl))[0])
@@ -225,6 +227,20 @@ def nested_selection(pool: Pool, base_over: dict, variant: str, out_dir, seed, s
         rec = dict(outer=outer, cand=cand, inner=inn, tm_bacc=tm, hr_within5=w5, spo2_mae=mae, best_step=fr.best_step, seconds=time.time() - t0)
         json.dump(rec, open(jp, 'w'), default=float)
         log(f'nested {outer} {cand} {inn}: tm {tm:.3f} hr5 {w5:.3f} mae {mae:.2f} ({rec["seconds"]:.0f}s)')
+
+
+def selection_sensitivity(out_dir):
+    """Which candidate wins when every selection job that touches one Hoffman person (as outer or inner person) is dropped, and the margin of the winner. Shows how much the
+    global choice depends on any single person. Returns a DataFrame."""
+    rows = [json.load(open(p)) for p in glob.glob(os.path.join(out_dir, 'nested_*.json'))]
+    d = pd.DataFrame(rows)
+    d['score'] = (d.tm_bacc.fillna(0.5) + d.hr_within5 + (1 - d.spo2_mae.fillna(5) / 5.0).clip(0, 1)) / 3.0
+    out = []
+    for p in [None] + sorted(set(d.outer) | set(d.inner)):
+        q = d if p is None else d[(d.outer != p) & (d.inner != p)]
+        m = q.groupby('cand').score.mean().sort_values(ascending=False)
+        out.append(dict(dropped_person=p or 'none', winner=m.index[0], margin_to_second=float(m.iloc[0] - m.iloc[1]), n_jobs=len(q), **{f'mean_{k}': float(v) for k, v in m.items()}))
+    return pd.DataFrame(out)
 
 
 def select_recipe(out_dir):

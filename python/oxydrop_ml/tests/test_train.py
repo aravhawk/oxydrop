@@ -276,3 +276,75 @@ def test_chain_logit_uses_only_given_rows():
     b = SR.chain_logit(X[:150], y[:150], X2[150:])
     assert a.shape == (50,) and not np.allclose(a, b)
     assert np.allclose(SR.chain_logit(X[:150], y[:150], X[150:]), a)
+
+
+def test_select_recipe_picks_best_mean_and_sensitivity_reports_dropped_person(tmp_path):
+    rows = []
+    for o, i, (a, b) in [('p1', 'p2', (0.7, 0.6)), ('p2', 'p3', (0.6, 0.7)), ('p3', 'p1', (0.7, 0.55))]:
+        for cand, tm in (('A', a), ('B', b)):
+            rows.append(dict(outer=o, inner=i, cand=cand, tm_bacc=tm, hr_within5=0.5, spo2_mae=2.0, best_step=100, seconds=1.0))
+    for k, r in enumerate(rows):
+        json.dump(r, open(tmp_path / f'nested_{k}.json', 'w'))
+    best, tab = LR.select_recipe(str(tmp_path))
+    assert best == 'A' and set(tab.chosen) <= {'A', 'B'}
+    sens = LR.selection_sensitivity(str(tmp_path))
+    assert sens.dropped_person.iloc[0] == 'none' and set(sens.dropped_person) == {'none', 'p1', 'p2', 'p3'}
+
+
+def test_nested_selection_never_reads_the_outer_or_inner_person(tmp_path, world, monkeypatch):
+    pool = T.Pool(root=world)
+    seen = []
+    orig = T.Pool.buffers
+
+    def spy(self, rows, *a, **k):
+        seen.append(np.asarray(rows).copy())
+        return orig(self, rows, *a, **k)
+    monkeypatch.setattr(T.Pool, 'buffers', spy)
+    monkeypatch.setattr(LR, 'CANDIDATES', {'A': dict()})
+    monkeypatch.setattr(LR, 'N_NESTED_MTHS', 2)
+    monkeypatch.setattr(LR, 'N_NESTED_BUT', 1)
+    LR.nested_selection(pool, dict(steps=4, bs=16, eval_every=2, eb_every=2, ox_cap=300), 'full', str(tmp_path), 0, (0, 12), 'cpu', lambda m: None)
+    files = sorted(tmp_path.glob('nested_*.json'))
+    assert files
+    # re-run one job under the spy to know which rows it read
+    seen.clear()
+    LR.nested_selection(pool, dict(steps=4, bs=16, eval_every=2, eb_every=2, ox_cap=300), 'full', str(tmp_path / 'again'), 0, (0, 12), 'cpu', lambda m: None)
+    j = json.load(open(sorted((tmp_path / 'again').glob('nested_*.json'))[0]))
+    read_people = set(pool.subject[np.unique(np.concatenate(seen))])
+    held_in_scoring = {j['inner']}                       # the inner person is scored (read after training) but never trained on
+    first_job_rows = np.unique(np.concatenate(seen[:max(1, len(seen) - 4)]))
+    assert j['outer'] not in set(pool.subject[first_job_rows]), 'the outer person was read'
+    assert j['outer'] not in read_people and held_in_scoring <= read_people | held_in_scoring
+
+
+def test_stage_b_trains_on_openox_rows_only_and_never_on_held_out_openox_people(world, monkeypatch):
+    pool = T.Pool(root=world)
+    seen = []
+    orig = T.Pool.buffers
+
+    def spy(self, rows, *a, **k):
+        seen.append(np.asarray(rows).copy())
+        return orig(self, rows, *a, **k)
+    monkeypatch.setattr(T.Pool, 'buffers', spy)
+    T.stage_b(pool, steps=6, init=None, seed=0, hp_over=dict(bs=16, eval_every=3, eb_every=3))
+    read = np.unique(np.concatenate(seen))
+    assert set(pool.ds[read]) == {'openox'}, 'stage B read non-OpenOx rows'
+    assert not set(pool.subject[read]) & set(pool.ox_holdout)
+
+
+def test_hybrid_candidate_choice_depends_only_on_inner_predictions():
+    from oxydrop_ml import stack_run as SR
+    r = np.random.default_rng(0)
+    persons = ['q1', 'q2', 'q3']
+    inner = pd.DataFrame(dict(inner=np.repeat(persons, 60), t_start=np.tile(np.arange(60) * 10.0, 3), low=(np.tile(np.arange(60), 3) > 30).astype(float)))
+    for a in (0, 50, 100):
+        inner[f'logit_a{a}'] = (inner.low - 0.5) * 2 + r.standard_normal(len(inner)) * (1 + a / 100)
+    outer = pd.DataFrame(dict(t_start=np.arange(60) * 10.0, low=(np.arange(60) > 30).astype(float)))
+    for a in (0, 50, 100):
+        outer[f'logit_a{a}'] = (outer.low - 0.5) * 2 + r.standard_normal(60)
+    ch_in, ch_out = r.standard_normal(len(inner)), r.standard_normal(60)
+    res1 = SR.candidate_scores(inner, outer, ch_in, ch_out)
+    outer2 = outer.copy(); outer2['low'] = 1 - outer2.low; outer2[['logit_a0', 'logit_a50', 'logit_a100']] *= -3
+    res2 = SR.candidate_scores(inner, outer2, ch_in, -ch_out)
+    assert {k: v['cv'] for k, v in res1.items()} == {k: v['cv'] for k, v in res2.items()}
+    assert max(res1, key=lambda k: res1[k]['cv']) == max(res2, key=lambda k: res2[k]['cv'])
