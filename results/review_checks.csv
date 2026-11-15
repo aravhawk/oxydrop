@@ -1,0 +1,31 @@
+name,value,note
+eval_windows,5644.0,"t >= 60 s, label = reference SpO2 < 90"
+hypoxic_windows,3244.0,
+majority_class_accuracy,0.5748,"always answer ""hypoxic"": the missing baseline"
+v2_answered_windows,3836.0,lock-gated + abstain band 0.10
+v2_coverage,0.6797,
+v2_accuracy_on_answered,0.9468,
+v1_accuracy_on_same_answered_windows,0.946,the selective gain over v1 on identical windows
+v1_accuracy_all_windows,0.8754,
+hypoxic_windows_unanswered,857.0,
+hypoxic_windows_alerted,2329.0,
+hypoxic_alert_rate_all_hypoxic_windows,0.7179,sensitivity counting abstentions as misses
+hypoxic_window_missed_given_answered,0.0243,the 2.4% figure: conditional on answering
+person_1_answered_windows,616.0,of 1022 windows
+person_2_answered_windows,925.0,of 1053 windows
+person_3_answered_windows,790.0,of 998 windows
+person_4_answered_windows,0.0,of 947 windows
+person_5_answered_windows,805.0,of 859 windows
+person_6_answered_windows,700.0,of 765 windows
+eval_windows_reference_below_70,240.0,window-mean reference SpO2 < 70 %
+tiny_minus_clock_accuracy_points,3.47,saved out-of-fold scores
+tiny_minus_clock_ci_low_points,-6.82,"paired person bootstrap, 500 draws, seed 1"
+tiny_minus_clock_ci_high_points,16.73,
+person4_left_false_alarm_windows,79.0,
+person4_left_false_alarm_first_s,212.0,
+person4_left_false_alarm_last_s,888.0,time of the window start
+person4_left_false_alarm_windows_after_400s,13.0,
+exercise_subjects_total,14.0,
+exercise_subjects_with_usable_heart_rate,13.0,
+exercise_fp_rate_all_subjects_pooled,0.634,"the subject with no usable heart rate counts as never flagged, which lowers the headline"
+exercise_fp_rate_usable_subjects_pooled,0.684,
