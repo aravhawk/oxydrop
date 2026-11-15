@@ -82,6 +82,7 @@ class HP:
     patience: int = 3
     eb_every: int = 100
     ox_cap: int = 30000
+    win: int = 10                  # input window in seconds (10 = shipped; 20 = ablation: two consecutive 10 s feature windows concatenated, BUT clips excluded)
     cfg: dict = field(default_factory=dict)   # OxyCfg overrides
 
     def to_dict(self):
@@ -109,6 +110,8 @@ def variant_hp(name: str, **over) -> HP:
         hp.w_spo2 = hp.w_low = hp.w_aux = 0.0
     elif name == 'adv':
         hp.adv = 0.3
+    elif name == 'win20':
+        hp.win = 20
     else:
         raise ValueError(name)
     return hp
@@ -144,6 +147,7 @@ class Pool:
                     if len(m) > ox_cap:
                         m = m.sample(ox_cap, random_state=seed).sort_index()
             frames.append(m)
+            ws.meta = ws.meta[['end_idx', 'rec_start']].copy()      # the gather only needs these two columns; frees the full OpenOx metadata (RAM)
         m = pd.concat(frames, ignore_index=True)
         self.meta = m
         N = len(m)
@@ -187,21 +191,35 @@ class Pool:
         self.ds_rows = {d: np.nonzero(self.ds == d)[0] for d in datasets}
 
     # ---- window gathering
-    def buffers(self, rows):
+    def buffers(self, rows, L=CTX + WIN):
+        """[B, L, 3] log-RGB buffers and [B, L] dt ending at each window's end. L = 450 is the shard convention (5 s warm-up + 10 s); longer buffers extend
+        into the past with the same odd reflection about the first sample of the recording."""
         rows = np.asarray(rows)
-        lrgb = np.empty((len(rows), CTX + WIN, 3), np.float32)
-        dt = np.empty((len(rows), CTX + WIN), np.float32)
+        lrgb = np.empty((len(rows), L, 3), np.float32)
+        dt = np.empty((len(rows), L), np.float32)
         for d in np.unique(self.ds[rows]):
             sel = np.nonzero(self.ds[rows] == d)[0]
             li = self.local[rows[sel]]
-            lrgb[sel] = self.ws[d].lrgb(li)
-            dt[sel] = self.ws[d].dt(li)
+            ws = self.ws[d]
+            if L == CTX + WIN:
+                lrgb[sel] = ws.lrgb(li)
+                dt[sel] = ws.dt(li)
+            else:
+                e = ws.meta.end_idx.values[li]; r = ws.meta.rec_start.values[li]
+                ii = e[:, None] - L + np.arange(L)[None, :]
+                below = ii < r[:, None]
+                src = np.where(below, 2 * r[:, None] - ii, ii)
+                v = np.asarray(ws.series[src], np.float32)
+                first = np.asarray(ws.series[r], np.float32)
+                lrgb[sel] = np.where(below[..., None], 2 * first[:, None, :] - v, v)
+                dt[sel] = np.asarray(ws.dtv[np.where(below, r[:, None], ii)], np.float32)
         return lrgb, dt
 
     def inputs(self, rows, aug=False, rng=None, acfg: AugCfg | None = None, p_aug=1.0, hp: HP | None = None):
         """x [B, 10, 300], s [B, 9] float32 (numpy), domain [B] int64. `aug`: augment each row with probability p_aug."""
         rows = np.asarray(rows)
-        lrgb, dt = self.buffers(rows)
+        w20 = hp is not None and hp.win == 20
+        lrgb, dt = self.buffers(rows, CTX + 2 * WIN if w20 else CTX + WIN)
         base = self.base[rows].copy()
         mask = self.mask[rows]
         if aug:
@@ -209,7 +227,10 @@ class Pool:
             if len(sel):
                 l2, d2, b2 = augment_batch(lrgb[sel], base[sel], mask[sel], rng, acfg)
                 lrgb[sel], dt[sel], base[sel] = l2, d2, b2
-        x, s, _ = FT.windows_to_tensor(lrgb, dt, base, mask)
+        x, s, _ = FT.windows_to_tensor(lrgb[:, -(CTX + WIN):], dt[:, -(CTX + WIN):], base, mask)
+        if w20:
+            x0, _, _ = FT.windows_to_tensor(lrgb[:, :CTX + WIN], dt[:, :CTX + WIN], base, mask)
+            x = np.concatenate([x0, x], axis=2)
         if hp is not None:
             x, s = apply_drop(x, s, hp)
         return x, s, self.domain[rows]
@@ -369,7 +390,7 @@ class Sampler:
         self.by = {}
         for d in pool.ds_rows:
             r = rows[pool.ds[rows] == d]
-            if d == 'openox' and not hp.use_openox:
+            if (d == 'openox' and not hp.use_openox) or (d == 'butppg' and hp.win == 20):
                 r = r[:0]
             if len(r):
                 self.by[d] = r
@@ -453,6 +474,9 @@ def fit(pool: Pool, train_rows, val_rows, hp: HP, seed=0, device='cpu', log=None
     seed_all(seed)
     rng = np.random.default_rng(seed)
     train_rows = np.asarray(train_rows)
+    if hp.win == 20:                                   # BUT clips are 10 s long: no 20 s window exists
+        train_rows = train_rows[pool.ds[train_rows] != 'butppg']
+        val_rows = None if val_rows is None else np.asarray(val_rows)[pool.ds[np.asarray(val_rows)] != 'butppg']
     net = make_net(hp, device)
     norm = Norm.fit(pool, train_rows, hp, rng)
     sam = Sampler(pool, train_rows, hp, rng)
@@ -570,7 +594,7 @@ def train_scores(pool, fr: FitResult, device='cpu', cap=1500, seed=0):
         o = predict(fr.net, pool, h, fr.norm, fr.hp, device)
         tm = M.time_matched(pool.t[h], pool.low[h], (o['p_low'] > 0.5).astype(int), o['p_low'])
         out['p1'] = tm['tm_bacc']
-    q = tr[np.isin(pool.ds[tr], ('mths', 'butppg')) & pool.has_hr[tr]]
+    q = tr[np.isin(pool.ds[tr], ('mths',) if fr.hp.win == 20 else ('mths', 'butppg')) & pool.has_hr[tr]]
     if len(q):
         q = rng.choice(q, min(cap, len(q)), replace=False)
         o = predict(fr.net, pool, q, fr.norm, fr.hp, device)
@@ -616,8 +640,10 @@ def main(argv=None):
     ap.add_argument('--data', default=None, help='shard root (default OXY_CACHE/data)')
     ap.add_argument('--device', default='cpu')
     ap.add_argument('--hp', default=None, help='JSON dict of HP overrides')
+    ap.add_argument('--recipe', default=None, help='JSON file with the nested-selection recipe (HP overrides)')
     a = ap.parse_args(argv)
-    over = json.loads(a.hp) if a.hp else {}
+    over = json.load(open(a.recipe)) if a.recipe else {}
+    over.update(json.loads(a.hp) if a.hp else {})
     if a.steps:
         over['steps'] = a.steps
     if a.init:
@@ -640,7 +666,14 @@ def main(argv=None):
         o = predict(fr.net, pool, rows, fr.norm, fr.hp, a.device)
         tm = M.time_matched(pool.t[rows], pool.low[rows], (o['p_low'] > 0.5).astype(int), o['p_low'])
         print('held-out', test, 'TM bacc', tm['tm_bacc'], 'HR within5', M.hr_metrics(o['hr'], pool.hr[rows])['within5_full'], 'SpO2 MAE', M.spo2_metrics(o['spo2'], pool.spo2[rows])['mae'])
-    if a.out:
+    if a.out and a.final:
+        # the exported student consumes RAW features: fold the phone-domain input scale into the weights (exact, see fold_norm and its test)
+        folded = fold_norm(fr.net, fr.norm, 0)
+        class _F:
+            pass
+        ff = _F(); ff.net, ff.norm, ff.hp, ff.best_step = folded, fr.norm, fr.hp, fr.best_step
+        print('saved', a.out, save_ckpt(a.out, ff, {'folded_norm_domain': 0, 'val_subjects': vs, 'params_shipped': count_params(folded, include_aux=False), 'seed': a.seed}))
+    elif a.out:
         print('saved', a.out, save_ckpt(a.out, fr))
 
 

@@ -37,11 +37,11 @@ from .train import HP, Pool, fit, fold_rows, predict, scores_frame, train_scores
 
 
 # ---------------------------------------------------------------------------------------------------------------- folds
-def make_folds(pool: Pool, task: str, seed=0):
+def make_folds(pool: Pool, task: str, seed=0, win=10):
     """List of dict(id, test_subjects, protocol). p1: Hoffman LOSO. p23: MTHS and BUT LOSO. p23k: 10 grouped folds over the MTHS+BUT people (not LOSO)."""
     if task == 'p1':
         return [dict(id=s, test=[s], protocol='LOSO') for s in pool.subjects_of('hoffman')]
-    subs = pool.subjects_of('mths') + pool.subjects_of('butppg')
+    subs = pool.subjects_of('mths') + ([] if win == 20 else pool.subjects_of('butppg'))   # BUT clips are 10 s: no 20 s window exists
     if task == 'p23':
         return [dict(id=s, test=[s], protocol='LOSO') for s in subs]
     if task == 'p23k':
@@ -178,6 +178,7 @@ CANDIDATES = {
     'A_base': dict(),                 # w_low 1.5, plain class-weighted BCE
     'B_focal': dict(focal=2.0),       # focal BCE (gamma 2)
     'C_lowhi': dict(w_low=3.0),       # low-oxygen loss weight 3
+    'D_steps800': dict(steps=800),    # twice the fine-tuning steps
 }
 N_INNER = 2                           # inner held-out Hoffman people per outer fold (random 2 of the 5 remaining; compute budget)
 
@@ -238,6 +239,38 @@ def select_recipe(out_dir):
     return glob_.index[0], per_outer.merge(chosen, on='outer')
 
 
+# ---------------------------------------------------------------------------------------------------------------- job queue
+INIT = {'no_ssl': 'stageB_nossl.pt', 'no_openox': 'ssl_noox.pt'}          # every other variant starts from stageB_full.pt (SSL + OpenOx warm-up)
+
+
+def default_init(variant, ckpt_dir):
+    return os.path.join(ckpt_dir, INIT.get(variant, 'stageB_full.pt'))
+
+
+def run_queue(jobs_file, runs, ckpt_dir, shard, device, recipe_path, log, data=None):
+    """Each line of jobs_file: `variant task seed`. Runs this worker's share of the folds of every job in order (fold k belongs to shard k % n);
+    resumable. Hyper-parameters = the nested-selection recipe (recipe.json: HP overrides) on top of the variant definition."""
+    recipe = json.load(open(recipe_path)) if recipe_path and os.path.exists(recipe_path) else {}
+    cache = {}
+    for line in open(jobs_file):
+        line = line.split('#')[0].split()
+        if len(line) < 3:
+            continue
+        variant, task, seed = line[0], line[1], int(line[2])
+        pool = cache.get('pool') or Pool(root=data, seed=0)
+        cache['pool'] = pool
+        hp = variant_hp(variant, **{**recipe, 'init': default_init(variant, ckpt_dir)})
+        out = os.path.join(runs, variant, f's{seed}', task)
+        folds = make_folds(pool, task, seed, hp.win)
+        mine = [f for k, f in enumerate(folds) if (not shard) or k % shard[1] == shard[0]]
+        os.makedirs(out, exist_ok=True)
+        json.dump(dict(variant=variant, hp=hp.to_dict(), seed=seed, task=task), open(os.path.join(out, f'config_{shard[0] if shard else 0}.json'), 'w'), indent=1, default=str)
+        for k, f in enumerate(mine):
+            t0 = time.time()
+            m = run_fold(pool, f, hp, seed, device, out, None)
+            log(f'{variant} {task} s{seed} [{k + 1}/{len(mine)}] {f["id"]} ' + ('skipped' if m is None else f'{time.time() - t0:.0f}s best_step {m["best_step"]}'))
+
+
 # ---------------------------------------------------------------------------------------------------------------- CLI
 def parse_shard(s):
     if not s:
@@ -256,6 +289,8 @@ def main(argv=None):
     n = sub.add_parser('nested'); n.add_argument('--out', required=True); n.add_argument('--variant', default='full'); n.add_argument('--seed', type=int, default=0)
     n.add_argument('--init', default=None); n.add_argument('--shard', default=None); n.add_argument('--hp', default=None); n.add_argument('--data', default=None); n.add_argument('--device', default='cpu')
     n.add_argument('--threads', type=int, default=0)
+    q = sub.add_parser('queue'); q.add_argument('--jobs', required=True); q.add_argument('--runs', required=True); q.add_argument('--ckpt-dir', required=True)
+    q.add_argument('--shard', default=None); q.add_argument('--recipe', default=None); q.add_argument('--device', default='cpu'); q.add_argument('--threads', type=int, default=0); q.add_argument('--data', default=None)
     s = sub.add_parser('summarize'); s.add_argument('dirs', nargs='+'); s.add_argument('--json', default=None)
     sel = sub.add_parser('select'); sel.add_argument('dir')
     a = ap.parse_args(argv)
@@ -272,6 +307,9 @@ def main(argv=None):
     import torch
     if a.threads:
         torch.set_num_threads(a.threads)
+    if a.cmd == 'queue':
+        run_queue(a.jobs, a.runs, a.ckpt_dir, parse_shard(a.shard), a.device, a.recipe, lambda m: print(m, flush=True), a.data)
+        return
     over = json.loads(a.hp) if a.hp else {}
     if a.init:
         over['init'] = a.init
@@ -282,7 +320,7 @@ def main(argv=None):
     if a.cmd == 'nested':
         nested_selection(pool, over, a.variant, a.out, a.seed, sh, a.device, log)
         return
-    folds = make_folds(pool, a.task, a.seed)
+    folds = make_folds(pool, a.task, a.seed, hp.win)
     if sh:
         folds = [f for k, f in enumerate(folds) if k % sh[1] == sh[0]]
     if a.limit:

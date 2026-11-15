@@ -1,0 +1,75 @@
+{
+ "ssl_full": {
+  "rows": 299754,
+  "subjects": 212,
+  "sources": {
+   "openox": 182579,
+   "moshekam": 54509,
+   "ptt_ppg": 31481,
+   "bidmc": 24698,
+   "apnoea": 6487
+  },
+  "steps": 2500,
+  "bs": 192,
+  "lr": 0.002,
+  "seed": 0,
+  "no_openox": false,
+  "n_excluded_subjects": 34,
+  "scale": 6.033920764923096,
+  "temperature": 0.2,
+  "first_loss": 5.279719638824463,
+  "last_loss": 2.098121290206909,
+  "last_top1": 0.8298958396911621,
+  "seconds": 323.5942587852478,
+  "sha256": "ccdb6a75eae969ae59fbf3b88656debdbec06316ecd83340814da0e78b294010"
+ },
+ "ssl_noox": {
+  "rows": 117175,
+  "subjects": 109,
+  "sources": {
+   "moshekam": 54509,
+   "ptt_ppg": 31481,
+   "bidmc": 24698,
+   "apnoea": 6487
+  },
+  "steps": 2500,
+  "bs": 192,
+  "lr": 0.002,
+  "seed": 0,
+  "no_openox": true,
+  "n_excluded_subjects": 34,
+  "scale": 0.6867480278015137,
+  "temperature": 0.2,
+  "first_loss": 5.480030212402344,
+  "last_loss": 2.16456974029541,
+  "last_top1": 0.8434374976158142,
+  "seconds": 327.4509470462799,
+  "sha256": "55a20b2f64a50c28dde4741847fa3c21f45449a136654ad658b88efb22d78630"
+ },
+ "linear_probe_hr": {
+  "checkpoint": "ssl_full.pt",
+  "sha256": "ccdb6a75eae969ae59fbf3b88656debdbec06316ecd83340814da0e78b294010",
+  "task": "ridge on the frozen 64-d embedding (phone domain): fit MTHS+BUT windows, test 2,500 Hoffman windows (no person shared)",
+  "ssl": {
+   "mae": 7.245389572143555,
+   "within5": 0.4884
+  },
+  "random_init": {
+   "mae": 13.477647985839845,
+   "within5": 0.2164
+  },
+  "train_mean": {
+   "mae": 14.539556588745118,
+   "within5": 0.2028
+  },
+  "n_train": 5905,
+  "n_test": 2500
+ },
+ "checkpoints_sha256": {
+  "ssl_full.pt": "ccdb6a75eae969ae59fbf3b88656debdbec06316ecd83340814da0e78b294010",
+  "ssl_noox.pt": "55a20b2f64a50c28dde4741847fa3c21f45449a136654ad658b88efb22d78630",
+  "stageB_full.pt": "59c29a3003d2823d8f4bf1a258c69f9dd29aa0a3429b195d3e1b0fc69ec67841",
+  "stageB_nossl.pt": "7cd36b7c84e0d6a0c9dd97e1dcdc94cf51cc7bf3b16af5392cd5ed85872f6548",
+  "student_v1.pt": "545e72c9639c818c11dcaa5cbc7222a02339e9eb568b7d9e250a05bc60a9db61"
+ }
+}

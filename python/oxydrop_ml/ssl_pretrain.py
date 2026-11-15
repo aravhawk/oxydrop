@@ -207,6 +207,7 @@ def main(argv=None):
     ap.add_argument('--curve', default=None, help='loss-curve CSV path')
     ap.add_argument('--manifest', default=None, help='JSON manifest to update with this run (key = --tag)')
     ap.add_argument('--tag', default='ssl_full')
+    ap.add_argument('--hash-dir', default=None, help='with --probe --manifest: also record the SHA-256 of every *.pt in this directory')
     ap.add_argument('--holdout', default=None, help='JSON list of OpenOx subject ids to exclude (default: train.openox_holdout of the shard)')
     ap.add_argument('--max-rows', type=int, default=None, help='subsample the corpus (smoke tests)')
     ap.add_argument('--probe', default=None, help='run the HR linear-probe sanity check on this checkpoint and exit')
@@ -215,6 +216,14 @@ def main(argv=None):
     if a.probe:
         r = probe(a.probe)
         print(json.dumps(r, indent=1))
+        if a.manifest:
+            m = json.load(open(a.manifest)) if os.path.exists(a.manifest) else {}
+            m['linear_probe_hr'] = dict(checkpoint=os.path.basename(a.probe), sha256=hashlib.sha256(open(a.probe, 'rb').read()).hexdigest(),
+                                        task='ridge on the frozen 64-d embedding (phone domain): fit MTHS+BUT windows, test 2,500 Hoffman windows (no person shared)', **r)
+            if a.hash_dir:
+                m['checkpoints_sha256'] = {f: hashlib.sha256(open(os.path.join(a.hash_dir, f), 'rb').read()).hexdigest() for f in sorted(os.listdir(a.hash_dir))
+                                           if f.endswith('.pt') and not f.startswith(('smoke', 'exp'))}
+            json.dump(m, open(a.manifest, 'w'), indent=1)
         return
     if a.holdout:
         hold = json.load(open(a.holdout))

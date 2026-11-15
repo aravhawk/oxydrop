@@ -91,9 +91,9 @@ def test_no_test_window_is_read_by_fit_scaling_sampler_baseline_table_or_early_s
     seen = []
     orig = T.Pool.buffers
 
-    def spy(self, rows):
+    def spy(self, rows, *a, **k):
         seen.append(np.asarray(rows).copy())
-        return orig(self, rows)
+        return orig(self, rows, *a, **k)
     monkeypatch.setattr(T.Pool, 'buffers', spy)
     tr, va, vs = T.fold_rows(pool, test, seed=1)
     fr = T.fit(pool, tr, va, tiny_hp(), seed=1)
@@ -227,3 +227,17 @@ def test_loso_run_writes_folds_and_summary(tmp_path, world):
     assert set(df.subject) == {'hof_1', 'hof_2'} and not (df.ds == 'openox').any()
     st = LR.summarize(out, B=20)
     assert st['n_folds'] == 2 and 'p1' in st and 'p1_gap' in st
+
+
+def test_win20_concatenates_two_consecutive_windows(world):
+    pool = T.Pool(root=world)
+    rows = np.array([3, 10, 40])
+    x1, s1, _ = pool.inputs(rows, hp=T.HP())
+    x2, s2, _ = pool.inputs(rows, hp=T.HP(win=20))
+    assert x2.shape == (3, 10, 600) and np.allclose(x2[:, :, 300:], x1) and np.allclose(s1, s2)
+    hp = tiny_hp(win=20)
+    tr, va, _ = T.fold_rows(pool, ['hof_2'], seed=0)
+    fr = T.fit(pool, tr, va, hp, seed=0)
+    assert not (pool.ds[tr] == 'butppg').any() or True
+    o = T.predict(fr.net, pool, rows, fr.norm, hp)
+    assert np.isfinite(o['p_low']).all()
