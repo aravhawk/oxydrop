@@ -17,7 +17,7 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res);
 }).listen(0, '127.0.0.1');
 await new Promise((r) => server.once('listening', r));
-const URL0 = `http://127.0.0.1:${server.address().port}/index.html`;
+const URL0 = process.env.LIVE_URL || `http://127.0.0.1:${server.address().port}/index.html`;   // LIVE_URL=https://aravhawk.github.io/oxydrop/index.html runs the same cases against the deployed site
 
 let failures = 0;
 const check = (name, ok, extra = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? '  (' + extra + ')' : ''}`); if (!ok) failures++; };
