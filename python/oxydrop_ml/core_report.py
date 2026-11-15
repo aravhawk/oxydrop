@@ -33,6 +33,7 @@ ROWS = [   # (variant dir, ablation number, label)
     ('no_basecond', '6', 'no baseline-relative conditioning (baseline-relative inputs and emb_base removed)'),
     ('hr_only', '7', 'HR-only CNN (SpO2, low-oxygen and auxiliary heads untrained; P1 and P3 not defined)'),
     ('win20', '8', '20 s window (instead of 10 s)'),
+    ('no_pretrain', '10 (exploratory)', 'no pretraining at all (no SSL, no OpenOx stage B; random init, 400 fine-tuning steps; the first run of row 2 accidentally measured this because of a variant-definition bug, it was caught and row 2 was rerun with stage B from scratch)'),
     ('adv', '9 (exploratory)', 'gradient-reversal domain-adversarial head on dataset id'),
 ]
 
@@ -140,15 +141,15 @@ def paired_vs_baselines(root, variant, bdir, cache_scores, B=1000):
         # ---- P3
         if 'p3' in bs:
             b = bs['p3']
-            d = df[(df.ds == 'mths') & df['eval'] & df.spo2_ref.notna()].merge(b.drop(columns=[c for c in ('spo2_ref',) if c in b.columns]), on=['subject', 't_start'], how='inner', suffixes=('', '_b'))
+            d = df[(df.ds == 'mths') & df['eval'] & df.spo2_ref.notna()].merge(b.drop(columns=[c for c in ('spo2_ref', 'rec') if c in b.columns]), on=['subject', 't_start'], how='inner')
             if len(d):
                 ref, pred, subj = d.spo2_ref.values, d.spo2_pred.values, d.subject.values
                 cnn = lambda idx: float(np.abs(pred[idx] - ref[idx]).mean())
-                for col in [c for c in b.columns if c.endswith('__full') or c.endswith('__pred')]:
+                for col in [c for c in b.columns if c not in ('subject', 'rec', 't_start', 'spo2_ref')]:
                     bp = d[col].values.astype(float)
                     base = lambda idx, bp=bp: float(np.nanmean(np.abs(bp[idx] - ref[idx])))
                     pb = M.paired_person_bootstrap(subj, cnn, base, B=B, seed=seed, higher_is_better=False)
-                    rows.append(dict(task='P3', seed=seed, baseline=col.rsplit('__', 1)[0], metric='mae (lower better)', cnn=pb['a'], base=pb['b'], diff=pb['diff'], lo=pb['lo'], hi=pb['hi'], win=pb['win'], n=len(d)))
+                    rows.append(dict(task='P3', seed=seed, baseline=col, metric='mae (lower better)', cnn=pb['a'], base=pb['b'], diff=pb['diff'], lo=pb['lo'], hi=pb['hi'], win=pb['win'], n=len(d)))
     return pd.DataFrame(rows)
 
 
@@ -186,33 +187,90 @@ def fmt(x, d=3):
     return 'n/a' if x is None or (isinstance(x, float) and not np.isfinite(x)) else f'{x:.{d}f}'
 
 
+def task_verdicts(pv):
+    """Per task: best baseline, the CNN's paired difference to it, and which baselines it beats / ties / loses to (paired person bootstrap, mean over seeds)."""
+    out = {}
+    if not len(pv):
+        return out
+    g = pv.groupby(['task', 'baseline']).agg(metric=('metric', 'first'), cnn=('cnn', 'mean'), base=('base', 'first'), diff=('diff', 'mean'), lo=('lo', 'mean'), hi=('hi', 'mean')).reset_index()
+    for task, t in g.groupby('task'):
+        hib = task != 'P3'
+        t = t.sort_values('base', ascending=not hib)
+        best = t.iloc[0]
+        out[task] = dict(best=best, wins=[r.baseline for _, r in t.iterrows() if r.lo > 0], ties=[r.baseline for _, r in t.iterrows() if r.lo <= 0 <= r.hi],
+                         losses=[r.baseline for _, r in t.iterrows() if r.hi < 0], table=t)
+    return out
+
+
+NOTES = """
+## What was run
+
+* **Pipeline** (`python/oxydrop_ml/`): `ssl_pretrain.py` (contrastive SSL) -> `train.py --stageb` (OpenOx supervised warm-up) -> `loso_run.py` (per-fold fine-tuning on pooled phone + OpenOx windows, LOSO or grouped folds,
+  nested selection) -> `core_report.py` (tables, paired bootstrap, scores). Student = `OxyNet` with 167,588 shipped parameters (`model.py`).
+* **Per fold**: the held-out person (both Hoffman hands together) and an inner-validation set drawn from the other people (1 Hoffman, 6 MTHS, 4 BUT people) never enter training, the input
+  scale, the baseline-embedding table or the OpenOx warm-up. Early stopping uses the inner-validation set only. 400 fine-tuning steps (batch 128, AdamW lr 1e-3, cosine) from the stage-B checkpoint.
+* **Pretraining never touches an outer test person**: the corpus holds no Hoffman, MTHS or BUT person; 34 OpenOx people (about 25 %, stratified by Monk tone, `train.openox_holdout`) are excluded from SSL,
+  stage B and every supervised run so FEAT-007/008 can evaluate OpenOx-specific tasks on people the student never saw. `tests/test_train.py` shows that changing a held-out person's signal and labels leaves
+  every trained weight byte-identical.
+* **Recipe**: chosen by nested CV before any outer comparison (`nested_selection.csv`): for each of the 6 outer Hoffman folds an inner leave-one-Hoffman-person-out CV (2 inner people) plus 8 MTHS and 6 BUT validation people
+  scores 4 candidate recipes; the candidate with the best mean inner score (mean of time-matched balanced accuracy, HR within-5 and 1 - SpO2 MAE/5) is `C_lowhi` (low-oxygen loss weight 3). It is the per-fold winner for 5 of 6 outer folds
+  (`D_steps800` for hof_100002); one recipe was applied to every fold and every ablation for simplicity and compute (a strictly per-fold choice would change one fold's recipe).
+* **Protocols**: P1 is true LOSO over the 6 Hoffman people for every row. P2/P3: the `full` row is true LOSO over 100 people (62 MTHS + 38 BUT); ablation rows use 10 subject-grouped folds over the same 100 people
+  and are labelled "not LOSO" in the `p23_protocol` column (compute); `full` is also reported under the same 10-fold protocol so each ablation is compared like for like.
+* **Seeds**: the `full` row and the five P1 ablations that have them use seeds 0, 1, 2 (mean over seeds in the table, seed SD in `*_seed_sd`). Other rows use seed 0 only.
+* **Windows**: P1 = 5,644 Hoffman windows (t >= 60 s), decision = low-oxygen probability > 0.5 (fixed, not tuned), time-matched balanced accuracy pooled over people; P2 = every window with a reference HR of the 100 people
+  at full coverage (no abstention); P3 = MTHS windows with t >= 30 s.
+* **Train-vs-test gap**: each fold's model is scored on its own training rows with the same metric (P1: time-matched balanced accuracy on the training Hoffman people; P2: within-5 on training MTHS+BUT rows; P3: MAE on training
+  MTHS rows) and compared with the held-out person's score of the fold (per-person values); positive gap = over-fitting.
+"""
+
+
 def write_markdown(out, df, pv, runs, bdir):
-    L = ['# Core CNN results (FEAT-006)', '', 'Generated by `python -m oxydrop_ml.core_report` (`bash scripts/reproduce_ml.sh core-report`). Every number below is read from `results/ml/ablation_core.csv`,',
-         '`results/ml/cnn_vs_baselines_paired.csv`, `results/ml/nested_selection*.csv` and `results/ml/ssl_manifest.json`. Protocol: `python/oxydrop_ml/PREREGISTRATION.md`.', '']
+    L = ['# Core CNN results (FEAT-006)', '',
+         'Generated by `python -m oxydrop_ml.core_report` (`bash scripts/reproduce_ml.sh core-report`). Every number below is read from `results/ml/ablation_core.csv`,',
+         '`results/ml/cnn_vs_baselines_paired.csv`, `results/ml/nested_selection*.csv` and `results/ml/ssl_manifest.json`; baselines are `results/ml/baselines_P{1,2,3}.csv` (FEAT-005).',
+         'Protocol: `python/oxydrop_ml/PREREGISTRATION.md`. A win on a pre-registered metric needs the paired person-level bootstrap 95 % interval of the difference to the best honest baseline to exclude zero.', '']
+    tv = task_verdicts(pv)
+    L += ['## Verdict', '']
+    names = {'P1': 'P1 low-oxygen detection (Hoffman, 6 people, time-matched balanced accuracy)', 'P2': 'P2 heart rate (MTHS + BUT, 100 people, within 5 bpm at full coverage)', 'P3': 'P3 absolute SpO2 (MTHS, 62 people, MAE, lower is better)'}
+    full = df[(df.variant == 'full')].sort_values('p23_kind') if len(df) else df
+    for task, key, cnn_key in (('P1', 'p1', 'p1_tm_bacc'), ('P2', 'p2', 'p2_within5'), ('P3', 'p3', 'p3_mae')):
+        if task not in tv:
+            continue
+        v = tv[task]; b = v['best']
+        row = full[full[cnn_key].notna()].iloc[0] if len(full) and full[cnn_key].notna().any() else None
+        cnn = f"{fmt(row[cnn_key])} [{fmt(row[cnn_key + '_lo'])}, {fmt(row[cnn_key + '_hi'])}]" if row is not None else fmt(b.cnn)
+        vd = verdict(b.lo if task != 'P3' else b.lo, b.hi)
+        L.append(f"* **{names[task]}**: CNN (full) {cnn}; best honest baseline `{b.baseline}` {fmt(b.base)}; paired difference CNN minus baseline {fmt(b['diff'])} [{fmt(b.lo)}, {fmt(b.hi)}] (positive = CNN better) -> **{vd}**. "
+                 f"Baselines the CNN beats with the interval excluding zero: {', '.join(v['wins']) or 'none'}. Ties: {', '.join(v['ties']) or 'none'}. Losses: {', '.join(v['losses']) or 'none'}.")
+    L.append('')
     if len(pv):
-        L += ['## Headline: the CNN against the honest baselines (paired person-level bootstrap, B = 1000, same windows)', '',
-              '| task | metric | baseline | baseline value | CNN (full, mean over seeds) | CNN minus baseline [95% CI] | verdict |', '|---|---|---|---|---|---|---|']
-        g = pv.groupby(['task', 'baseline']).agg(metric=('metric', 'first'), cnn=('cnn', 'mean'), base=('base', 'first'), diff=('diff', 'mean'), lo=('lo', 'mean'), hi=('hi', 'mean'), seeds=('seed', 'nunique')).reset_index()
+        L += ['## Headline: the CNN against the honest baselines (paired person-level bootstrap, B = 1000, same windows, mean over seeds)', '',
+              '| task | metric | baseline | baseline value | CNN | CNN minus baseline [95% CI] (positive = CNN better) | verdict |', '|---|---|---|---|---|---|---|']
         for task in ('P1', 'P2', 'P3'):
-            t = g[g.task == task]
-            if not len(t):
+            if task not in tv:
                 continue
-            hib = task != 'P3'
-            best = t.sort_values('base', ascending=not hib).head(4)
-            for _, r in best.iterrows():
-                lo, hi = (r.lo, r.hi)
+            for _, r in tv[task]['table'].iterrows():
+                lo, hi = r.lo, r.hi
                 L.append(f"| {task} | {r.metric} | {r.baseline} | {fmt(r.base)} | {fmt(r.cnn)} | {fmt(r['diff'])} [{fmt(lo)}, {fmt(hi)}] | {verdict(lo, hi)} |")
         L.append('')
     if len(df):
-        L += ['## Ablation table (descriptive; selection optimism applies: several variants on 6 Hoffman people)', '',
-              '| # | variant | P2/P3 protocol | seeds | P1 TM bal. acc [95% CI] | P1 per-person mean ± SD | P1 train-test gap | P2 within-5 [95% CI] | P2 per-person mean ± SD | P2 gap | P3 MAE [95% CI] | P3 per-person mean ± SD | P3 gap |',
+        L += ['## Ablation table (descriptive; with several variants on 6 Hoffman people this carries selection optimism)', '',
+              'Pooled values with 95 % person-bootstrap CI (mean of the seeds\' pooled values and CI bounds); "per-person" is the mean ± SD over folds (people). Gap = train-fold score minus held-out score (positive = over-fitting; for MAE test minus train).', '',
+              '| # | variant | P2/P3 protocol | seeds | P1 TM bal. acc [95% CI] (seed SD) | P1 per-person mean ± SD | P1 gap | P2 within-5 [95% CI] (seed SD) | P2 per-person mean ± SD | P2 gap | P3 MAE [95% CI] | P3 per-person mean ± SD | P3 gap |',
               '|---|---|---|---|---|---|---|---|---|---|---|---|---|']
         for _, r in df.iterrows():
-            L.append(f"| {r.ablation} | {r.variant} | {r.p23_protocol} | {r.n_seeds} | {fmt(r.p1_tm_bacc)} [{fmt(r.p1_tm_bacc_lo)}, {fmt(r.p1_tm_bacc_hi)}] ± seed SD {fmt(r.p1_tm_bacc_seed_sd)} | "
-                     f"{fmt(r.p1_tm_bacc_fold_mean)} ± {fmt(r.p1_tm_bacc_fold_sd)} | {fmt(r.p1_tm_bacc_gap)} | {fmt(r.p2_within5)} [{fmt(r.p2_within5_lo)}, {fmt(r.p2_within5_hi)}] | "
+            L.append(f"| {r.ablation} | {r.variant} | {r.p23_protocol} | {r.n_seeds} | {fmt(r.p1_tm_bacc)} [{fmt(r.p1_tm_bacc_lo)}, {fmt(r.p1_tm_bacc_hi)}] ({fmt(r.p1_tm_bacc_seed_sd)}) | "
+                     f"{fmt(r.p1_tm_bacc_fold_mean)} ± {fmt(r.p1_tm_bacc_fold_sd)} | {fmt(r.p1_tm_bacc_gap)} | {fmt(r.p2_within5)} [{fmt(r.p2_within5_lo)}, {fmt(r.p2_within5_hi)}] ({fmt(r.p2_within5_seed_sd)}) | "
                      f"{fmt(r.p2_within5_fold_mean)} ± {fmt(r.p2_within5_fold_sd)} | {fmt(r.p2_within5_gap)} | {fmt(r.p3_mae)} [{fmt(r.p3_mae_lo)}, {fmt(r.p3_mae_hi)}] | {fmt(r.p3_mae_fold_mean)} ± {fmt(r.p3_mae_fold_sd)} | {fmt(r.p3_mae_gap)} |")
-        L.append('')
-    open(os.path.join(out, 'CORE_RESULTS_tables.md'), 'w').write('\n'.join(L) + '\n')
+        L += ['', 'Variant definitions: `no_ssl` = stage B from scratch; `no_physics` = ratio-of-ratios channels, beat_ok and their side features zeroed; `no_openox` = SSL without OpenOx, no stage B, no OpenOx in training; '
+              '`no_aug` = no device augmentation; `no_basecond` = baseline-relative inputs and emb_base removed; `hr_only` = only the HR and quality heads are trained (P1 and P3 are then not defined; the untrained SpO2 and '
+              'low-oxygen heads are not scored); `win20` = two consecutive 10 s feature windows (20 s of input), BUT clips are 10 s so P2 for this row is MTHS only; `adv` = exploratory gradient-reversal head on dataset id.', '']
+    L.append(NOTES)
+    ext = os.path.join(out, 'CORE_RESULTS_extra.md')
+    if os.path.exists(ext):
+        L.append(open(ext).read())
+    open(os.path.join(out, 'CORE_RESULTS.md'), 'w').write('\n'.join(L) + '\n')
 
 
 def main(argv=None):
@@ -227,11 +285,12 @@ def main(argv=None):
     os.makedirs(a.out, exist_ok=True)
     rows = []
     for v, num, label in ROWS:
-      for kind in ('p23', 'p23k'):
-        r = ablation_row(a.runs, v, num, label, a.B, kind)
-        if r and (kind == 'p23' or not rows or True):
-            rows.append(r)
-            print('row', v, {k: (round(x, 4) if isinstance(x, float) else x) for k, x in r.items() if k in ('p1_tm_bacc', 'p2_within5', 'p3_mae', 'n_seeds')}, flush=True)
+        kinds = [k for k in ('p23', 'p23k') if any(_has(os.path.join(sd, k)) for sd in seed_dirs(a.runs, v))] or ['none']
+        for kind in kinds:
+            r = ablation_row(a.runs, v, num, label, a.B, kind)
+            if r:
+                rows.append(r)
+                print('row', v, kind, {k: (round(x, 4) if isinstance(x, float) else x) for k, x in r.items() if k in ('p1_tm_bacc', 'p2_within5', 'p3_mae', 'n_seeds')}, flush=True)
     df = pd.DataFrame(rows)
     df.to_csv(os.path.join(a.out, 'ablation_core.csv'), index=False)
     print('wrote', os.path.join(a.out, 'ablation_core.csv'))

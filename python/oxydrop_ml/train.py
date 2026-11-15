@@ -95,7 +95,9 @@ def variant_hp(name: str, **over) -> HP:
     hp = HP(**over)
     if name == 'full':
         pass
-    elif name == 'no_ssl':
+    elif name == 'no_ssl':                           # keep the init passed in: stage B from scratch (no SSL), see loso_run.INIT
+        pass
+    elif name == 'no_pretrain':                      # exploratory: neither SSL nor the OpenOx warm-up; fine-tune from random init
         hp.init = None
     elif name == 'no_physics':                       # drop the ratio-of-ratios channels (4, 5), beat_ok (6) and their side features
         hp.drop_ch = (4, 5, 6); hp.drop_side = (0, 1, 8)

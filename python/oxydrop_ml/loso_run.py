@@ -260,6 +260,8 @@ def run_queue(jobs_file, runs, ckpt_dir, shard, device, recipe_path, log, data=N
         pool = cache.get('pool') or Pool(root=data, seed=0)
         cache['pool'] = pool
         hp = variant_hp(variant, **{**recipe, 'init': default_init(variant, ckpt_dir)})
+        if variant == 'no_pretrain':
+            assert hp.init is None
         out = os.path.join(runs, variant, f's{seed}', task)
         folds = make_folds(pool, task, seed, hp.win)
         mine = [f for k, f in enumerate(folds) if (not shard) or k % shard[1] == shard[0]]

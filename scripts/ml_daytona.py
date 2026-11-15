@@ -67,6 +67,7 @@ def code_tar():
 def up(a):
     D, Img, Res = sdk()
     sb = D.create(Img(image='python:3.12-slim', resources=Res(cpu=a.cpu, memory=a.mem, disk=a.disk), labels={'proj': 'veritas-ml-train', 'owner': 'feat006'}), timeout=600)
+    sb.set_autostop_interval(0)          # background jobs do not count as activity: without this the sandbox stops after 15 minutes
     json.dump(dict(id=sb.id, tag=a.tag), open(state_path(a.tag), 'w'))
     print('sandbox', sb.id, flush=True)
     ex = lambda c, t=1800: sb.process.exec(c, timeout=t)
