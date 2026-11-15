@@ -326,3 +326,19 @@ def test_committed_results_are_internally_consistent():
     b = MM.time_matched(base.t_start.values, base.y_low.values.astype(int), base['chain_v1__full'].values.astype(int), base['chain_v1__score'].values)['tm_bacc']
     assert abs(b - tab[tab.model == 'CHAIN_SHIPPED'].tm_bacc.iloc[0]) < 1e-9 and abs(b - 0.7962495) < 1e-6        # the shipped chain reproduces the FEAT-005 baseline
     assert tab.ci_lo.le(tab.tm_bacc + 1e-9).all() and tab.ci_hi.ge(tab.tm_bacc - 1e-9).all()
+
+
+def test_hybrid_md_prints_the_static_tail_as_lines_not_characters(tmp_path):
+    """Regression: `L += STATIC` iterated the string and wrote one character per line. Runs the generator on the committed CSVs into a temp copy."""
+    import shutil
+    from oxydrop_ml import hybrid_md as HM
+    root = Path(__file__).resolve().parents[3] / 'results' / 'ml'
+    if not (root / 'hybrid_p1_final.csv').exists():
+        pytest.skip('hybrid results not generated')
+    shutil.copytree(root, tmp_path / 'ml', ignore=shutil.ignore_patterns('*.md'))
+    HM.main(['--res', str(tmp_path / 'ml')])
+    lines = (tmp_path / 'ml' / 'HYBRID.md').read_text().splitlines()
+    assert len(lines) < 1000
+    assert sum(1 for ln in lines if len(ln) == 1) < 10
+    assert any(ln.startswith('## What is and is not claimed') for ln in lines)
+    assert any('Not claimed:' in ln for ln in lines)

@@ -208,7 +208,7 @@ def main(argv=None):
         L += ['## Deployed pipeline', '',
               f'Choosing by the same inner-fold rule on the six out-of-fold tables gives source `{pl["source"]}` (features {", ".join(pl["features"])}), per-user calibration {"on" if pl["calibration"] else "off"}, k = {pl["aggregate_windows"]} window(s), inner-CV TM balanced accuracy {f3(pl["inner_cv_tm_bacc"])}; ensemble members: {", ".join(f"{m["family"]} seed {m["seed"]}" for m in dj["members"])} ({sum(m.get("bytes", 0) for m in dj["members"]) / 1e6:.1f} MB of weights).',
               (f'The nested estimate of this deployed *procedure* is the `HYBRID_FINAL` row above ({f3(fin.tm_bacc)}). The row `default_{pl["source"]}` ({f3(dflt.tm_bacc.iloc[0])}) is the same pipeline looked at after the fact on the outer folds: it is not an unbiased estimate, because the pipeline was chosen with all six people in view.' if len(dflt) else ''), '']
-    L += STATIC
+    L += STATIC.split("\n")
     open(os.path.join(R, f'HYBRID{t}.md'), 'w').write('\n'.join(L) + '\n')
     print('wrote', os.path.join(R, f'HYBRID{t}.md'))
 
