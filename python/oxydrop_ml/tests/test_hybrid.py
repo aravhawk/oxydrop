@@ -309,3 +309,20 @@ def test_documented_combiner_matches_the_pipeline_with_calibration_and_aggregati
         doc = dict(pipeline=dict(features=H.CANDS[src], calibration=cal, aggregate_windows=k, meta=f.params))
         rows = [dict(zip(['c', 'p', 'corr', 'in_base'], v)) for v in zip(outer['c'], outer['p'], outer['corr'], outer['in_base'])]
         assert np.allclose(reference_combiner(doc, rows), sc, atol=1e-9), (src, cal, k)
+
+
+def test_committed_results_are_internally_consistent():
+    """Independent recomputation of the headline numbers from the committed per-window score files (skips when the results are not generated)."""
+    root = Path(__file__).resolve().parents[3] / 'results' / 'ml'
+    sp, tp, bp = root / 'scores' / 'hybrid_final_hoffman.csv', root / 'hybrid_p1_final.csv', root / 'scores' / 'baseline_P1_hoffman.csv'
+    if not (sp.exists() and tp.exists() and bp.exists()):
+        pytest.skip('hybrid results not generated')
+    from oxydrop_ml import metrics as MM
+    s, tab, base = pd.read_csv(sp), pd.read_csv(tp), pd.read_csv(bp)
+    assert len(s) == 5644 and s.subject.nunique() == 6 and s.low.isin([0, 1]).all() and np.allclose(s.prob, 1 / (1 + np.exp(-s.logit)))
+    row = tab[tab.model == ('HYBRID_FINAL_EXT' if s.ruleset.iloc[0] == 'EXT' else 'HYBRID_FINAL')].iloc[0]
+    tm = MM.time_matched(s.t_start.values, s.low.values.astype(int), (s.logit.values > 0).astype(int), s.logit.values)['tm_bacc']
+    assert abs(tm - row.tm_bacc) < 1e-9
+    b = MM.time_matched(base.t_start.values, base.y_low.values.astype(int), base['chain_v1__full'].values.astype(int), base['chain_v1__score'].values)['tm_bacc']
+    assert abs(b - tab[tab.model == 'CHAIN_SHIPPED'].tm_bacc.iloc[0]) < 1e-9 and abs(b - 0.7962495) < 1e-6        # the shipped chain reproduces the FEAT-005 baseline
+    assert tab.ci_lo.le(tab.tm_bacc + 1e-9).all() and tab.ci_hi.ge(tab.tm_bacc - 1e-9).all()
