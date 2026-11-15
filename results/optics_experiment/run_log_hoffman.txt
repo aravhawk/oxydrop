@@ -1,0 +1,94 @@
+gate coverage on evaluated windows: 0.9725; valid_hr 0.9731
+time-only clock                                acc 0.838 bacc 0.834 sens 0.864 spec 0.805 auc 0.825 TM 0.519 worst 0.538 cov 0.973
+dHR-only (TINY stage 1, shipped)               acc 0.756 bacc 0.764 sens 0.710 spec 0.818 auc 0.862 TM 0.799 worst 0.507 cov 0.973
+TINY chain                                     acc 0.876 bacc 0.875 sens 0.883 spec 0.867 auc 0.949 TM 0.801 worst 0.778 cov 0.973
+TINY chain (ALL windows, reference)            acc 0.870 bacc 0.869 sens 0.879 spec 0.858 auc 0.942 TM 0.795 worst 0.775 cov 1.000
+time-only clock (ALL windows)                  acc 0.835 bacc 0.830 sens 0.864 spec 0.797 auc 0.819 TM 0.519 worst 0.539 cov 1.000
+dHR-only (ALL windows)                         acc 0.751 bacc 0.759 sens 0.706 spec 0.812 auc 0.855 TM 0.791 worst 0.507 cov 1.000
+LR OPT (RoR+PI+DC+CV)                          acc 0.755 bacc 0.752 sens 0.769 spec 0.736 auc 0.813 TM 0.695 worst 0.492 cov 0.973 C chosen [0.003, 0.01, 0.03, 3] 5s
+LR OPT+dHR                                     acc 0.802 bacc 0.802 sens 0.799 spec 0.805 auc 0.891 TM 0.740 worst 0.576 cov 0.973 C chosen [0.003, 0.01, 0.03, 0.1] 9s
+LR RoR only                                    acc 0.671 bacc 0.663 sens 0.720 spec 0.607 auc 0.725 TM 0.620 worst 0.433 cov 0.973 C chosen [0.01, 0.03, 0.1, 0.3, 1] 11s
+LR DC only                                     acc 0.819 bacc 0.814 sens 0.848 spec 0.780 auc 0.906 TM 0.668 worst 0.758 cov 0.973 C chosen [0.03, 0.1, 0.3] 13s
+LR PI only                                     acc 0.612 bacc 0.593 sens 0.728 spec 0.458 auc 0.590 TM 0.632 worst 0.404 cov 0.973 C chosen [0.003, 0.01, 0.3] 16s
+LR dHR only (new HR, gated)                    acc 0.790 bacc 0.787 sens 0.811 spec 0.763 auc 0.877 TM 0.790 worst 0.623 cov 0.973 C chosen [0.03, 0.1] 18s
+LR RoR+dHR                                     acc 0.797 bacc 0.796 sens 0.805 spec 0.787 auc 0.878 TM 0.763 worst 0.588 cov 0.973 C chosen [0.01, 0.03, 0.1] 20s
+LR RoR_GB only (post hoc)                      acc 0.666 bacc 0.639 sens 0.823 spec 0.456 auc 0.699 TM 0.670 worst 0.417 cov 0.973 C chosen [0.003, 0.01] 21s
+LR RoR_GB+dHR (post hoc)                       acc 0.751 bacc 0.739 sens 0.819 spec 0.659 auc 0.823 TM 0.719 worst 0.495 cov 0.973 C chosen [0.003, 0.1] 23s
+LR DC+dHR                                      acc 0.828 bacc 0.822 sens 0.869 spec 0.774 auc 0.914 TM 0.734 worst 0.703 cov 0.973 C chosen [0.01, 0.03, 0.1] 26s
+LR PI+dHR                                      acc 0.756 bacc 0.755 sens 0.762 spec 0.749 auc 0.823 TM 0.724 worst 0.506 cov 0.973 C chosen [0.01, 0.3] 28s
+LR RoR_RG only                                 acc 0.561 bacc 0.516 sens 0.830 spec 0.202 auc 0.575 TM 0.509 worst 0.377 cov 0.973 C chosen [0.003, 0.01] 30s
+GBM OPT+dHR                                    acc 0.819 bacc 0.819 sens 0.825 spec 0.813 auc 0.887 TM 0.746 worst 0.653 cov 0.973 hp chosen [(120, 3), (40, 6), (40, 6), (120, 3), (120, 3), (120, 3)] 33s
+GBM OPT (RoR+PI+DC+CV)                         acc 0.832 bacc 0.828 sens 0.852 spec 0.804 auc 0.901 TM 0.710 worst 0.733 cov 0.973 hp chosen [(120, 3), (120, 3), (120, 3), (120, 3), (120, 3), (120, 3)] 36s
+TINY + (LR OPT+dHR) average                    acc 0.835 bacc 0.837 sens 0.824 spec 0.850 auc 0.934 TM 0.759 worst 0.685 cov 0.973
+LR OPT+dHR, no gating (all windows)            acc 0.797 bacc 0.797 sens 0.797 spec 0.796 auc 0.877 TM 0.742 worst 0.566 cov 1.000
+TINY on same all windows                       acc 0.870 bacc 0.869 sens 0.879 spec 0.858 auc 0.942 TM 0.795 worst 0.775 cov 1.000
+
+Per-person Spearman (feature delta vs reference SpO2; plain / time-partial):
+feature    p1   pt1    p2   pt2    p3   pt3    p4   pt4    p5   pt5    p6   pt6  n_pos  n_neg  mean_rho  n_pos_timepartial  n_neg_timepartial  mean_rho_timepartial
+     hr -0.91 -0.92 -0.94 -0.94 -0.80 -0.76 -0.63 -0.67 -0.90 -0.90 -0.89 -0.90      0      6     -0.85                  0                  6                 -0.85
+ ror_RG  0.13  0.10 -0.70 -0.74 -0.33 -0.47 -0.09 -0.32 -0.67 -0.72 -0.79 -0.81      1      5     -0.41                  1                  5                 -0.49
+ ror_RB  0.24  0.22 -0.40 -0.50  0.05 -0.23  0.37  0.27 -0.30 -0.33 -0.24 -0.24      3      3     -0.05                  2                  4                 -0.13
+ ror_GB  0.41  0.53  0.87  0.88  0.47  0.56  0.47  0.58  0.85  0.86  0.89  0.90      6      0      0.66                  6                  0                  0.72
+   pi_R -0.22 -0.20 -0.56 -0.63 -0.07 -0.37  0.07 -0.14 -0.27 -0.42 -0.65 -0.68      1      5     -0.29                  0                  6                 -0.41
+   pi_G -0.09 -0.02 -0.27 -0.31  0.06 -0.21  0.13 -0.05 -0.10 -0.27 -0.53 -0.55      2      4     -0.13                  0                  6                 -0.24
+   pi_B -0.24 -0.28 -0.48 -0.52 -0.11 -0.38  0.02 -0.18 -0.24 -0.41 -0.67 -0.70      1      5     -0.29                  0                  6                 -0.41
+   dc_R -0.88 -0.88 -0.92 -0.92 -0.85 -0.83 -0.64 -0.67 -0.77 -0.80 -0.96 -0.96      0      6     -0.84                  0                  6                 -0.84
+   dc_G -0.57 -0.57 -0.63 -0.66 -0.75 -0.75 -0.49 -0.57 -0.71 -0.75 -0.91 -0.91      0      6     -0.68                  0                  6                 -0.70
+   dc_B -0.88 -0.88 -0.84 -0.85 -0.84 -0.82 -0.65 -0.67 -0.76 -0.79 -0.95 -0.95      0      6     -0.82                  0                  6                 -0.83
+ amp_cv -0.08 -0.10 -0.34 -0.34  0.09  0.04 -0.48 -0.43 -0.36 -0.34 -0.19 -0.19      1      5     -0.23                  1                  5                 -0.22
+
+best optics-bearing LR variant by balanced accuracy (post hoc): LR DC+dHR
+nested cuts {1: 0.06, 2: 0.34, 3: 0.28, 4: 0.24, 5: 0.28, 6: 0.28}
+
+Selective prediction:
+               model                                 rule  coverage_of_all_eval   acc  bacc  sens  spec   auc  tm_acc  worst_person
+          TINY chain                      fixed band 0.00                 0.973 0.876 0.875 0.883 0.867 0.949   0.801         0.778
+          TINY chain                      fixed band 0.05                 0.905 0.905 0.905 0.904 0.907 0.958   0.828         0.801
+          TINY chain                      fixed band 0.10                 0.829 0.931 0.929 0.937 0.922 0.965   0.891         0.831
+          TINY chain                      fixed band 0.15                 0.754 0.948 0.947 0.954 0.940 0.971   0.912         0.877
+          TINY chain                      fixed band 0.20                 0.647 0.959 0.958 0.969 0.947 0.978   0.927         0.883
+           LR DC+dHR                      fixed band 0.00                 0.973 0.828 0.822 0.869 0.774 0.914   0.734         0.703
+           LR DC+dHR                      fixed band 0.05                 0.919 0.847 0.841 0.879 0.803 0.922   0.742         0.714
+           LR DC+dHR                      fixed band 0.10                 0.872 0.864 0.859 0.889 0.828 0.930   0.771         0.728
+           LR DC+dHR                      fixed band 0.15                 0.823 0.882 0.879 0.894 0.864 0.937   0.788         0.735
+           LR DC+dHR                      fixed band 0.20                 0.767 0.899 0.899 0.901 0.896 0.944   0.849         0.741
+           LR DC+dHR nested cutoff (target acc&bacc>=0.9)                 0.689 0.900 0.905 0.885 0.925 0.953   0.892         0.719
+          LR OPT+dHR                      fixed band 0.00                 0.973 0.802 0.802 0.799 0.805 0.891   0.740         0.576
+          LR OPT+dHR                      fixed band 0.05                 0.917 0.821 0.822 0.816 0.828 0.902   0.756         0.579
+          LR OPT+dHR                      fixed band 0.10                 0.873 0.834 0.835 0.829 0.842 0.909   0.772         0.589
+          LR OPT+dHR                      fixed band 0.15                 0.828 0.849 0.849 0.844 0.855 0.917   0.814         0.606
+          LR OPT+dHR                      fixed band 0.20                 0.784 0.863 0.864 0.855 0.873 0.924   0.829         0.618
+          LR OPT+dHR          nested cutoff (target 0.90)                 0.675 0.849 0.851 0.839 0.863 0.927   0.820         0.614
+TINY+OPT+dHR average                      fixed band 0.00                 0.973 0.835 0.837 0.824 0.850 0.934   0.759         0.685
+TINY+OPT+dHR average                      fixed band 0.05                 0.903 0.857 0.859 0.846 0.872 0.948   0.797         0.696
+TINY+OPT+dHR average                      fixed band 0.10                 0.836 0.882 0.883 0.873 0.893 0.961   0.820         0.726
+TINY+OPT+dHR average                      fixed band 0.15                 0.768 0.909 0.909 0.908 0.910 0.973   0.845         0.771
+TINY+OPT+dHR average                      fixed band 0.20                 0.693 0.946 0.944 0.958 0.931 0.984   0.882         0.879
+
+Per-person accuracy (person 2 = only Black participant):
+                    group                               model    p1    p2    p3    p4    p5    p6
+baseline-on-gated-windows                     time-only clock 0.963 0.954 0.835 0.908 0.745 0.538
+baseline-on-gated-windows    dHR-only (TINY stage 1, shipped) 0.507 0.903 0.693 0.604 0.959 0.916
+baseline-on-gated-windows                          TINY chain 0.917 0.886 0.865 0.778 0.927 0.877
+     baseline-all-windows TINY chain (ALL windows, reference) 0.917 0.886 0.850 0.775 0.917 0.877
+     baseline-all-windows       time-only clock (ALL windows) 0.963 0.954 0.818 0.911 0.739 0.539
+     baseline-all-windows              dHR-only (ALL windows) 0.507 0.903 0.687 0.596 0.953 0.916
+           optics-v2 (LR)               LR OPT (RoR+PI+DC+CV) 0.492 0.739 0.828 0.756 0.873 0.906
+           optics-v2 (LR)                          LR OPT+dHR 0.576 0.816 0.855 0.781 0.917 0.915
+           optics-v2 (LR)                         LR RoR only 0.433 0.695 0.641 0.661 0.823 0.840
+           optics-v2 (LR)                          LR DC only 0.832 0.888 0.788 0.758 0.854 0.774
+           optics-v2 (LR)                          LR PI only 0.404 0.696 0.642 0.515 0.630 0.826
+           optics-v2 (LR)         LR dHR only (new HR, gated) 0.623 0.809 0.748 0.766 0.935 0.908
+           optics-v2 (LR)                          LR RoR+dHR 0.588 0.806 0.826 0.760 0.940 0.914
+           optics-v2 (LR)           LR RoR_GB only (post hoc) 0.417 0.745 0.638 0.547 0.798 0.912
+           optics-v2 (LR)            LR RoR_GB+dHR (post hoc) 0.495 0.799 0.763 0.671 0.921 0.915
+           optics-v2 (LR)                           LR DC+dHR 0.703 0.908 0.790 0.758 0.916 0.919
+           optics-v2 (LR)                           LR PI+dHR 0.506 0.861 0.782 0.558 0.945 0.933
+           optics-v2 (LR)                      LR RoR_RG only 0.377 0.619 0.578 0.486 0.635 0.711
+     optics-v2 (tiny GBM)                         GBM OPT+dHR 0.653 0.927 0.783 0.733 0.909 0.940
+     optics-v2 (tiny GBM)              GBM OPT (RoR+PI+DC+CV) 0.814 0.901 0.790 0.733 0.876 0.874
+         optics-v2 + TINY         TINY + (LR OPT+dHR) average 0.685 0.857 0.877 0.799 0.923 0.898
+      optics-v2 (no gate) LR OPT+dHR, no gating (all windows) 0.566 0.789 0.850 0.796 0.898 0.935
+     baseline-all-windows            TINY on same all windows 0.917 0.886 0.850 0.775 0.917 0.877
+
+MAIN TABLE written; 23 rows; elapsed 43s

@@ -1,8 +1,12 @@
-// OxyDrop TINY chain, JavaScript port of python/tiny_chain.py + python/stages.py.
+// OxyDrop TINY chain v2 (field-hardened), JavaScript port of python/oxydrop/{features_v2,chain_v2,hr}.py.
+// v2 = v1 statistics + robust heart-rate estimator, beat spacing that cannot double-count, per-window validity gate ('nolock').
+// (engine_v1.js is the original research model kept for the v1 parity test.)
 // Pure ES module with no DOM/Node dependencies, so the same file runs in the browser and in the Node parity test.
 // Input: per-frame mean R,G,B (0..255 scale) resampled to a fixed 30 Hz grid. Fully causal, streaming.
 // Parity target: Python reference (scipy sosfilt / find_peaks, numpy) to ~1e-9 on the probability.
 
+import { bestChannelEstimate } from './hr.js';
+export const BEAT_AGREE = 0.12, SAT_MAX = 0.10, LOG251 = Math.log(251.0);
 export const FS = 30, WIN = 10, STEP = 2, CAL = 60, BAND = 0.10;
 export const FUSION = ['hr', 'rmssd', 'sdnn', 'rr_amp', 'rr_ibi', 'pi_R', 'pi_G', 'pi_B', 'beat_cv',
   'ror_RG', 'ror_RB', 'ror_GB', 'sl_RG', 'sl_RB', 'sl30_RG', 'ror30_RG', 'dc_R', 'dc_G', 'dc_B'];
@@ -92,23 +96,9 @@ function respRate(x) {
   return bestK * 0.00390625 * 60;
 }
 
-// spectral-concentration signal-quality index (cardiac band) of a 10 s green AC window (app quality gate; same definition as stages.py 'sqi')
-export function sqiOf(a10g) {
-  const M = a10g.length, N = 2048, w = a10g.map((v, n) => v * (0.5 - 0.5 * Math.cos(2 * Math.PI * n / (M - 1))));
-  const mags = []; let kMax = -1;
-  for (let k = 0; k <= N / 2; k++) {
-    const fr = k * FS / N; if (fr < 0.7 || fr > 3.5) continue;
-    let re = 0, im = 0; const ang = 2 * Math.PI * k / N;
-    for (let n = 0; n < M; n++) { re += w[n] * Math.cos(ang * n); im -= w[n] * Math.sin(ang * n); }
-    mags.push([k, Math.hypot(re, im)]);
-  }
-  let tot = 0, bi = 0; mags.forEach(([, m], i) => { tot += m; if (m > mags[bi][1]) bi = i; });
-  let near = 0; for (let i = Math.max(bi - 4, 0); i < Math.min(bi + 5, mags.length); i++) near += mags[i][1];
-  return near / (tot + 1e-9);
-}
-
 // ---------- per-window features ----------
 function winFeats(lgR, lgG, lgB, acR, acG, acB, te) {
+  const lgs = [lgR, lgG, lgB];
   const f = {}, s10 = te - 10 * FS, s30 = Math.max(0, te - 30 * FS);
   const a10 = [], a30 = [];
   for (let i = s10; i < te; i++) a10.push([acR[i], acG[i], acB[i]]);
@@ -120,12 +110,22 @@ function winFeats(lgR, lgG, lgB, acR, acG, acB, te) {
   const C3 = cov3(a30); f.sl30_RG = C3[0][1] / (C3[1][1] + 1e-12); f.ror30_RG = 0.5 * Math.log(C3[0][0] / (C3[1][1] + 1e-12));
   f.dc_R = dc[0]; f.dc_G = dc[1]; f.dc_B = dc[2];
   f.pi_R = Math.log(sd[0]); f.pi_G = Math.log(sd[1]); f.pi_B = Math.log(sd[2]);
-  const x = a30.map((r) => -(sd[1] > sd[0] * 0.3 ? r[1] : r[0]));
-  const pk = findPeaks(x, Math.trunc(FS * 0.33), stdp(x) * 0.3);
+  const primary = sd[1] > sd[0] * 0.3 ? 1 : 0;
+  const chans = [0, 1, 2].map((c) => a30.map((r) => r[c]));
+  const { est, ch } = bestChannelEstimate(chans, primary);
+  const x = chans[ch].map((v) => -v);
+  const fHr = Number.isFinite(est.hr) ? est.hr / 60 : null;
+  const dist = fHr ? Math.max(Math.trunc(FS * 0.33), Math.trunc(0.55 * FS / fHr)) : Math.trunc(FS * 0.33);
+  const pk = findPeaks(x, dist, stdp(x) * 0.3);
   let ibi = [];
   if (pk.length >= 6) { for (let i = 1; i < pk.length; i++) { const v = (pk[i] - pk[i - 1]) / FS; if (v > 0.3 && v < 1.6) ibi.push(v); } }
-  if (ibi.length >= 5) {
-    f.hr = 60 / median(ibi);
+  const hrBeat = ibi.length >= 5 ? 60 / median(ibi) : NaN;
+  const lch = lgs[ch]; let nsat = 0; for (let i = s10; i < te; i++) if (lch[i] >= LOG251) nsat++;
+  const sat = nsat / (te - s10);
+  const valid = !!(est.valid && Number.isFinite(hrBeat) && Math.abs(hrBeat - est.hr) / est.hr < BEAT_AGREE && sat <= SAT_MAX);
+  f._valid = valid; f._sqi = est.sqi; f._acf = est.acf; f._ch = ch; f._hrEst = est.hr; f._hrBeat = hrBeat; f._sat = sat;
+  if (valid) {
+    f.hr = hrBeat;
     let ss = 0; for (let i = 1; i < ibi.length; i++) ss += (ibi[i] - ibi[i - 1]) ** 2;
     f.rmssd = Math.log(Math.sqrt(ss / (ibi.length - 1)) + 1e-3);
     f.sdnn = Math.log(stdp(ibi) + 1e-3);
@@ -139,8 +139,6 @@ function winFeats(lgR, lgG, lgB, acR, acG, acB, te) {
     }
     f.beat_cv = stdp(amp) / (mean(amp.map(Math.abs)) + 1e-9);
   }
-  // quality (not a model input)
-  f._sqi = sqiOf(a10.map((r) => r[1]));
   return f;
 }
 
@@ -153,7 +151,7 @@ export class Chain {
     this.W = weights; this.band = opts.band ?? BAND;
     this.z = [0, 1, 2].map(() => SOS.map(() => [0, 0]));  // sosfilt state per channel/section
     this.lg = [[], [], []]; this.ac = [[], [], []]; this.n = 0;
-    this.last = new Array(FUSION.length).fill(NaN); this.calRows = []; this.base = null;
+    this.last = new Array(FUSION.length).fill(NaN); this.calRows = []; this.calValid = []; this.calHr = []; this.base = null;
   }
   /** push one 30 Hz sample (mean R,G,B on 0..255 scale). Returns a decision object when a new 2 s window completes, else null. */
   push(r, g, b) {
@@ -172,20 +170,21 @@ export class Chain {
     return this._window(this.n);
   }
   _window(te) {
-    const s = te / FS - WIN, f = winFeats(...this.lg, ...this.ac, te);
-    const row = FUSION.map((k, j) => { const val = f[k] === undefined ? NaN : f[k]; return Number.isNaN(val) ? this.last[j] : val; });
-    this.last = row.slice();                       // causal forward fill
-    if (s + WIN <= CAL) { this.calRows.push(row); return { s, calibrating: true, sqi: f._sqi, hr: row[0] }; }
+    const s = te / FS - WIN, f = winFeats(...this.lg, ...this.ac, te), v = f._valid;
+    const row = FUSION.map((k, j) => { const val = (v && f[k] !== undefined) ? f[k] : NaN; return Number.isNaN(val) ? this.last[j] : val; });
+    this.last = row.slice();                       // causal forward fill (invalid windows contribute nothing)
+    const q = { sqi: f._sqi, acf: f._acf, ch: f._ch, sat: f._sat, hrEst: f._hrEst, hrBeat: f._hrBeat, valid: v };
+    if (s + WIN <= CAL) { this.calValid.push(v); this.calHr.push(v ? f._hrBeat : NaN); this.calRows.push(row); return { s, calibrating: true, ...q, hr: v ? f._hrEst : NaN }; }
     if (!this.base) this.base = FUSION.map((_, j) => nanmedian(this.calRows.map((r) => r[j])));
-    const X = row.map((v, j) => (Number.isNaN(v) ? this.base[j] : v) - this.base[j]);
-    if (s < CAL) return { s, calibrating: true, warm: true, sqi: f._sqi, hr: row[0] };
+    const X = row.map((x, j) => (Number.isNaN(x) ? this.base[j] : x) - this.base[j]);
+    if (s < CAL) return { s, calibrating: true, warm: true, ...q, hr: v ? f._hrEst : NaN };
     const p = 0.5 * (lr(this.W.hr, [X[0]]) + lr(this.W.fusion, X));
-    const label = Math.abs(p - 0.5) < this.band ? 'unsure' : (p > 0.5 ? 'HYPOXIC' : 'normal');
-    return { s, calibrating: false, p, label, hr: row[0], dHR: X[0], baseHR: this.base[0], sqi: f._sqi, X };
+    const label = !v ? 'nolock' : (Math.abs(p - 0.5) < this.band ? 'unsure' : (p > 0.5 ? 'HYPOXIC' : 'normal'));
+    return { s, calibrating: false, p, label, ...q, hr: v ? f._hrEst : NaN, dHR: X[0], baseHR: this.base[0], X };
   }
   calibrationSummary() {
-    const hrs = this.calRows.map((r) => r[0]).filter((v) => !Number.isNaN(v));
-    return { hr: hrs.length ? median(hrs) : NaN, hrSpread: hrs.length ? Math.max(...hrs) - Math.min(...hrs) : NaN, windows: this.calRows.length };
+    const hrs = this.calHr.filter((v) => !Number.isNaN(v));
+    return { hr: hrs.length ? median(hrs) : NaN, hrSpread: hrs.length ? Math.max(...hrs) - Math.min(...hrs) : NaN, windows: this.calValid.length, validFraction: this.calValid.length ? this.calValid.filter(Boolean).length / this.calValid.length : 0 };
   }
 }
 

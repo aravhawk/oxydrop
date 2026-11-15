@@ -57,3 +57,13 @@ button:focus-visible,summary:focus-visible,input:focus-visible,a:focus-visible{o
 .replay-note{background:var(--surf2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:.85rem;color:var(--mute);margin-bottom:10px}
 @media (min-width:700px){main{max-width:600px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.mode{display:grid;gap:8px;margin:12px 0}.mode label{display:flex;gap:10px;align-items:flex-start;background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:48px}
+.mode input{width:22px;height:22px;accent-color:var(--accent);flex:none;margin-top:2px}.mode small{color:var(--mute)}
+.lens{display:grid;gap:4px;color:var(--mute);font-size:.85rem;margin:8px 0}
+select{font:inherit;color:var(--text);background:var(--surf2);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px;width:100%}
+.place{border-radius:12px;padding:10px 12px;margin:10px 0;display:grid;gap:2px;border:2px solid var(--amber);background:rgba(255,200,87,.08)}
+.place.good{border-color:var(--green);background:rgba(61,220,151,.1)}.place.bad{border-color:var(--red);background:rgba(255,107,122,.1)}.place span{color:var(--mute);font-size:.9rem}
+button.link{background:none;border:none;color:var(--mute);text-decoration:underline;font-weight:400;min-height:44px;width:100%}
+.debug summary{font-weight:600}.dbg{white-space:pre-wrap;word-break:break-word;font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--mute);margin:8px 0}
+.wave.small{height:70px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.row button{min-height:44px;font-size:.85rem}

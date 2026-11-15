@@ -59,18 +59,30 @@
     <h2>Set up your fingertip</h2>
     <ol class="steps">
       <li>Sit down and rest for 2 minutes. Rest the phone and your hand on a table.</li>
-      <li>Cover the <b>rear camera and the flash</b> with your fingertip, pressing lightly.</li>
+      <li>Cover the <b>rear camera lens</b> completely with your fingertip, pressing lightly. If the flash is next to the lens, cover it too when you can. If your finger can&rsquo;t cover both, cover just the lens and use <b>Ambient light</b> below.</li>
       <li>Keep still. Don&rsquo;t talk. Keep the screen on.</li>
     </ol>
     <div class="status-line"><span id="cam-state">Camera off</span></div>
     <button id="btn-cam" class="primary">Turn on camera</button>
     <div id="setup-live" hidden>
+      <div class="mode" role="radiogroup" aria-label="Light source">
+        <label><input type="radio" name="light" value="flash" checked> <span>Flash on <small>(recommended)</small></span></label>
+        <label><input type="radio" name="light" value="ambient"> <span>Ambient light <small>(no flash: face a lamp or window)</small></span></label>
+      </div>
+      <label class="lens">Camera lens
+        <select id="lens" aria-label="Camera lens"></select>
+      </label>
+      <p class="fine" id="lens-help">Pick the lens that sits closest to the flash, usually &ldquo;Back Camera&rdquo; (the main one).</p>
+      <div id="place" class="place warn"><b id="place-title">Looking for your fingertip…</b><span id="place-msg"></span></div>
       <div class="meter"><div class="meter-fill" id="q-fill"></div></div>
-      <p id="q-text" class="fine">Looking for your pulse…</p>
+      <p id="q-text" class="fine">Signal quality</p>
       <canvas id="wave-setup" class="wave" width="600" height="120" aria-label="Pulse waveform"></canvas>
       <ul class="checks" id="checks"></ul>
       <button id="btn-begin" class="primary" disabled>Start 60-second calibration</button>
+      <button id="btn-begin-anyway" class="link" hidden>Start anyway (readings will likely be &ldquo;unsure&rdquo;)</button>
     </div>
+    <details class="card debug" id="debug-setup"><summary>Debug view (for troubleshooting)</summary><pre id="dbg-setup" class="dbg"></pre><canvas id="raw-setup" class="wave small" width="600" height="100"></canvas>
+      <div class="row"><button class="secondary" data-dl>Download raw trace (CSV)</button><button class="secondary" data-copy>Copy debug summary</button></div></details>
   </section>
 
   <!-- MEASURE -->
@@ -104,6 +116,8 @@
       <button id="btn-stop" class="secondary">Stop</button>
       <button id="btn-restart" class="secondary" hidden>Restart calibration</button>
     </div>
+    <details class="card debug" id="debug-measure"><summary>Debug view (for troubleshooting)</summary><pre id="dbg-measure" class="dbg"></pre><canvas id="raw-measure" class="wave small" width="600" height="100"></canvas>
+      <div class="row"><button class="secondary" data-dl>Download raw trace (CSV)</button><button class="secondary" data-copy>Copy debug summary</button></div></details>
     <p class="fine foot">Prototype. Not medical advice. Not a medical device.</p>
   </section>
 </main>
