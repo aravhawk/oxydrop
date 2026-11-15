@@ -70,6 +70,15 @@ Written by `python -m oxydrop_ml.export_hybrid` (format `oxydrop-hybrid-v1`):
 | `members[]` | `family` (P, D or R), `seed`, `role` (which feature the member feeds), `weights` (file with the `oxynet-v1` graph, phone input scale folded in, consumes raw features), `ckpt_sha256`; members of a family are averaged in logit space |
 | `selection` | the inner-CV scores that chose the pipeline when the rule is run on all six out-of-fold tables |
 
+Reference combiner (per recording, windows in time order, the chain logit `c` and the member logits already computed):
+
+```
+f[i]      = [feature_j(i) for j in pipeline.features]              # c, p, d, corr, r = c + corr
+if calibration: f[i] -= median(f[w] for windows w that end inside the first 60 s)
+if k > 1:       f[i]  = mean(f[max(0, i - k + 1) .. i])            # causal, baseline windows included
+logit[i]  = intercept + sum_j coef[j] * (f[i][j] - mean[j]) / scale[j]       # > 0: possible low oxygen
+```
+
 `tests/fixtures/hybrid_ref.json` holds one recording of feature rows with the expected logit for the combiner (the chain and the CNN have their own parity tests). Since the chain is only defined after the first minute, the app evaluates the chain on the stored calibration windows once the baseline exists (retroactively) before it applies calibration and aggregation.
 
 ## Reproduce
