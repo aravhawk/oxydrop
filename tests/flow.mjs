@@ -28,7 +28,7 @@ class El {
   async click() { const hs = this.handlers.click || []; await Promise.all(hs.map((h) => h({ target: this }))); }
 }
 const noop = () => {};
-let pulseAt = () => [150, 110, 80];
+let pulseAt = () => [200, 80, 60], fingerOff = false;   // fingerOff: an open grey scene (finger lifted)
 const ctx = new Proxy({}, {
   get(_, p) { if (p === 'getImageData') return () => frame(); if (p === 'drawImage') return noop; return noop; },
   set() { return true; },
@@ -40,7 +40,7 @@ function frame() {
   for (let i = 0; i < n; i++) d[i * 4 + 3] = 255;
   return { data: d };
 }
-pulseAt = (t) => { const x = 2 * Math.PI * 1.2 * t, w = Math.sin(x) + 0.5 * Math.sin(2 * x + 1); return [150 * (1 + 0.006 * w), 110 * (1 + 0.010 * w), 80 * (1 + 0.008 * w)]; };
+pulseAt = (t) => { const x = 2 * Math.PI * 1.2 * t, w = Math.sin(x) + 0.5 * Math.sin(2 * x + 1); if (fingerOff) return [128, 128, 128]; return [200 * (1 + 0.006 * w), 80 * (1 + 0.010 * w), 60 * (1 + 0.008 * w)]; };
 
 class FakeVideo {
   constructor() { this.videoWidth = 640; this.videoHeight = 480; this.srcObject = null; this.n = 0; }
@@ -120,9 +120,27 @@ assert.ok($('checks').innerHTML.includes('<li'), 'checks list rendered');
 assert.equal(openTracks(), 1, 'exactly one live camera stream while in setup');
 assert.equal(lightValue, 'flash', 'the probe chose the torch');
 assert.ok($('probe-scores').textContent.includes('torch'), 'probe scores shown');
+await sleep(800);
+assert.equal($('place-title').textContent, 'Fingertip detected');
 await sleep(1200);
 assert.match($('dbg-setup').textContent, /samples [1-9]\d*/, 'frames reach the engine after the transition (the new camera generation is live)');
 ok('probe -> start -> setup UI visible, one stream open, frames flowing');
+
+// starting calibration from setup (exposure settles first, then the minute begins) and a steady finger does not void it
+await $('btn-begin-anyway').click();
+assert.equal($('phase').textContent, 'Calibrating');
+assert.equal($('status-main').textContent, 'Calibrating');
+await sleep(1500);
+assert.equal($('phase').textContent, 'Calibrating', 'a steady, well-placed finger must not restart the calibration minute');
+ok('begin -> calibration starts after exposure setup and is not restarted while the finger stays on');
+
+// lifting the finger for > 2 s inside the calibration minute voids it; putting it back starts the minute again from zero
+fingerOff = true; await sleep(2800);
+assert.equal($('phase').textContent, 'Calibrating', 'not restarted while the finger is still off');
+fingerOff = false; await sleep(1500);
+assert.equal($('phase').textContent, 'Calibrating (restarted)');
+assert.match($('status-sub').textContent, /came off the lens or flash during calibration, so the minute was started again/);
+ok('finger lifted during calibration: the minute restarts once the finger is back');
 
 // ---------------- 3. a stale / rejected deviceId falls back to facingMode ----------------
 await $('wm-stop').click(); fresh();

@@ -2,7 +2,7 @@ import { Chain, FS, CAL, WIN } from './engine.js';
 import { CameraSource, Motion, listBackCameras, pickDefault, listCameras, probeCamFactory } from './camera.js';
 import { runProbeLadder, liveQuality, ringState, probeSummary } from './lensprobe.js';
 import { MIN_TRACKABLE_BPM } from './hr.js';
-import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, STATE, STATE_TEXT, MOTION_MAX, STALL_MS } from './decision.js';
+import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, calibrationInterrupt, calibrationFingerReason, STATE, STATE_TEXT, MOTION_MAX, STALL_MS } from './decision.js';
 
 const $ = (id) => document.getElementById(id);
 const MIN_HR = MIN_TRACKABLE_BPM, MAX_HR = 110; // plausible *resting* heart rate at calibration; MIN_HR follows the HR estimator's band edge (F_LO = 0.85 Hz = 51 bpm)
@@ -26,7 +26,8 @@ let replay = null, replayTimer = null, uiTimer = null, anywayTimer = null, tickN
 let strip = [], tally = {}, calMotion = [], calFps = [], calWin = [], calGaps0 = 0, calFailed = false, calChecked = false, calOk = true;
 let lockHist = [], lockRun = 0, camStartedAt = 0, place = { level: 'warn', title: '', msg: '' }, fingerHist = [], gapLog = [], lastGaps = 0, lastD = null, lastDecision = null, lastWaveCh = 1;
 let probe = null, qual = null, weakSince = 0, weakNow = false, weakShown = false, chosenLabel = '';
-let goodSince = 0, badSince = 0, lockBusy = false, stalledShown = false, calStartN = 0;
+let goodSince = 0, badSince = 0, lockBusy = false, stalledShown = false, calStartN = 0, beginning = false;
+let calFingerGood = 0, calFingerN = 0, calBadSince = 0, calDirty = false, calSig = '';   // acquisition watch over the calibration minute
 const raw = new Float32Array(RAW_MAX * 3); let rawN = 0, decLog = [];
 
 function show(id) { document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id)); window.scrollTo(0, 0); }
@@ -50,7 +51,7 @@ const isFront = () => lightMode() === 'front';
 function showWhite() { $('white').hidden = false; }
 function hideWhite() { $('white').hidden = true; }
 $('wm-stop').addEventListener('click', () => { cleanup(); show('home'); });
-$('wm-begin').addEventListener('click', () => { if (mode === 'setup') startMeasure('live'); else if (mode === 'measure') startMeasure('live'); });
+$('wm-begin').addEventListener('click', () => { if (mode === 'setup') beginLive(); else if (mode === 'measure') startMeasure('live'); });
 async function keepAwake() { try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) { /* ignore */ } }
 function startUi() { clearInterval(uiTimer); tickN = 0; uiTimer = setInterval(uiTick, 250); }
 
@@ -259,8 +260,21 @@ function renderChecks() {
   $('checks').innerHTML = li.map(([ok, t]) => `<li class="${ok ? 'ok' : 'warn'}">${ok ? '✓' : '!'} ${t}</li>`).join('');
 }
 
-$('btn-begin').addEventListener('click', () => startMeasure('live'));
-$('btn-begin-anyway').addEventListener('click', () => startMeasure('live'));
+// Calibration must not start until exposure / white balance / focus are settled: a lock taken after the baseline minute has begun changes the image
+// level and the baseline would then describe a different camera state than the readings that follow.
+async function beginLive() {
+  if (beginning || mode !== 'setup' || !cam) return;
+  beginning = true;
+  try {
+    const c0 = cam, g = sessionGen;
+    while (lockBusy && g === sessionGen) await sleep(100);
+    if (g === sessionGen && cam === c0 && !c0.locked) { lockBusy = true; try { await lockWithAdapt(c0); } catch (e) { /* best effort */ } finally { lockBusy = false; } }
+    if (g !== sessionGen || cam !== c0 || mode !== 'setup') return;
+    startMeasure('live');
+  } finally { beginning = false; }
+}
+$('btn-begin').addEventListener('click', beginLive);
+$('btn-begin-anyway').addEventListener('click', beginLive);
 
 // ---------------- replay flow ----------------
 $('btn-replay').addEventListener('click', async () => {
@@ -281,7 +295,8 @@ $('btn-replay').addEventListener('click', async () => {
 // ---------------- shared measurement logic ----------------
 function startMeasure(k, w) {
   kind = k; mode = 'measure'; chain = new Chain(w || weights); chain.n = 0;
-  stalledShown = false; calStartN = cam ? cam.rs.n : 0; if (k === 'live' && cam && !cam.locked && !lockBusy) { lockBusy = true; cam.lockExposure().then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
+  stalledShown = false; calStartN = cam ? cam.rs.n : 0;
+  calFingerGood = 0; calFingerN = 0; calBadSince = 0; calDirty = false; calSig = acquisitionSig();
   calMotion = []; calFps = []; calWin = []; calFailed = false; calChecked = false; calOk = true; strip = []; $('strip').innerHTML = ''; lastD = null; lastDecision = null;
   if (k === 'live') { calGaps0 = cam ? cam.stats.gaps : 0; decLog = []; }
   tally = { normal: 0, low: 0, uns: 0, pause: 0, right: 0, wrong: 0 };
@@ -294,6 +309,25 @@ function startMeasure(k, w) {
 }
 $('btn-restart').addEventListener('click', () => startMeasure('live'));
 $('btn-stop').addEventListener('click', () => { cleanup(); show('home'); });
+
+// Anything that changes how the camera sees the finger voids the calibration minute (the baseline would describe a different camera state).
+const acquisitionSig = () => (kind === 'live' && cam ? `${cam.info.deviceId}|${cam.locked}|${JSON.stringify(cam.info.locks)}|${cam.info.torch}|${isFront()}` : '');
+const RESTART_TEXT = {
+  finger_lost: 'Your fingertip came off the lens or flash during calibration, so the minute was started again. Keep it covering both and still.',
+  settings_changed: 'The camera settings changed during calibration, so the minute was started again. Keep still.',
+};
+function restartCalibration(why) { startMeasure('live'); setStatus('calibrating', '◔', 'Calibrating', RESTART_TEXT[why]); $('phase').textContent = 'Calibrating (restarted)'; }
+// Called every UI tick while the calibration minute runs (live only). A frame stall is left to the calibration stall rule, not counted as finger loss.
+function watchCalibration(now, stalled) {
+  if (stalled) { calBadSince = 0; return false; }
+  const good = place.level === 'good';
+  calFingerN++; if (good) { calFingerGood++; calBadSince = 0; } else if (!calBadSince) calBadSince = now;
+  const why = calibrationInterrupt({ placeGood: good, stalled, badMs: calBadSince ? now - calBadSince : 0, settingsChanged: acquisitionSig() !== calSig });
+  if (why === 'settings_changed') { restartCalibration(why); return true; }
+  if (why === 'finger_lost') calDirty = true;
+  if (calDirty && good) { restartCalibration('finger_lost'); return true; }   // the finger is back: begin the minute again from zero
+  return false;
+}
 
 function uiTick() {
   tickN++;
@@ -311,6 +345,7 @@ function uiTick() {
     else if (mode === 'setup' && cam.locked && !lockBusy && badSince && now - badSince >= UNLOCK_AFTER_MS) { const c0 = cam; lockBusy = true; c0.unlockExposure().then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
     if (!stalled) { fingerHist.push(place.level === 'good'); if (fingerHist.length > 40) fingerHist.shift(); }   // a stall is not evidence about the finger
     updateQuality(st, now, stalled);
+    if (mode === 'measure' && !calChecked && !calFailed && chain && watchCalibration(now, stalled)) return;
     if (mode === 'setup') { renderPlace(weakNow && !stalled ? WEAK_PLACE : place); if (tickN % 4 === 0) renderChecks(); if (stalled) { $('btn-begin').disabled = true; lockRun = 0; } }
     if (mode === 'measure') { watchStall(stalled, st); if (!stalled) watchWeak(); }
     updateRing(st); updateWhite();
@@ -408,7 +443,7 @@ function onWindow(d) {
   showHr(d, ctx); if (weakNow && kind === 'live') $('hr').textContent = '–'; setSig(d); $('dhr').textContent = d.valid && dec.hr != null && Number.isFinite(d.dHR) ? (d.dHR >= 0 ? '+' : '') + d.dHR.toFixed(0) : '–';
   let ref = null; if (kind === 'replay') { ref = refAt(d.s); $('ref').textContent = ref == null ? '–' : ref.toFixed(0); }
   const t = `${d.s + WIN}s` + (Number.isFinite(d.p) ? ` p=${d.p.toFixed(2)}` : '');
-  if (dec.state === STATE.NORMAL) { tally.normal++; setStatus('normal', '✓', dec.text, 'No drop from your own baseline detected in this window.'); pushStrip('d-normal', 'normal ' + t); }
+  if (dec.state === STATE.NORMAL) { tally.normal++; setStatus('normal', '✓', dec.text, 'No drop from your own first minute detected in this window. It cannot know whether you were already low when you started.'); pushStrip('d-normal', 'normal ' + t); }
   else if (dec.state === STATE.LOW) { tally.low++; setStatus('hyp', '↓', dec.text, 'Your signs look like a drop from your own baseline. This is not a diagnosis. If you feel unwell, get medical help.'); pushStrip('d-hyp', 'possible low oxygen ' + t); }
   else if (dec.reason === 'moving') { tally.pause++; setStatus('uns', '✋', dec.text, dec.detail); pushStrip('d-pause', 'unsure: moving'); }
   else { tally.uns++; setStatus('uns', '?', dec.text, dec.detail); pushStrip('d-uns', 'unsure: ' + dec.reason); }
@@ -426,6 +461,8 @@ function checkCalibration() {
   if (kind === 'live' && calFps.length && Math.min(...calFps) < CAL_FPS_MIN) return 'The camera frame rate was too low during calibration.';
   if (kind === 'live' && cam && cam.rs.gapStats(calStartN).max > CAL_GAP_S_MAX) return 'The camera stalled during calibration.';
   if (kind === 'live' && cam && cam.stats.gaps - calGaps0 > CAL_GAPS_MAX) return 'The camera dropped too many frames during calibration.';
+  if (kind === 'live') { const fr = calibrationFingerReason(calFingerGood, calFingerN); if (fr) return fr; }
+  if (kind === 'live' && calDirty) return 'Your fingertip came off the lens or flash during calibration and was not put back.';
   if (!Number.isFinite(s.hr)) return 'No pulse was found during calibration.';
   const cw = calWin.filter((x) => x[0] > CAL_WARM_S), vf = cw.length ? cw.filter((x) => x[1]).length / cw.length : 0;
   if (vf < CAL_VALID_MIN) return `The pulse was only clearly detected in ${Math.round(vf * 100)}% of the calibration minute (need ${Math.round(CAL_VALID_MIN * 100)}%).`;

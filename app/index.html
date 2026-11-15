@@ -59,7 +59,7 @@
     <button class="back" data-go="home">← Back</button>
     <h2>Set up your fingertip</h2>
     <ol class="steps">
-      <li>Sit down and rest for 2 minutes. Rest the phone and your hand on a table.</li>
+      <li>Sit down and rest for 2 minutes. Rest the phone and your hand on a table. The first minute becomes your baseline, so only start if you feel well: the app cannot know whether your oxygen was already low at the start.</li>
       <li>Lay your fingertip <b>flat across the whole camera plateau</b>, covering the <b>lens the app picks</b> and, if you can, the <b>flash</b> under the same finger. Light pressure, do not press hard. Phones differ: on newer iPhone Pro models the flash is 2-3 cm from the main lens, so a flat finger over both gives a weaker but usable glow.</li>
       <li>Keep still. Don&rsquo;t talk. Keep the screen on. After you tap the button the app tests every camera for about 3 seconds each and picks the one with the strongest pulse. If no back lens works it switches to the front camera with a white screen.</li>
     </ol>
@@ -102,6 +102,7 @@
       <div class="status-sub" id="status-sub">Rest, keep still. Learning your normal.</div>
     </div>
     <div class="progress" id="cal-progress"><div id="cal-fill"></div></div>
+    <p class="fine" id="baseline-note">Oxygen status at start unknown: every answer compares you with your own first minute, so it cannot tell whether you were already low when you began.</p>
 
     <div class="grid">
       <div class="tile"><span class="k">Heart rate</span><span class="v" id="hr">–</span><span class="u">bpm</span></div>
