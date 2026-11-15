@@ -1,6 +1,7 @@
 """Export OxyNet for the browser and for interoperability.
 
-  * app/data/cnn_weights.json : architecture as an op list + BatchNorm-folded float32 tensors (base64). Read by app/js/cnn.js.
+  * --weights (default: a temp file, oxynet_single_network_check.json) : architecture as an op list + BatchNorm-folded float32 tensors (base64), the format app/js/cnn.js reads.
+    The app's shipped member files are app/data/hybrid_R_s*.json (export_hybrid.py); the old app/data/cnn_weights.json placeholder no longer exists.
   * app/data/oxynet.onnx      : the same eval-mode graph as ONNX (verified against torch with onnxruntime, 1e-5).
   * tests/fixtures/cnn_ref.json : random and real-looking inputs with torch outputs for every head (tests/cnn_parity.mjs).
 

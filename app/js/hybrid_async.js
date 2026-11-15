@@ -37,13 +37,14 @@ export class HybridWorkerEngine {
   constructor(lite, worker, alpha, onWindow) {
     this.A = { conformal: lite.conformal }; this.alpha = alpha; this.worker = worker; this.onWindow = onWindow;
     this.v2 = new V2Chain(lite.v2Weights); this.ac = this.v2.ac; this.lg = this.v2.lg; this.n = 0;
-    this.buf = []; this.id = 0; this.pending = new Map(); this.lat = []; this.latV2 = []; this.latCore = []; this.lastMs = NaN; this.dead = false;
+    this.buf = []; this.id = 0; this.pending = new Map(); this.lat = []; this.latV2 = []; this.latCore = []; this.lastMs = NaN; this.dead = false; this.degraded = false;
     this.gen = worker.reset(); this._h = (m) => this._msg(m); worker.handler = this._h;
   }
   get info() { return this.worker.info; }
   get embBase() { return null; }
   latency() { const l = latencyStats(this.lat, this.lastMs); l.v2Median = latencyStats(this.latV2).median; l.coreMedian = latencyStats(this.latCore).median; l.async = true; return l; }
   push(r, g, b, dt = 1 / FS) {
+    if (this.degraded) { this.n++; return this.v2.push(r, g, b); }   // the worker is gone: the quality chain's own decision is the answer (the logistic chain, same weights)
     const t0 = performance.now(), d2 = this.v2.push(r, g, b);
     this.buf.push(r, g, b, dt); this.n++;
     if (!d2) return null;
@@ -64,6 +65,10 @@ export class HybridWorkerEngine {
   }
   /** Windows sent to the worker whose result has not arrived yet. */
   get inFlight() { return this.pending.size; }
+  /** Age in ms of the oldest window the worker has not answered (0 if none). A healthy worker answers in 50 to 300 ms; a dead or hung one never does. */
+  oldestPendingMs() { let m = 0; const now = performance.now(); for (const p of this.pending.values()) m = Math.max(m, now - p.t0); return m; }
+  /** Stop waiting for the worker (it crashed or stopped answering). Windows already sent are dropped; from the next sample on push() returns the logistic chain's decisions. */
+  degrade() { if (this.degraded) return; this.degraded = true; this.pending.clear(); if (this.worker.handler === this._h) this.worker.handler = null; }
   close() { this.dead = true; if (this.worker.handler === this._h) this.worker.handler = null; this.pending.clear(); }
   calibrationSummary() { return this.v2.calibrationSummary(); }
 }

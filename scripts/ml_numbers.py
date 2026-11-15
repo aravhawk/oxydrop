@@ -1078,14 +1078,14 @@ def block_openox(full: bool = False) -> str:
             cells = []
             for m in ('R', 'ror_textbook', 'train_mean'):
                 r = _row(sk, scheme=scheme, group=g, model=m)
-                cells.append(f'{f(r.mae, 2)} [{f(r.mae_lo, 2)}, {f(r.mae_hi, 2)}]')
+                cells.append('suppressed (under 5 people)' if bool(r.get('suppressed', False)) else f'{f(r.mae, 2)} [{f(r.mae_lo, 2)}, {f(r.mae_hi, 2)}]')
             n = int(_row(sk, scheme=scheme, group=g, model='R').n_people)
             srows.append([f'{sl} {g}', str(n)] + cells)
     out += ['**By skin tone** (Monk scale from the dataset; ITA from the image-derived tertiles; MAE in SpO2 points):', '',
             md_table(['Group', 'People', 'CNN MAE', 'Textbook ratio-of-ratios MAE', 'Training-mean MAE'], srows, ['l', 'r', 'r', 'r', 'r']), '']
     g = _row(rd('openox_spo2_gaps.csv'), label='lag_star', scheme='ita', model='R', metric='mae')
     g7 = _row(rd('openox_spo2_gaps.csv'), label='lag_star', scheme='monk', model='R', metric='mae')
-    out += [f'CNN MAE dark minus light, ITA tertiles ({int(g.n_dark)} versus {int(g.n_light)} people): {_ox_cell(g.gap, g.lo, g.hi, "d")}, and the interval {"contains 0" if g.lo < 0 < g.hi else "excludes 0"}. Monk 7 and above has only {int(g7.n_dark)} held-out people, so the gap by Monk group is **not estimable**.', '']
+    out += [f'CNN MAE dark minus light, ITA tertiles ({int(g.n_dark)} versus {int(g.n_light)} people): {_ox_cell(g.gap, g.lo, g.hi, "d")}, and the interval {"contains 0" if g.lo < 0 < g.hi else "excludes 0"}. Monk 7 and above has only {int(g7.n_dark)} held-out people, so the gap by Monk group is **not estimable**. Minimum group size: every committed skin-tone cell needs at least 5 people, smaller groups are suppressed.', '']
     cb = rd('openox_spo2_contact_bias_gaps.csv')
     bm, bi = _row(cb, scheme='monk'), _row(cb, scheme='ita')
     out += [f'**The reference itself is biased.** Contact-oximeter display minus blood-gas SaO2 (all {int(rd("openox_spo2_contact_bias.csv").query("scheme == 'monk'").n_people.sum())} people with draws), dark minus light: Monk 7+ versus 1-3 {_ox_cell(bm.gap, bm.lo, bm.hi, "d")} points ({int(bm.n_dark)} versus {int(bm.n_light)} people), '

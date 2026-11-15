@@ -148,7 +148,7 @@ MODEL.md,hr:agree:within5_full,0.826
 MODEL.md,@hrvote_full,<block 2034 chars>
 MODEL.md,@p3_main,<block 1010 chars>
 MODEL.md,cp:P3/-1/train_mean|d,"-0.017 [-0.181, 0.148]"
-MODEL.md,@openox_full,<block 3142 chars>
+MODEL.md,@openox_full,<block 3279 chars>
 MODEL.md,oxp:lag_star/R/ror_textbook|d,"-0.13 [-0.47, +0.26]"
 MODEL.md,oxp:lag_star/R/train_mean|d,"-4.44 [-4.94, -3.97]"
 MODEL.md,oxg:ita/R/mae|d,"+0.41 [-0.75, +1.63]"
@@ -267,7 +267,7 @@ WHITEPAPER.md,cf:deployed_R/0.1:set_cov_hypoxic|pct,91.3%
 WHITEPAPER.md,cf:deployed_R/0.1:set_cov_normal|pct,93.2%
 WHITEPAPER.md,cpp:deployed_R/0.1/hof_100001:confident_miss|pct,51.3%
 WHITEPAPER.md,cpp:deployed_R/0.1/hof_100004:share_unsure|pct,58.2%
-WHITEPAPER.md,@openox,<block 2305 chars>
+WHITEPAPER.md,@openox,<block 2442 chars>
 WHITEPAPER.md,@skin_hoffman,<block 113 chars>
 WHITEPAPER.md,v:guard_mths,6.7%
 WHITEPAPER.md,v:guard_but,8.8%

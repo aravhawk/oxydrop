@@ -114,9 +114,9 @@ Paired person bootstrap of the MAE difference (hybrid R minus the other predicto
 | MONK | 4-6 | CNN hybrid R members (3 seeds, deployed family) | 14 | 17,996 | 2.66 [2.14, 3.40] | 0.73 | 0.970 |
 | MONK | 4-6 | ratio-of-ratios, textbook 110 - 25 R | 14 | 17,996 | 2.88 [2.54, 3.29] | -0.59 | 0.969 |
 | MONK | 4-6 | train-mean | 14 | 17,996 | 7.60 [7.17, 8.16] | 0.47 | 0.500 |
-| MONK | 7+ | CNN hybrid R members (3 seeds, deployed family) | 2 | 3,727 | 3.42 [3.01, 4.57] | 2.55 | 0.957 |
-| MONK | 7+ | ratio-of-ratios, textbook 110 - 25 R | 2 | 3,727 | 2.90 [2.12, 5.09] | 0.28 | 0.949 |
-| MONK | 7+ | train-mean | 2 | 3,727 | 7.13 [6.38, 9.22] | 0.75 | 0.500 |
+| MONK | 7+ | CNN hybrid R members (3 seeds, deployed family) | 2 | suppressed | suppressed (fewer than 5 people) | suppressed | suppressed |
+| MONK | 7+ | ratio-of-ratios, textbook 110 - 25 R | 2 | suppressed | suppressed (fewer than 5 people) | suppressed | suppressed |
+| MONK | 7+ | train-mean | 2 | suppressed | suppressed (fewer than 5 people) | suppressed | suppressed |
 | ITA | darkest tertile | CNN hybrid R members (3 seeds, deployed family) | 7 | 10,026 | 3.12 [2.50, 4.09] | 1.72 | 0.958 |
 | ITA | darkest tertile | ratio-of-ratios, textbook 110 - 25 R | 7 | 10,026 | 2.87 [2.35, 3.66] | -0.44 | 0.955 |
 | ITA | darkest tertile | train-mean | 7 | 10,026 | 7.26 [6.57, 8.40] | 0.47 | 0.500 |
@@ -127,16 +127,16 @@ Paired person bootstrap of the MAE difference (hybrid R minus the other predicto
 | ITA | lightest tertile | ratio-of-ratios, textbook 110 - 25 R | 6 | 7,689 | 3.49 [2.54, 4.47] | 0.10 | 0.940 |
 | ITA | lightest tertile | train-mean | 6 | 7,689 | 7.70 [6.99, 8.77] | -0.46 | 0.500 |
 
-Dark-minus-light gaps (darkest minus lightest ITA tertile; Monk 7+ minus 1-3 only with at least 3 people per group), independent person bootstraps:
+Dark-minus-light gaps (darkest minus lightest ITA tertile; Monk 7+ minus 1-3; a gap needs at least 5 people in each group, the minimum group size for every committed group cell), independent person bootstraps:
 
 | scale | predictor | metric | people dark vs light | gap [95% CI] |
 |---|---|---|---|---|
-| MONK | CNN hybrid R members (3 seeds, deployed family) | mae | 2 vs 8 | not estimable (fewer than 3 people in a group) |
-| MONK | CNN hybrid R members (3 seeds, deployed family) | bias | 2 vs 8 | not estimable (fewer than 3 people in a group) |
-| MONK | train-mean | mae | 2 vs 8 | not estimable (fewer than 3 people in a group) |
-| MONK | train-mean | bias | 2 vs 8 | not estimable (fewer than 3 people in a group) |
-| MONK | ratio-of-ratios, textbook 110 - 25 R | mae | 2 vs 8 | not estimable (fewer than 3 people in a group) |
-| MONK | ratio-of-ratios, textbook 110 - 25 R | bias | 2 vs 8 | not estimable (fewer than 3 people in a group) |
+| MONK | CNN hybrid R members (3 seeds, deployed family) | mae | 2 vs 8 | not estimable (fewer than 5 people in a group) |
+| MONK | CNN hybrid R members (3 seeds, deployed family) | bias | 2 vs 8 | not estimable (fewer than 5 people in a group) |
+| MONK | train-mean | mae | 2 vs 8 | not estimable (fewer than 5 people in a group) |
+| MONK | train-mean | bias | 2 vs 8 | not estimable (fewer than 5 people in a group) |
+| MONK | ratio-of-ratios, textbook 110 - 25 R | mae | 2 vs 8 | not estimable (fewer than 5 people in a group) |
+| MONK | ratio-of-ratios, textbook 110 - 25 R | bias | 2 vs 8 | not estimable (fewer than 5 people in a group) |
 | ITA | CNN hybrid R members (3 seeds, deployed family) | mae | 7 vs 6 | +0.41 [-0.75, +1.63] |
 | ITA | CNN hybrid R members (3 seeds, deployed family) | bias | 7 vs 6 | +0.90 [-1.13, +2.88] |
 | ITA | train-mean | mae | 7 vs 6 | -0.43 [-1.74, +0.81] |

@@ -266,7 +266,7 @@ def fig_openox_skin():
     ax[0].set_xticks(x)
     ax[0].set_xticklabels([f'{lab}\n(n={int(N._row(sk, scheme=s, group=g, model="R").n_people)})' for s, g, lab in groups], fontsize=8)
     ax[0].set_ylabel('SaO2 MAE, SpO2 points')
-    ax[0].set_title('Error by skin tone, 24 held-out people (n = people)\nMonk 7+ has 2 people: not estimable', fontsize=9.5)
+    ax[0].set_title('Error by skin tone, 24 held-out people (n = people)\nMonk 7+ has 2 people: suppressed (minimum group size 5)', fontsize=9.5)
     ax[0].legend(fontsize=8, loc='upper left')
     ax[0].set_ylim(0, 6)
     xb = np.arange(len(cb))

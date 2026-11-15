@@ -284,7 +284,8 @@ def run(res, B=2000):
             if (ds, v) not in est_store:
                 continue
             m = (df.hr_ref.values < 50)
-            if m.sum() >= 5:
+            # minimum group size 5 people for every dataset except Hoffman (MIT data, one named slow-pulse case study); a smaller MTHS or BUT PPG group is one person's result
+            if m.sum() >= 5 and (ds == 'hoffman' or df.subject[m].nunique() >= 5):
                 mm = M.hr_metrics(est_store[(ds, v)][m], df.hr_ref.values[m])
                 srows.append(dict(dataset=ds, variant=v, n_windows=int(m.sum()), n_people=int(df.subject[m].nunique()), mae=mm['mae'], within5=mm['within5'], halving=mm['halving'], doubling=mm['doubling'], mean_estimate=float(np.nanmean(est_store[(ds, v)][m])), mean_ref=float(df.hr_ref.values[m].mean())))
     pd.DataFrame(srows).to_csv(os.path.join(res, 'hr_vote_slow_pulse.csv'), index=False)

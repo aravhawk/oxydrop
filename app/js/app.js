@@ -60,18 +60,30 @@ async function loadHybrid(needFull) {
     }
     if (needFull) { if (!hybridFull) hybridFull = await loadHybridAssets(fetchJson); return; }
     if (!hybridWorker && !hybridFull && typeof Worker !== 'undefined') {
-      try { const w = new HybridWorker(new URL('./hybrid_worker.js', import.meta.url), hybridAlpha); await w.ready; hybridWorker = w; hybridWorker.onError = (m) => { engineNote += `model worker error: ${m}. `; }; }
+      try { const w = new HybridWorker(new URL('./hybrid_worker.js', import.meta.url), hybridAlpha); await w.ready; hybridWorker = w; hybridWorker.onError = (m) => workerFailed(m); }
       catch (e) { engineNote += `model worker unavailable (${e && e.message ? e.message : e}); running the model in the page thread. `; }
     }
     if (!hybridWorker && !hybridFull) hybridFull = await loadHybridAssets(fetchJson);
   } catch (e) { engineUsed = 'logistic'; engineNote = `hybrid model could not be loaded (${e && e.message ? e.message : e}); using the logistic chain. `; }
 }
-// The hybrid model failing to load must never be silent: the page switched to the logistic chain alone, so the measurement screen says so (text only, no device logic).
-// Not shown when the chain was asked for on purpose (?engine=logistic).
+// The hybrid model failing must never be silent: the page switched to the logistic chain alone, so the measurement screen says so (text only, no device logic).
+// Two cases: the assets could not be loaded, or the Web Worker errored or stopped answering after it had loaded. Not shown when the chain was asked for on purpose (?engine=logistic).
 const FALLBACK_NOTICE = 'Notice: the neural-network part of the model could not be loaded, so these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
+const WORKER_NOTICE = 'Notice: the neural-network part of the model stopped working, so from now on these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
+const WORKER_STALL_MS = 10000;  // a window the worker has not answered for this long counts as a dead worker (normal latency is 50 to 300 ms)
+let noticeText = FALLBACK_NOTICE;
 function showEngineNotice() {
   const el = $('engine-note'), fell = ENGINE_REQ === 'hybrid' && engineUsed === 'logistic';
-  el.hidden = !fell; el.textContent = fell ? FALLBACK_NOTICE : '';
+  el.hidden = !fell; el.textContent = fell ? noticeText : '';
+}
+// The CNN worker errored, or stopped answering, after it had loaded: leave the hybrid for good (this page load), keep the running measurement on the logistic chain
+// (the quality chain inside the worker engine already holds the calibration), and say so on screen.
+function workerFailed(msg) {
+  if (engineUsed !== 'hybrid') return;
+  engineUsed = 'logistic'; noticeText = WORKER_NOTICE; engineNote += `model worker failed after loading (${msg}); using the logistic chain. `;
+  if (hybridWorker) { hybridWorker.onError = null; hybridWorker.terminate(); hybridWorker = null; }
+  if (chain && chain.degrade) chain.degrade();
+  showEngineNotice();
 }
 // a fresh engine for one measurement (calibration restarts get a new one)
 function newMeasureEngine(w) {
@@ -388,6 +400,7 @@ function watchCalibration(now, stalled) {
 
 function uiTick() {
   tickN++;
+  if (chain && chain.worker && chain.oldestPendingMs && chain.oldestPendingMs() > WORKER_STALL_MS) workerFailed('no answer from the model worker for ' + Math.round(WORKER_STALL_MS / 1000) + ' s');
   if (kind === 'live' && cam) {
     const st = cam.stats, now = performance.now();
     if (st.gaps > lastGaps) { gapLog.push([now, st.gaps - lastGaps]); lastGaps = st.gaps; }

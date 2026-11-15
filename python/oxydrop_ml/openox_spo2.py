@@ -2,6 +2,9 @@
 
 THIS IS A CONTACT RED/INFRARED FINGER-CLIP SENSOR TEST. It is not a phone-camera test and says nothing about phone SpO2 accuracy.
 
+Minimum group size: a committed per-group cell (skin-tone group, contact-bias group) needs at least MIN_GROUP = 5 people; below that the metrics are blank and `suppressed` is True,
+and a dark-minus-light gap needs MIN_GROUP people in both groups. A group aggregate of 2 to 4 people is close to a per-person value, which the data-use agreement does not allow to be published.
+
     # on a Daytona sandbox only (OpenOximetry is PhysioNet credentialed data: never Kaggle, never git; only aggregates leave the sandbox)
     python -m oxydrop_ml.openox_spo2 infer   --ckpt-dir ckpt --out runs/openox_spo2      # lags, labels, predictions of every model (row-level parquet stays outside git)
     python -m oxydrop_ml.openox_spo2 analyze --out runs/openox_spo2 --res results       # aggregates (CSV only)
@@ -281,6 +284,24 @@ def group_frame(df, people_skin, cuts):
     return d.merge(ps[['subject', 'monk_group', 'ita_group']], on='subject', how='left')
 
 
+MIN_GROUP = 5   # minimum group size (people) for any committed per-group cell: a smaller group's aggregate is close to a per-person value (data-use agreement), so its metrics are blank and `suppressed` is True
+
+
+def suppress_small(rows, n_col='n_people', keep=('label', 'scheme', 'group', 'model', 'n_people')):
+    """Blank every metric of a per-group row whose group has fewer than MIN_GROUP people (the people count itself stays); adds the column `suppressed`."""
+    out = []
+    for r in rows:
+        r = dict(r)
+        small = r[n_col] < MIN_GROUP
+        if small:
+            for k in list(r):
+                if k not in keep:
+                    r[k] = np.nan
+        r['suppressed'] = bool(small)
+        out.append(r)
+    return out
+
+
 def skin_rows(df, label, ycol, B, models=None):
     """Per-group metrics (person-bootstrap CI) and dark-minus-light gaps (independent person bootstraps per group)."""
     rows, gaps = [], []
@@ -303,7 +324,7 @@ def skin_rows(df, label, ycol, B, models=None):
             gd, gl = d[d[col] == dark], d[d[col] == light]
             for k in ('mae', 'bias'):
                 nd, nl = gd.subject.nunique(), gl.subject.nunique()
-                ok = nd >= 3 and nl >= 3
+                ok = nd >= MIN_GROUP and nl >= MIN_GROUP
                 if ok:
                     ed, el = gd[[ycol, pc, 'subject']].dropna(), gl[[ycol, pc, 'subject']].dropna()
                     bd = M.person_bootstrap(ed.subject.values, lambda i: err_metrics(ed[ycol].values[i], ed[pc].values[i], auc=False)[k], B=B, seed=1)
@@ -344,7 +365,7 @@ def contact_bias(draws, people, cuts, B):
             rows.append(dict(scheme=scheme, group=g, n_people=int(s.subject.nunique()), n_draws=int(len(s)), bias=b['point'], lo=b['lo'], hi=b['hi'], person_mean=float(per.mean()),
                              occult_share_of_sao2_lt88=float(occult), n_sao2_lt88=int((s.sao2 < 88).sum())))
             res[g] = (s, b)
-        if dark in res and light in res and res[dark][0].subject.nunique() >= 3 and res[light][0].subject.nunique() >= 3:
+        if dark in res and light in res and res[dark][0].subject.nunique() >= MIN_GROUP and res[light][0].subject.nunique() >= MIN_GROUP:
             bd, bl = res[dark][1], res[light][1]
             diff = bd['boot'] - bl['boot']
             gaps.append(dict(scheme=scheme, dark=dark, light=light, n_dark=int(res[dark][0].subject.nunique()), n_light=int(res[light][0].subject.nunique()), gap=bd['point'] - bl['point'],
@@ -435,6 +456,9 @@ def analyze(out_dir, res_dir, B=B_DEFAULT):
                   ror_cal_a=par['a'], ror_cal_b=par['b'], device_display_mae=devm['mae'], device_display_bias=devm['bias'], device_display_arms_70_100=devm['arms_70_100'],
                   device_display_auroc_lt90=devm['auroc_lt90'], device_display_n=devm['n'])
     os.makedirs(res_dir, exist_ok=True)
+    sk = suppress_small(sk)
+    cb = suppress_small(cb, keep=('scheme', 'group', 'n_people'))
+    ra = suppress_small(ra, keep=('scheme', 'group', 'n_people'))
     for name, rows in (('overall', ov), ('paired', pr), ('skin', sk), ('gaps', gp), ('contact_bias', cb), ('contact_bias_gaps', cg), ('ror_all_people', ra), ('lag', lag_rows(df, lagj))):
         pd.DataFrame(rows).to_csv(os.path.join(res_dir, f'openox_spo2_{name}.csv'), index=False)
     pd.DataFrame([counts]).to_csv(os.path.join(res_dir, 'openox_spo2_counts.csv'), index=False)

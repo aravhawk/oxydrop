@@ -5,6 +5,7 @@
 // setup UI never appeared (REVIEW.md section 3). Cases: (1) cancel during the countdown, (2) full flow, (3) stale deviceId falls back to facingMode.
 // Usage: node tests/flow.mjs        (about 25 s of real time: the app's own 3 s get-ready countdown and 3.5 s lens probe are not mocked)
 //        FLOW_HYBRID_FAIL=1 node tests/flow.mjs   the hybrid model assets fail to load (HTTP 503): the app falls back to the logistic chain and the measurement screen must say so
+//        FLOW_WORKER_FAIL=1 node tests/flow.mjs   the CNN Web Worker loads fine and then errors during the measurement: the app drops to the logistic chain and shows a visible, device-agnostic notice
 //        FLOW_ENGINE=logistic node tests/flow.mjs   the live camera path with ?engine=logistic: the logistic chain runs on purpose, no fallback notice
 //        FLOW_APP=../app/js/app_old.js node tests/flow.mjs    runs another copy of app.js (a path relative to this file, copy placed in app/js/) to show an old version fails
 import assert from 'node:assert/strict';
@@ -92,6 +93,18 @@ globalThis.document = document;
 const LOGISTIC_REQ = process.env.FLOW_ENGINE === 'logistic';
 globalThis.location = { search: LOGISTIC_REQ ? '?engine=logistic' : '' };
 const HYBRID_FAIL = process.env.FLOW_HYBRID_FAIL === '1';
+const WORKER_FAIL = process.env.FLOW_WORKER_FAIL === '1';
+if (WORKER_FAIL) {
+  // A stand-in module Worker: it starts and reports ready (so the app commits to the worker path), never answers a window, and raises an error event 1 s after the measurement's engine is created.
+  globalThis.Worker = class {
+    constructor() { this.onmessage = null; this.onerror = null; this.terminated = false; globalThis.__fakeWorker = this; }
+    postMessage(m) {
+      if (m.type === 'init') setTimeout(() => this.onmessage && this.onmessage({ data: { type: 'ready', info: { model: 'OxyNet residual CNN', params: 167588, paramsTotal: 502764, alpha: 0.1, thresholds: { normal_below: 0, low_above: 0 } } } }), 20);
+      else if (m.type === 'reset') setTimeout(() => { if (!this.terminated && this.onerror) this.onerror({ message: 'simulated worker crash' }); }, 1000);
+    }
+    terminate() { this.terminated = true; }
+  };
+}
 globalThis.fetch = async (url) => {
   if (HYBRID_FAIL && /hybrid_|conformal/.test(url)) return { ok: false, status: 503, json: async () => { throw new Error('unavailable'); } };
   return { ok: true, json: async () => JSON.parse(fs.readFileSync(new URL('../app/' + url, import.meta.url), 'utf8')) };
@@ -147,6 +160,15 @@ if (LOGISTIC_REQ) {
   assert.equal($('engine-note').hidden, true, 'no fallback notice when the chain was requested on purpose');
   assert.equal($('status-main').textContent, 'Calibrating');
   ok('?engine=logistic on the live camera path: logistic chain, no fallback notice');
+} else if (WORKER_FAIL) {
+  assert.ok(globalThis.__fakeWorker, 'the app started the Web Worker');
+  assert.equal(globalThis.__fakeWorker.terminated, true, 'the failed worker is shut down');
+  assert.equal($('engine-note').hidden, false, 'a worker error after loading must be visible on the measurement screen, not only in the debug text');
+  assert.match($('engine-note').textContent, /neural-network part of the model stopped working.*logistic chain alone.*three result words are unchanged/, $('engine-note').textContent);
+  assert.doesNotMatch($('engine-note').textContent, /iPhone|Android|Pixel|Samsung/, 'the notice is device-agnostic');
+  assert.match($('dbg-measure').textContent, /engine logistic chain v2 \(baseline \/ fallback\).*model worker failed after loading \(simulated worker crash\)/, 'the debug text records the worker failure');
+  assert.equal($('status-main').textContent, 'Calibrating', 'the measurement keeps running on the logistic chain');
+  ok('CNN worker errors after loading: the logistic chain takes over the running measurement and the screen shows a visible, device-agnostic notice');
 } else if (!HYBRID_FAIL) {
   assert.match($('dbg-measure').textContent, /engine oxydrop-hybrid-v1: v1 physics chain \+ OxyNet residual CNN, 3 seeds, 167,588 parameters per seed/, 'the default engine in the measurement is the hybrid (CNN)');
   assert.match($('dbg-measure').textContent, /conformal alpha 0\.1 /, 'the conformal level is shown in the debug summary');
@@ -168,6 +190,7 @@ fingerOff = false; await sleep(1500);
 assert.equal($('phase').textContent, 'Calibrating (restarted)');
 assert.match($('status-sub').textContent, /came off the lens or flash during calibration, so the minute was started again/);
 ok('finger lifted during calibration: the minute restarts once the finger is back');
+if (WORKER_FAIL) { assert.equal($('engine-note').hidden, false, 'the notice stays visible after the calibration minute restarts'); assert.match($('dbg-measure').textContent, /engine logistic chain v2/, 'the restarted measurement uses the logistic chain, not the dead worker'); ok('the restarted measurement stays on the logistic chain with the notice shown'); }
 
 // ---------------- 3. a stale / rejected deviceId falls back to facingMode ----------------
 await $('wm-stop').click(); fresh();

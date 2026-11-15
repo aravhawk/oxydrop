@@ -105,7 +105,8 @@ def synth_world(tmp, rng, n_people=14):
     dr.to_parquet(tmp / 'draws_all.parquet')
 
 
-def test_analyze_on_a_synthetic_world(tmp_path):
+def test_analyze_on_a_synthetic_world(tmp_path, monkeypatch):
+    monkeypatch.setattr(O, 'MIN_GROUP', 3)   # the synthetic world has 14 people; the production minimum is 5 (see test_small_groups_are_suppressed)
     rng = np.random.default_rng(0)
     synth_world(tmp_path, rng)
     out = tmp_path / 'agg'
@@ -124,7 +125,8 @@ def test_analyze_on_a_synthetic_world(tmp_path):
     assert set(cb.scheme) == {'monk', 'ita'}
 
 
-def test_a_group_with_fewer_than_three_people_has_no_gap(tmp_path):
+def test_a_group_with_fewer_than_three_people_has_no_gap(tmp_path, monkeypatch):
+    monkeypatch.setattr(O, 'MIN_GROUP', 3)
     rng = np.random.default_rng(1)
     synth_world(tmp_path, rng)
     p = pd.read_parquet(tmp_path / 'people.parquet'); p.loc[p.monk == 8, 'monk'] = np.where(np.arange((p.monk == 8).sum()) < 2, 8, 5); p.to_parquet(tmp_path / 'people.parquet')
@@ -164,3 +166,25 @@ def test_openox_md_numbers_come_from_the_csv():
     ov = pd.read_csv(RES / 'openox_spo2_overall.csv')
     r = ov[(ov.label == 'lag_star') & (ov.model == 'R')].iloc[0]
     assert f'{r.mae:.2f} [{r.mae_lo:.2f}, {r.mae_hi:.2f}]' in md and 'contact red/infrared finger-clip sensor test' in md
+
+
+def test_small_groups_are_suppressed():
+    """Minimum group size: a per-group cell with fewer than MIN_GROUP (5) people keeps only its people count; the metrics are blank and `suppressed` is True."""
+    assert O.MIN_GROUP == 5
+    rows = O.suppress_small([dict(label='l', scheme='monk', group='7+', model='R', n_people=2, n_windows=300, mae=3.1, mae_lo=1.0, mae_hi=5.0),
+                             dict(label='l', scheme='monk', group='1-3', model='R', n_people=8, n_windows=900, mae=2.9, mae_lo=2.0, mae_hi=4.0)])
+    a, b = rows
+    assert a['suppressed'] and a['n_people'] == 2 and all(np.isnan(a[k]) for k in ('n_windows', 'mae', 'mae_lo', 'mae_hi')) and a['group'] == '7+'
+    assert not b['suppressed'] and b['mae'] == 2.9 and b['n_windows'] == 900
+
+
+def test_committed_group_cells_respect_the_minimum_group_size():
+    for name in ('skin', 'contact_bias', 'ror_all_people'):
+        d = pd.read_csv(RES / f'openox_spo2_{name}.csv')
+        small = d.n_people < O.MIN_GROUP
+        assert (d.suppressed == small).all(), name
+        assert d[small].drop(columns=[c for c in ('label', 'scheme', 'group', 'model', 'n_people', 'suppressed') if c in d.columns]).isna().all().all(), f'{name}: a group under {O.MIN_GROUP} people has values'
+    g = pd.read_csv(RES / 'openox_spo2_gaps.csv')
+    assert (g.estimable == ((g.n_dark >= O.MIN_GROUP) & (g.n_light >= O.MIN_GROUP))).all()
+    hv = pd.read_csv(RES / 'hr_vote_slow_pulse.csv')
+    assert ((hv.dataset == 'hoffman') | (hv.n_people >= O.MIN_GROUP)).all() and 'mths' not in set(hv.dataset), 'a restricted-licence dataset must not appear as a one-person row'

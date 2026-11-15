@@ -215,7 +215,7 @@ Source: `results/ml/conformal_curve.csv`, `conformal_matched.csv`, `conformal_pe
 
 ![HR Bland-Altman and error by dataset](docs/figures/ml_hr_blandaltman.png)
 
-Rule selection on the Hoffman inner folds (6 people disjoint from every P2 test person): `spec` 0.883, `agree` 0.826, `guard` 0.811, `gate` 0.814, `cnn` 0.803. The pre-registered metric shows a "win" (+0.061 [0.013, 0.107]), but it rests on a rule chosen after the pooled table had been seen (Amendment 3) and is **exploratory, not a clean win**: the gain comes from BUT PPG (+0.115 [0.054, 0.177]); on MTHS the spectral estimator is nominally better (-0.039 [-0.102, 0.017]); on the Hoffman people the spectral estimator alone is best (0.883 against 0.826 for the rule that ships).
+Rule selection on the Hoffman inner folds (6 people disjoint from every P2 test person): `spec` 0.883, `agree` 0.826, `guard` 0.811, `gate` 0.814, `cnn` 0.803. The pre-registered metric shows a "win" (+0.061 [0.013, 0.107]), but it rests on a rule chosen after the pooled table had been seen (Amendment 3) and is **exploratory, not a clean win**: the gain comes from BUT PPG (+0.115 [0.054, 0.177]); on MTHS the spectral estimator is nominally better (-0.039 [-0.102, 0.017]); on the Hoffman inner folds the spectral estimator alone is best (0.883 against 0.826 for the rule that ships; this is the pooled out-of-fold selection table, not an outer-fold test result).
 
 **Voting rule on clean clips** (pass the shipped v2 quality gate; MAE in bpm; target stated before any result: MAE under 3 bpm and doubling under 1%). Voting of autocorrelation, spectral harmonic sum and the CNN, with octave check and a causal median of 5:
 
@@ -283,12 +283,12 @@ MTHS is normoxic, so nothing beats the train-mean predictor, including the CNN (
 | :--- | ---: | ---: | ---: | ---: |
 | Monk 1-3 | 8 | 3.25 [2.03, 4.04] | 3.44 [2.15, 4.16] | 7.11 [5.95, 7.85] |
 | Monk 4-6 | 14 | 2.66 [2.14, 3.40] | 2.88 [2.54, 3.29] | 7.60 [7.17, 8.16] |
-| Monk 7+ | 2 | 3.42 [3.01, 4.57] | 2.90 [2.12, 5.09] | 7.13 [6.38, 9.22] |
+| Monk 7+ | 2 | suppressed (under 5 people) | suppressed (under 5 people) | suppressed (under 5 people) |
 | ITA lightest tertile | 6 | 2.71 [1.89, 3.64] | 3.49 [2.54, 4.47] | 7.70 [6.99, 8.77] |
 | ITA mid tertile | 7 | 2.97 [1.94, 3.96] | 3.11 [1.95, 3.93] | 7.27 [6.05, 7.91] |
 | ITA darkest tertile | 7 | 3.12 [2.50, 4.09] | 2.87 [2.35, 3.66] | 7.26 [6.57, 8.40] |
 
-CNN MAE dark minus light, ITA tertiles (7 versus 6 people): +0.41 [-0.75, +1.63], and the interval contains 0. Monk 7 and above has only 2 held-out people, so the gap by Monk group is **not estimable**.
+CNN MAE dark minus light, ITA tertiles (7 versus 6 people): +0.41 [-0.75, +1.63], and the interval contains 0. Monk 7 and above has only 2 held-out people, so the gap by Monk group is **not estimable**. Minimum group size: every committed skin-tone cell needs at least 5 people, smaller groups are suppressed.
 
 **The reference itself is biased.** Contact-oximeter display minus blood-gas SaO2 (all 137 people with draws), dark minus light: Monk 7+ versus 1-3 +1.77 [+0.64, +2.61] points (7 versus 55 people), ITA darkest versus lightest tertile +1.10 [+0.65, +1.55] points. The device over-reads more in darker skin, so any label from a pulse oximeter inherits this; the analysis above is anchored to blood gas.
 

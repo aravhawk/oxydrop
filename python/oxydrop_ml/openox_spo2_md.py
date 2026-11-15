@@ -95,13 +95,14 @@ def report(res):
                 r = g[(g.scheme == scheme) & (g.group == grp) & (g.model == m)]
                 if len(r):
                     r = r.iloc[0]
-                    rows.append([scheme.upper(), grp, MODEL_TEXT[m], int(r.n_people), f'{int(r.n_windows):,}', ci2(r, 'mae'), f2(r.bias), f3(r.auroc_lt90)])
+                    sup = bool(r.get('suppressed', False))
+                    rows.append([scheme.upper(), grp, MODEL_TEXT[m], int(r.n_people), 'suppressed' if sup else f'{int(r.n_windows):,}', 'suppressed (fewer than 5 people)' if sup else ci2(r, 'mae'), 'suppressed' if sup else f2(r.bias), 'suppressed' if sup else f3(r.auroc_lt90)])
     L.append(table(rows, ['scale', 'group', 'predictor', 'people', 'windows', 'MAE [95% CI]', 'bias', 'AUROC SaO2 < 90']))
     L.append('')
-    L.append('Dark-minus-light gaps (darkest minus lightest ITA tertile; Monk 7+ minus 1-3 only with at least 3 people per group), independent person bootstraps:\n')
+    L.append('Dark-minus-light gaps (darkest minus lightest ITA tertile; Monk 7+ minus 1-3; a gap needs at least 5 people in each group, the minimum group size for every committed group cell), independent person bootstraps:\n')
     rows = []
     for _, r in gp[(gp.label == 'lag_star') & (gp.model.isin(['R', 'ror_textbook', 'train_mean']))].iterrows():
-        rows.append([r.scheme.upper(), MODEL_TEXT[r.model], r.metric, f'{int(r.n_dark)} vs {int(r.n_light)}', f'{r.gap:+.2f} [{r.lo:+.2f}, {r.hi:+.2f}]' if r.estimable else 'not estimable (fewer than 3 people in a group)'])
+        rows.append([r.scheme.upper(), MODEL_TEXT[r.model], r.metric, f'{int(r.n_dark)} vs {int(r.n_light)}', f'{r.gap:+.2f} [{r.lo:+.2f}, {r.hi:+.2f}]' if r.estimable else 'not estimable (fewer than 5 people in a group)'])
     L.append(table(rows, ['scale', 'predictor', 'metric', 'people dark vs light', 'gap [95% CI]']))
     L.append('')
     gR = gp[(gp.label == 'lag_star') & (gp.model == 'R') & (gp.scheme == 'ita') & (gp.metric == 'mae')].iloc[0]

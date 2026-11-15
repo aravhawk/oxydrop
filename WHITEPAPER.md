@@ -78,7 +78,7 @@ The conformal three-state output and its comparison at matched coverage are in t
 | CNN alone (3-seed median) | 0.468 [0.419, 0.522] | 0.410 | 0.576 | 8.63 | 0.02% | tie (3-seed ensemble) |
 | **Hybrid HR rule `agree`** (CNN, averaged with v2 spectral when within 5 bpm) | 0.480 [0.429, 0.534] | 0.419 | 0.594 | 8.55 | 0.02% | win by the rule (+0.061 [0.013, 0.107]); **post hoc, exploratory, driven by BUT PPG** |
 
-The hybrid rule `agree` (mean of CNN and v2 spectral estimate if within 5 bpm, else CNN) shows a paired difference of +0.061 [0.013, 0.107] against the best baseline, which would be a win by the pre-registered rule, but it is **post hoc and exploratory, not a clean win**. It was chosen among CNN-containing rules on Hoffman inner folds after the pooled table had been seen (Amendment 3); the Hoffman people alone would choose the spectral estimator (0.883 against 0.826 for `agree`). The gain comes from BUT PPG (+0.115 [0.054, 0.177]; noisy ear and motion clips); on MTHS the spectral estimator is nominally better (-0.039 [-0.102, 0.017]). The CNN alone ties. A voting rule over autocorrelation, spectral and CNN estimates with octave check (Amendment 5, written before any result) does not help on phone-ear data:
+The hybrid rule `agree` (mean of CNN and v2 spectral estimate if within 5 bpm, else CNN) shows a paired difference of +0.061 [0.013, 0.107] against the best baseline, which would be a win by the pre-registered rule, but it is **post hoc and exploratory, not a clean win**. It was chosen among CNN-containing rules on Hoffman inner folds after the pooled table had been seen (Amendment 3); the Hoffman inner folds alone (pooled out-of-fold windows of the six Hoffman people, the table that selected the rule, not an outer-fold test result) would choose the spectral estimator (0.883 against 0.826 for `agree`). The gain comes from BUT PPG (+0.115 [0.054, 0.177]; noisy ear and motion clips); on MTHS the spectral estimator is nominally better (-0.039 [-0.102, 0.017]). The CNN alone ties. A voting rule over autocorrelation, spectral and CNN estimates with octave check (Amendment 5, written before any result) does not help on phone-ear data:
 
 **Voting rule on clean clips** (pass the shipped v2 quality gate; MAE in bpm; target stated before any result: MAE under 3 bpm and doubling under 1%). Voting of autocorrelation, spectral harmonic sum and the CNN, with octave check and a causal median of 5:
 
@@ -195,12 +195,12 @@ Source: `results/ml/conformal_curve.csv`, `conformal_matched.csv`, `conformal_pe
 | :--- | ---: | ---: | ---: | ---: |
 | Monk 1-3 | 8 | 3.25 [2.03, 4.04] | 3.44 [2.15, 4.16] | 7.11 [5.95, 7.85] |
 | Monk 4-6 | 14 | 2.66 [2.14, 3.40] | 2.88 [2.54, 3.29] | 7.60 [7.17, 8.16] |
-| Monk 7+ | 2 | 3.42 [3.01, 4.57] | 2.90 [2.12, 5.09] | 7.13 [6.38, 9.22] |
+| Monk 7+ | 2 | suppressed (under 5 people) | suppressed (under 5 people) | suppressed (under 5 people) |
 | ITA lightest tertile | 6 | 2.71 [1.89, 3.64] | 3.49 [2.54, 4.47] | 7.70 [6.99, 8.77] |
 | ITA mid tertile | 7 | 2.97 [1.94, 3.96] | 3.11 [1.95, 3.93] | 7.27 [6.05, 7.91] |
 | ITA darkest tertile | 7 | 3.12 [2.50, 4.09] | 2.87 [2.35, 3.66] | 7.26 [6.57, 8.40] |
 
-CNN MAE dark minus light, ITA tertiles (7 versus 6 people): +0.41 [-0.75, +1.63], and the interval contains 0. Monk 7 and above has only 2 held-out people, so the gap by Monk group is **not estimable**.
+CNN MAE dark minus light, ITA tertiles (7 versus 6 people): +0.41 [-0.75, +1.63], and the interval contains 0. Monk 7 and above has only 2 held-out people, so the gap by Monk group is **not estimable**. Minimum group size: every committed skin-tone cell needs at least 5 people, smaller groups are suppressed.
 
 **The reference itself is biased.** Contact-oximeter display minus blood-gas SaO2 (all 137 people with draws), dark minus light: Monk 7+ versus 1-3 +1.77 [+0.64, +2.61] points (7 versus 55 people), ITA darkest versus lightest tertile +1.10 [+0.65, +1.55] points. The device over-reads more in darker skin, so any label from a pulse oximeter inherits this; the analysis above is anchored to blood gas.
 

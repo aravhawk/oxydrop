@@ -15,6 +15,8 @@ All datasets are public except OpenOximetry, which is credentialed (used as deri
 
 **Compute handling.** Heavy training used a Daytona sandbox; OpenOximetry-derived arrays were uploaded only there (never to Kaggle) and stay on the sandbox and the analysis host (remove the sandbox with `python scripts/ml_daytona.py down`). Kaggle was used only for the HealthRing experiment, which touched public-licence data (HealthRing CC BY, Hoffman MIT) and no OpenOximetry or MTHS data. Checkpoints and run directories stay outside git.
 
+**Minimum group size (5 people).** No committed table reports a group of fewer than 5 people from MTHS, BUT PPG or OpenOximetry (`MIN_GROUP` in `python/oxydrop_ml/openox_spo2.py`): a smaller group's aggregate is close to one person's result. In `results/ml/openox_spo2_skin.csv` the Monk 7+ group (2 people) and the ITA `unknown` group (4 people) keep only their people count and have `suppressed = True`; a dark-minus-light gap needs 5 people in both groups; `hr_vote_slow_pulse.csv` has no MTHS row (it was one person) and keeps the Hoffman rows (MIT data, one named slow-pulse case). `results/mths_spo2/per_person.csv` and `results/hr_validation/long_windows.csv` predate this branch, sit on `main` and are not changed here; they are the owner's call (see the licence action below).
+
 ## Shipped model weights: caveat for the owner to confirm
 
 The three CNN seed files and the ONNX export are **derived models**. They were trained on MTHS (CC BY-NC-ND 4.0) and on OpenOximetry (PhysioNet credentialed data use agreement), besides Hoffman (MIT), BUT PPG (CC BY 4.0) and the PhysioNet pretraining corpus. The weights contain no raw signal, no frame and no per-person record, and the repository publishes aggregates only for OpenOximetry.
