@@ -1,13 +1,24 @@
 import { Chain, FS, CAL, WIN } from './engine.js';
-import { CameraSource, Motion } from './camera.js';
+import { CameraSource, Motion, listBackCameras, pickDefault } from './camera.js';
 import { MIN_TRACKABLE_BPM } from './hr.js';
+import { decide, hrToShow, assessPlacement, STATE, MOTION_MAX } from './decision.js';
 
 const $ = (id) => document.getElementById(id);
-const SQI_MIN = 0.12;          // rule-based quality gate; Hoffman windows: 1st percentile 0.143, min 0.099
-const MOTION_MAX = 0.35;       // m/s^2 std of |accel| over 3 s: above this we pause decisions
 const MIN_HR = MIN_TRACKABLE_BPM, MAX_HR = 110; // plausible *resting* heart rate at calibration; MIN_HR follows the HR estimator's band edge (F_LO = 0.85 Hz = 51 bpm)
-let mode = null, chain = null, weights = null, cam = null, motion = null, wake = null;
-let replay = null, replayTimer = null, timers = [], strip = [], tally = {}, calSqi = [], calMotion = [], calFailed = false, calChecked = false, lastWave = [];
+const LOCK_NEED = 3;            // consecutive valid-lock windows before calibration can start
+const ANYWAY_AFTER_S = 20;      // seconds without a lock before "start anyway" is offered
+const CAL_VALID_MIN = 0.6;      // fraction of calibration windows that must have a valid pulse lock
+const CAL_FPS_MIN = 20, CAL_GAPS_MAX = 20;
+const CAL_WARM_S = 20;          // windows starting at s <= 20 still contain the band-pass filter's start-up transient (always invalid, even on a clean signal), so they are not counted
+const RAW_MAX = 15 * 60 * FS;   // raw trace ring buffer: 15 minutes at 30 Hz
+
+let mode = null;                // null | 'setup' | 'measure'
+let kind = null;                // 'live' | 'replay'
+let chain = null, weights = null, cam = null, motion = null, wake = null, camGen = 0;
+let replay = null, replayTimer = null, uiTimer = null, anywayTimer = null, tickN = 0;
+let strip = [], tally = {}, calMotion = [], calFps = [], calWin = [], calGaps0 = 0, calFailed = false, calChecked = false, calOk = true;
+let lockHist = [], lockRun = 0, camStartedAt = 0, place = { level: 'warn', title: '', msg: '' }, fingerHist = [], gapLog = [], lastGaps = 0, lastD = null, lastDecision = null, lastWaveCh = 1;
+const raw = new Float32Array(RAW_MAX * 3); let rawN = 0, decLog = [];
 
 function show(id) { document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id)); window.scrollTo(0, 0); }
 document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => { cleanup(); show(b.dataset.go); }));
@@ -20,80 +31,214 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 async function loadWeights() { if (!weights) weights = await (await fetch('data/weights.json')).json(); return weights; }
 
 function cleanup() {
-  timers.forEach(clearInterval); timers = []; clearInterval(replayTimer); if (cam) { cam.stop(); cam = null; } if (motion) { motion.stop(); motion = null; }
-  if (wake) { try { wake.release(); } catch (e) { /* ignore */ } wake = null; } replay = null; mode = null;
+  camGen++; clearInterval(replayTimer); clearInterval(uiTimer); clearTimeout(anywayTimer); uiTimer = null;
+  if (cam) { cam.stop(); cam = null; } if (motion) { motion.stop(); motion = null; }
+  if (wake) { try { wake.release(); } catch (e) { /* ignore */ } wake = null; }
+  replay = null; mode = null; kind = null; chain = null;
 }
 async function keepAwake() { try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) { /* ignore */ } }
+function startUi() { clearInterval(uiTimer); tickN = 0; uiTimer = setInterval(uiTick, 250); }
+
+// ---------------- raw trace recorder (bounded ring buffer) ----------------
+function resetRecorder() { rawN = 0; decLog = []; lastD = null; lastDecision = null; }
+function record(r, g, b) { const i = (rawN % RAW_MAX) * 3; raw[i] = r; raw[i + 1] = g; raw[i + 2] = b; rawN++; }
+function logDecision(d, dec) { decLog.push({ idx: rawN - 1, d, dec }); if (decLog.length > RAW_MAX / (2 * FS) + 5) decLog.shift(); }
+function buildCsv() {
+  const start = Math.max(0, rawN - RAW_MAX), byIdx = new Map(decLog.map((x) => [x.idx, x]));
+  const rows = ['t_s,R,G,B,sqi,acf,hr_est,hr_beat,valid,sat,label,p,state,reason,hr_shown'];
+  for (let n = start; n < rawN; n++) {
+    const i = (n % RAW_MAX) * 3; let tail = ',,,,,,,,,,';
+    const x = byIdx.get(n);
+    if (x) { const d = x.d, c = x.dec; tail = [f4(d.sqi), f4(d.acf), f2(d.hrEst), f2(d.hrBeat), d.valid ? 1 : 0, f4(d.sat), d.label || (d.calibrating ? 'calibrating' : ''), f4(d.p), c ? c.state : '', c && c.reason ? c.reason : '', c && c.hr != null ? c.hr.toFixed(1) : ''].join(','); }
+    rows.push(`${(n / FS).toFixed(3)},${raw[i].toFixed(3)},${raw[i + 1].toFixed(3)},${raw[i + 2].toFixed(3)},${tail}`);
+  }
+  return rows.join('\n') + '\n';
+}
+const f2 = (v) => (Number.isFinite(v) ? v.toFixed(2) : ''), f4 = (v) => (Number.isFinite(v) ? v.toFixed(4) : '');
+function download() {
+  const url = URL.createObjectURL(new Blob([buildCsv()], { type: 'text/csv' }));
+  const a = document.createElement('a'); a.href = url; a.download = `oxydrop-trace-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+async function copyDebug(btn) {
+  const txt = debugText(); const old = btn.textContent;
+  try { await navigator.clipboard.writeText(txt); btn.textContent = 'Copied'; }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    let okc = false; try { okc = document.execCommand('copy'); } catch (e2) { /* ignore */ } ta.remove(); btn.textContent = okc ? 'Copied' : 'Copy failed: select the text above';
+  }
+  setTimeout(() => { btn.textContent = old; }, 2000);
+}
+document.querySelectorAll('[data-dl]').forEach((b) => b.addEventListener('click', download));
+document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyDebug(b)));
+
+function debugText() {
+  const L = []; const st = cam ? cam.stats : null;
+  L.push(`mode ${mode || '-'} / ${kind || '-'}   samples ${rawN}   t ${(rawN / FS).toFixed(1)} s`);
+  if (cam && st) {
+    L.push(`fps ${st.fps.toFixed(1)}  jitter ${st.jitterMs.toFixed(1)} ms  gaps ${st.gaps} (max ${(st.maxGap * 1000).toFixed(0)} ms)  skipped ${st.skipped}  frames ${st.frames}`);
+    L.push(`lens "${cam.info.lens}"  ${cam.info.width}x${cam.info.height}`);
+    L.push(`torch ${cam.info.torchSupported ? (cam.info.torch ? 'on' : 'off') : 'unsupported'}  locks ${JSON.stringify(cam.info.locks)}`);
+    L.push(`mean RGB ${st.mean.map((v) => v.toFixed(1)).join(' / ')}  frame-saturated ${(st.satFrac * 100).toFixed(1)}%  spatialCV ${st.spatialCV.toFixed(3)}  luma ${st.luma.toFixed(1)}`);
+    L.push(`placement ${place.level}: ${place.title}`);
+  }
+  if (lastD) {
+    const d = lastD; L.push(`window s=${d.s}  SQI ${f4(d.sqi)}  ACF ${f4(d.acf)}  hrEst ${f2(d.hrEst)}  hrBeat ${f2(d.hrBeat)}  ch ${d.ch}  sat ${f4(d.sat)}  valid ${d.valid}  label ${d.label || 'calibrating'}  p ${f4(d.p)}`);
+    if (lastDecision) L.push(`decision ${lastDecision.state}${lastDecision.reason ? ' (' + lastDecision.reason + ')' : ''}  hr shown ${lastDecision.hr != null ? lastDecision.hr.toFixed(1) : '-'}`);
+  } else L.push('no window yet');
+  L.push(`lock history (last 5): ${lockHist.map((v) => (v ? '1' : '0')).join('') || '-'}  motion ${motion && motion.ok && motion.level(10) != null ? motion.level(10).toFixed(2) + ' m/s2' : 'no sensor'}`);
+  L.push(navigator.userAgent);
+  return L.join('\n');
+}
 
 // ---------------- live camera flow ----------------
-$('btn-live').addEventListener('click', () => { cleanup(); show('setup'); $('setup-live').hidden = true; $('btn-cam').hidden = false; $('cam-state').textContent = 'Camera off'; });
+const lightMode = () => (document.querySelector('input[name=light]:checked') || { value: 'flash' }).value;
+
+$('btn-live').addEventListener('click', () => { cleanup(); show('setup'); $('setup-live').hidden = true; $('btn-cam').hidden = false; $('cam-state').textContent = 'Camera off'; $('checks').innerHTML = ''; });
 
 $('btn-cam').addEventListener('click', async () => {
   $('btn-cam').hidden = true; $('cam-state').textContent = 'Starting camera…';
   try {
+    cleanup(); motion = new Motion(); const mp = motion.start();   // start the motion permission prompt first: iOS needs it inside the tap
     await loadWeights(); await keepAwake();
-    chain = new Chain(weights);
-    const video = document.createElement('video');
-    cam = new CameraSource((r, g, b) => { const d = chain.push(r, g, b); if (d) onSetupWindow(d); lastWave = chain.ac[1].slice(-300); }, () => renderChecks());
-    await cam.start(video); mode = 'setup';
-    motion = new Motion(); await motion.start();
-    $('setup-live').hidden = false; $('cam-state').textContent = cam.info.torch ? 'Camera on, flash on' : 'Camera on (flash not available in this browser)';
-    renderChecks(); timers.push(setInterval(() => drawWave($('wave-setup'), lastWave), 100));
+    kind = 'live'; mode = 'setup'; startUi();
+    await startCamera(null);
+    // if the browser picked an ultra-wide / telephoto lens, move to the main one once
+    const cams = await populateLens(); const cur = cam.info.deviceId, pd = pickDefault(cams);
+    const curLabel = (cams.find((c) => c.id === cur) || {}).label || '';
+    if (pd && cur && pd.id !== cur && /ultra|0\.5|tele|zoom|macro|depth/i.test(curLabel)) { $('lens').value = pd.id; await startCamera(pd.id); await populateLens(); }
+    await mp;
+    $('setup-live').hidden = false; renderChecks(); renderPlace();
   } catch (e) {
-    $('cam-state').textContent = 'Could not start the camera: ' + (e && e.message ? e.message : e) + '. Allow camera access and reload, or use the recorded demo.';
-    $('btn-cam').hidden = false;
+    cleanup(); $('cam-state').textContent = 'Could not start the camera: ' + (e && e.message ? e.message : e) + '. Allow camera access and reload, or use the recorded demo.';
+    $('btn-cam').hidden = false; $('setup-live').hidden = true;
   }
 });
 
-let setupSqi = 0, setupHr = NaN;
-function onSetupWindow(d) { setupSqi = d.sqi; setupHr = d.hr; const q = Math.max(0, Math.min(1, (d.sqi - 0.08) / 0.2)); $('q-fill').style.width = (q * 100) + '%'; $('q-fill').style.background = d.sqi >= SQI_MIN + 0.04 ? 'var(--green)' : 'var(--amber)'; $('q-text').textContent = d.sqi >= SQI_MIN + 0.04 ? 'Good pulse signal. Keep still.' : 'Weak signal. Cover the camera and flash fully, press lightly.'; $('btn-begin').disabled = !(d.sqi >= SQI_MIN + 0.04); renderChecks(); }
+async function startCamera(deviceId) {
+  const gen = ++camGen;
+  if (cam) { cam.stop(); cam = null; }
+  chain = new Chain(weights); resetRecorder(); lockHist = []; lockRun = 0; fingerHist = []; gapLog = []; lastGaps = 0; place = { level: 'warn', title: 'Looking for your fingertip…', msg: '' };
+  $('btn-begin').disabled = true; $('btn-begin-anyway').hidden = true; $('q-fill').style.width = '0%'; $('q-text').textContent = 'Signal quality: waiting for a pulse lock';
+  const c = new CameraSource((r, g, b) => { if (gen === camGen) sink(r, g, b); });
+  cam = c;
+  await c.start(document.createElement('video'), { deviceId, torch: lightMode() === 'ambient' ? 'off' : 'auto' });
+  camStartedAt = performance.now();
+  clearTimeout(anywayTimer); anywayTimer = setTimeout(() => { if (mode === 'setup' && $('btn-begin').disabled) $('btn-begin-anyway').hidden = false; }, ANYWAY_AFTER_S * 1000);
+  $('cam-state').textContent = c.info.torch ? 'Camera on, flash on' : (lightMode() === 'ambient' ? 'Camera on, flash off (ambient light)' : 'Camera on (flash control not available in this browser)');
+}
+async function populateLens() {
+  const cams = await listBackCameras(), sel = $('lens'); sel.innerHTML = '';
+  for (const c of cams) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.label; sel.appendChild(o); }
+  if (cam && cam.info.deviceId && cams.some((c) => c.id === cam.info.deviceId)) sel.value = cam.info.deviceId;
+  $('lens-help').textContent = cams.length > 1 ? 'Pick the lens that sits closest to the flash, usually “Back Camera” (the main one). Not the ultra-wide or zoom lens.' : 'Only one camera was found.';
+  return cams;
+}
+$('lens').addEventListener('change', async () => {
+  if (mode !== 'setup' || !cam) return;
+  try { await startCamera($('lens').value); renderChecks(); } catch (e) { $('cam-state').textContent = 'Could not switch lens: ' + (e && e.message ? e.message : e); }
+});
+document.querySelectorAll('input[name=light]').forEach((r) => r.addEventListener('change', async () => {
+  if (mode !== 'setup' || !cam) return;
+  const on = lightMode() !== 'ambient'; await cam.setTorch(on);
+  chain = new Chain(weights); lockHist = []; lockRun = 0; $('btn-begin').disabled = true; camStartedAt = performance.now();
+  clearTimeout(anywayTimer); $('btn-begin-anyway').hidden = true; anywayTimer = setTimeout(() => { if (mode === 'setup' && $('btn-begin').disabled) $('btn-begin-anyway').hidden = false; }, ANYWAY_AFTER_S * 1000);
+  $('cam-state').textContent = on ? (cam.info.torch ? 'Camera on, flash on' : 'Camera on (flash control not available in this browser)') : 'Camera on, flash off (ambient light)';
+  renderChecks();
+}));
+
+// every resampled 30 Hz camera/replay sample goes through here
+function sink(r, g, b) {
+  record(r, g, b);
+  if (!chain) return;
+  const d = chain.push(r, g, b);
+  if (d) { if (mode === 'setup') onSetupWindow(d); else if (mode === 'measure') onWindow(d); }
+}
+
+function liveCtx() {
+  if (kind !== 'live' || !cam) return { fps: 30, recentGaps: 0, finger: true, moving: false, calOk };
+  const st = cam.stats, m = motion && motion.level(10);
+  const finger = fingerHist.length < 4 ? place.level === 'good' : fingerHist.filter(Boolean).length / fingerHist.length >= 0.8;
+  return { fps: st.fps > 0 ? st.fps : 30, recentGaps: gapLog.reduce((a, x) => a + x[1], 0), finger, moving: m != null && m > MOTION_MAX, calOk };
+}
+
+function onSetupWindow(d) {
+  lastD = d; lastDecision = null; lastWaveCh = d.ch;
+  logDecision(d, null);
+  lockHist.push(!!d.valid); if (lockHist.length > 5) lockHist.shift(); lockRun = d.valid ? lockRun + 1 : 0;
+  const q = lockHist.filter(Boolean).length / 5, good = lockRun >= LOCK_NEED || q >= 0.8;
+  $('q-fill').style.width = (q * 100) + '%'; $('q-fill').style.background = good ? 'var(--green)' : 'var(--amber)';
+  $('q-text').textContent = good ? 'Good pulse lock. Keep still.' : q > 0 ? 'Weak pulse lock. Cover the lens and flash fully, press lightly.' : 'No pulse lock yet. Follow the fingertip message above.';
+  $('btn-begin').disabled = lockRun < LOCK_NEED; if (lockRun >= LOCK_NEED) $('btn-begin-anyway').hidden = true;
+}
+function renderPlace() { const el = $('place'); el.className = 'place ' + place.level; $('place-title').textContent = place.title; $('place-msg').textContent = place.msg; }
 function renderChecks() {
-  if (!cam) return; const li = [];
-  li.push([cam.info.torch, cam.info.torch ? 'Flash on' : 'No flash control here (common on iPhone Safari). Use bright light; accuracy is unvalidated.']);
-  li.push([cam.info.exposureLocked, cam.info.exposureLocked ? 'Exposure locked' : 'Exposure not locked on this device (can reduce accuracy)']);
-  li.push([cam.info.fps >= 20, `Camera ${cam.info.fps.toFixed(0)} fps` + (cam.info.fps < 20 ? ' (low)' : '')]);
+  if (!cam) return; const st = cam.stats, li = [], lk = cam.info.locks || {}, ambient = lightMode() === 'ambient';
+  if (ambient) li.push([true, 'Flash off (ambient light). Face a bright lamp or window.']);
+  else li.push([cam.info.torch, cam.info.torch ? 'Flash on' : 'No flash control here (common on iPhone Safari). Use bright light; accuracy is unvalidated.']);
+  const locked = ['exposure', 'wb', 'focus'].filter((k) => lk[k]), missed = ['exposure', 'wb', 'focus'].filter((k) => !lk[k]);
+  if (performance.now() - camStartedAt < 3000) li.push([true, 'Locking exposure, white balance and focus…']);
+  else li.push([locked.includes('exposure') && locked.includes('wb'), locked.length ? `Locked: ${locked.join(', ')}` + (missed.length ? `. Not lockable here: ${missed.join(', ')}` : '') : 'Exposure and white balance could not be locked on this device (can reduce accuracy)']);
+  li.push([st.fps >= CAL_FPS_MIN, st.fps ? `Camera ${st.fps.toFixed(0)} fps, jitter ${st.jitterMs.toFixed(1)} ms` + (st.fps < CAL_FPS_MIN ? ' (too low)' : '') : 'Measuring camera speed…']);
+  const g = gapLog.reduce((a, x) => a + x[1], 0);
+  li.push([g === 0, g === 0 ? `No dropped frames (${st.gaps} total)` : `${g} dropped-frame gaps in the last 10 s`]);
   li.push([motion && motion.ok, motion && motion.ok ? 'Motion sensor on' : 'No motion sensor: hold very still yourself']);
   $('checks').innerHTML = li.map(([ok, t]) => `<li class="${ok ? 'ok' : 'warn'}">${ok ? '✓' : '!'} ${t}</li>`).join('');
 }
 
-$('btn-begin').addEventListener('click', () => { startMeasure('live'); });
+$('btn-begin').addEventListener('click', () => startMeasure('live'));
+$('btn-begin-anyway').addEventListener('click', () => startMeasure('live'));
 
 // ---------------- replay flow ----------------
 $('btn-replay').addEventListener('click', async () => {
-  cleanup(); await loadWeights(); show('measure');
+  cleanup(); await loadWeights(); show('measure'); kind = 'replay'; resetRecorder();
   const pick = new URLSearchParams(location.search).get('rec') || (Math.random() < 0.5 ? '100001L' : '100004R');
   const [meta, buf] = await Promise.all([fetch(`data/replay/${pick}.json`).then((r) => r.json()), fetch(`data/replay/${pick}.bin`).then((r) => r.arrayBuffer())]);
   replay = { meta, rgb: new Float32Array(buf), i: 0, speed: 30 };
   startMeasure('replay', meta.weights);
   const note = $('replay-note'); note.hidden = false;
-  note.innerHTML = `Recorded demo: study participant ${meta.person} (UW Hoffman 2022 data, MIT licence). The model used here was fitted <b>without</b> this person, so these are genuinely held-out decisions. Replaying at ${replay.speed}× speed.${meta.person === 4 ? ' <b>This is the hardest person in the study (78% accurate).</b>' : ''}`;
+  note.innerHTML = `Recorded demo: study participant ${meta.person} (UW Hoffman 2022 data, MIT licence). The model used here was fitted <b>without</b> this person, so these are genuinely held-out decisions. Replaying at ${replay.speed}× speed.${meta.person === 4 ? ' <b>This is the hardest person in the study: a resting heart rate of 43 bpm is below the 51 bpm this version can follow, so it correctly answers &ldquo;unsure&rdquo; throughout.</b>' : ''}`;
   replayTimer = setInterval(() => {
     const per = Math.round(replay.speed * FS * 0.05);
-    for (let k = 0; k < per && replay.i < replay.meta.n; k++, replay.i++) { const j = replay.i * 3; feed(replay.rgb[j], replay.rgb[j + 1], replay.rgb[j + 2]); }
+    for (let k = 0; k < per && replay.i < replay.meta.n; k++, replay.i++) { const j = replay.i * 3; sink(replay.rgb[j], replay.rgb[j + 1], replay.rgb[j + 2]); }
     if (replay.i >= replay.meta.n) { clearInterval(replayTimer); $('phase').textContent = 'Replay finished'; }
   }, 50);
 });
 
 // ---------------- shared measurement logic ----------------
-function startMeasure(kind, w) {
-  if (kind === 'live') { timers.forEach(clearInterval); timers = []; }
-  mode = kind; chain = new Chain(w || weights); calSqi = []; calMotion = []; calFailed = false; calChecked = false; strip = []; $('strip').innerHTML = '';
-  tally = { normal: 0, hyp: 0, uns: 0, pause: 0, right: 0, wrong: 0 };
-  show('measure'); $('btn-restart').hidden = kind !== 'live'; $('ref-tile').hidden = kind !== 'replay'; if (kind !== 'replay') $('replay-note').hidden = true;
+function startMeasure(k, w) {
+  kind = k; mode = 'measure'; chain = new Chain(w || weights); chain.n = 0;
+  calMotion = []; calFps = []; calWin = []; calFailed = false; calChecked = false; calOk = true; strip = []; $('strip').innerHTML = ''; lastD = null; lastDecision = null;
+  if (k === 'live') { calGaps0 = cam ? cam.stats.gaps : 0; decLog = []; }
+  tally = { normal: 0, low: 0, uns: 0, pause: 0, right: 0, wrong: 0 };
+  clearTimeout(anywayTimer); show('measure'); $('btn-restart').hidden = k !== 'live'; $('ref-tile').hidden = k !== 'replay'; if (k !== 'replay') $('replay-note').hidden = true;
   setStatus('calibrating', '◔', 'Calibrating', 'Rest, keep still. Learning your normal heart-rate and light baseline.');
   $('phase').textContent = 'Calibrating'; $('cal-progress').hidden = false; $('tally').textContent = '';
-  if (kind === 'live') {
-    cam.onSample = (r, g, b) => feed(r, g, b);
-    timers.push(setInterval(() => { const m = motion && motion.level(); if (m != null) { $('mot').textContent = m < MOTION_MAX ? 'Still' : 'Moving'; $('mot-u').textContent = m.toFixed(2) + ' m/s²'; } else { $('mot').textContent = '?'; $('mot-u').textContent = 'no sensor'; } }, 500));
-  } else { $('mot').textContent = '–'; $('mot-u').textContent = 'n/a in replay'; }
-  timers.push(setInterval(() => drawWave($('wave'), chain.ac[1].slice(-300)), 100));
-  timers.push(setInterval(tick, 250));
+  $('hr').textContent = '–'; $('dhr').textContent = '–'; $('sig').textContent = '–'; $('sig-u').textContent = '';
+  if (k !== 'live') { $('mot').textContent = '–'; $('mot-u').textContent = 'n/a in replay'; }
+  startUi();
 }
 $('btn-restart').addEventListener('click', () => startMeasure('live'));
 $('btn-stop').addEventListener('click', () => { cleanup(); show('home'); });
 
-function feed(r, g, b) { const d = chain.push(r, g, b); if (d) onWindow(d); }
-function tick() { if (!chain) return; const s = chain.n / FS; $('clock').textContent = `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`; $('cal-fill').style.width = Math.min(100, (s / (CAL + WIN)) * 100) + '%'; }
+function uiTick() {
+  tickN++;
+  if (kind === 'live' && cam) {
+    const st = cam.stats, now = performance.now();
+    if (st.gaps > lastGaps) { gapLog.push([now, st.gaps - lastGaps]); lastGaps = st.gaps; }
+    while (gapLog.length && now - gapLog[0][0] > 10000) gapLog.shift();
+    place = assessPlacement(st, { torch: cam.info.torch }); fingerHist.push(place.level === 'good'); if (fingerHist.length > 40) fingerHist.shift();
+    if (mode === 'setup') { renderPlace(); if (tickN % 4 === 0) renderChecks(); }
+    if (mode === 'measure') { const m = motion && motion.level(10); if (m != null) { $('mot').textContent = m < MOTION_MAX ? 'Still' : 'Moving'; $('mot-u').textContent = m.toFixed(2) + ' m/s²'; } else { $('mot').textContent = '?'; $('mot-u').textContent = 'no sensor'; } }
+  }
+  if (mode === 'setup' && chain) drawWave($('wave-setup'), chain.ac[lastWaveCh].slice(-300));
+  if (mode === 'measure' && chain) {
+    const s = chain.n / FS; $('clock').textContent = `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`; $('cal-fill').style.width = Math.min(100, (s / (CAL + WIN)) * 100) + '%';
+    drawWave($('wave'), chain.ac[lastWaveCh].slice(-300));
+  }
+  const rawCv = mode === 'setup' ? $('raw-setup') : $('raw-measure'); drawRaw(rawCv);
+  if (tickN % 2 === 0) { $(mode === 'setup' ? 'dbg-setup' : 'dbg-measure').textContent = debugText(); }
+}
 
 function setStatus(cls, icon, main, sub) { const el = $('status'); el.className = 'status-card ' + cls; $('status-icon').textContent = icon; $('status-main').textContent = main; $('status-sub').textContent = sub; }
 function pushStrip(cls, title) { strip.push([cls, title]); if (strip.length > 90) strip.shift(); $('strip').innerHTML = strip.map(([c, t]) => `<i class="${c}" title="${t}"></i>`).join(''); }
@@ -101,35 +246,44 @@ function pushStrip(cls, title) { strip.push([cls, title]); if (strip.length > 90
 function refAt(s) { // window-mean reference SpO2 (study oximeters), replay only
   const g = replay.meta.spo2.slice(s, s + WIN).filter((v) => v != null); return g.length >= 5 ? g.reduce((a, b) => a + b, 0) / g.length : null;
 }
+function showHr(d, ctx) { const h = hrToShow(d, ctx); $('hr').textContent = h == null ? '–' : String(Math.round(h)); }
 
 function onWindow(d) {
-  const m = motion && motion.level(10);
+  lastD = d; lastWaveCh = d.ch; const ctx = liveCtx();
   if (d.calibrating) {
-    calSqi.push(d.sqi); if (mode === 'live') calMotion.push(m != null && m > MOTION_MAX);
-    $('hr').textContent = Number.isFinite(d.hr) ? Math.round(d.hr) : '–'; setSig(d.sqi); return;
+    calWin.push([d.s, !!d.valid]); if (kind === 'live') { calMotion.push(ctx.moving); calFps.push(ctx.fps); }
+    logDecision(d, null); showHr(d, ctx); setSig(d); return;
   }
-  if (!calChecked) { calChecked = true; const why = checkCalibration(); if (why) { calFailed = true; setStatus('fail', '✕', 'Calibration failed', why + ' Rest for a couple of minutes, then restart calibration.'); $('phase').textContent = 'Restart needed'; $('btn-restart').hidden = mode !== 'live'; return; } $('phase').textContent = 'Measuring'; $('cal-progress').hidden = true; }
-  if (calFailed) return;
-  $('hr').textContent = Number.isFinite(d.hr) ? Math.round(d.hr) : '–'; $('dhr').textContent = Number.isFinite(d.dHR) ? (d.dHR >= 0 ? '+' : '') + d.dHR.toFixed(0) : '–'; setSig(d.sqi);
-  let ref = null; if (mode === 'replay') { ref = refAt(d.s); $('ref').textContent = ref == null ? '–' : ref.toFixed(0); }
-  const moving = mode === 'live' && m != null && m > MOTION_MAX;
-  if (moving) { tally.pause++; setStatus('pause', '✋', 'Hold still', 'Movement detected, so this reading is skipped. Rest your hand and the phone on a table.'); pushStrip('d-pause', 'paused: moving'); return; }
-  if (d.sqi < SQI_MIN || !Number.isFinite(d.hr)) { tally.uns++; setStatus('uns', '?', 'Unsure, re-measure', 'Weak pulse signal. Cover the camera and flash fully and press lightly.'); pushStrip('d-uns', 'unsure: poor signal'); return; }
-  const t = `${d.s + WIN}s p=${d.p.toFixed(2)}`;
-  if (d.label === 'unsure') { tally.uns++; setStatus('uns', '?', 'Unsure, re-measure', 'The model is not confident for this window. Keep still; the next reading is 2 seconds away.'); pushStrip('d-uns', 'unsure ' + t); }
-  else if (d.label === 'HYPOXIC') { tally.hyp++; setStatus('hyp', '↓', 'Possible low-oxygen episode', 'Your signs look like a drop from your baseline (SpO₂ under 90%). Check with a medical pulse oximeter. If you feel unwell, get medical help.'); pushStrip('d-hyp', 'low-oxygen ' + t); }
-  else { tally.normal++; setStatus('normal', '✓', 'Normal vs your baseline', 'No drop from your own baseline detected in this window.'); pushStrip('d-normal', 'normal ' + t); }
-  if (ref != null && d.label !== 'unsure') { ((d.label === 'HYPOXIC') === (ref < 90)) ? tally.right++ : tally.wrong++; }
-  const n = tally.normal + tally.hyp + tally.uns + tally.pause;
-  $('tally').textContent = `${n} readings: ${tally.normal} normal, ${tally.hyp} low-oxygen, ${tally.uns} unsure, ${tally.pause} paused.` + (mode === 'replay' ? ` Against the study reference, ${tally.right} of ${tally.right + tally.wrong} answered readings were correct.` : '');
+  if (!calChecked) {
+    calChecked = true; const why = checkCalibration();
+    if (why && kind === 'live') { calFailed = true; calOk = false; setStatus('fail', '✕', 'Unsure, re-measure', why + ' Rest for a couple of minutes, then restart calibration.'); $('phase').textContent = 'Restart needed'; $('cal-progress').hidden = true; $('btn-restart').hidden = false; }
+    else { $('phase').textContent = why ? 'Measuring (no baseline)' : 'Measuring'; $('cal-progress').hidden = true; }
+  }
+  if (calFailed) { logDecision(d, null); showHr(d, ctx); return; }
+  const dec = decide(d, ctx); lastDecision = dec; logDecision(d, dec);
+  showHr(d, ctx); setSig(d); $('dhr').textContent = d.valid && dec.hr != null && Number.isFinite(d.dHR) ? (d.dHR >= 0 ? '+' : '') + d.dHR.toFixed(0) : '–';
+  let ref = null; if (kind === 'replay') { ref = refAt(d.s); $('ref').textContent = ref == null ? '–' : ref.toFixed(0); }
+  const t = `${d.s + WIN}s` + (Number.isFinite(d.p) ? ` p=${d.p.toFixed(2)}` : '');
+  if (dec.state === STATE.NORMAL) { tally.normal++; setStatus('normal', '✓', dec.text, 'No drop from your own baseline detected in this window.'); pushStrip('d-normal', 'normal ' + t); }
+  else if (dec.state === STATE.LOW) { tally.low++; setStatus('hyp', '↓', dec.text, 'Your signs look like a drop from your own baseline. This is not a diagnosis. If you feel unwell, get medical help.'); pushStrip('d-hyp', 'possible low oxygen ' + t); }
+  else if (dec.reason === 'moving') { tally.pause++; setStatus('uns', '✋', dec.text, dec.detail); pushStrip('d-pause', 'unsure: moving'); }
+  else { tally.uns++; setStatus('uns', '?', dec.text, dec.detail); pushStrip('d-uns', 'unsure: ' + dec.reason); }
+  if (ref != null && dec.state !== STATE.UNSURE) { ((dec.state === STATE.LOW) === (ref < 90)) ? tally.right++ : tally.wrong++; }
+  const n = tally.normal + tally.low + tally.uns + tally.pause;
+  $('tally').textContent = `${n} readings: ${tally.normal} normal, ${tally.low} possible low oxygen, ${tally.uns + tally.pause} unsure.` + (kind === 'replay' ? ` Against the study reference, ${tally.right} of ${tally.right + tally.wrong} answered readings were correct.` : '');
 }
-function setSig(q) { $('sig').textContent = q >= SQI_MIN + 0.08 ? 'Good' : q >= SQI_MIN ? 'Fair' : 'Poor'; $('sig-u').textContent = 'quality ' + q.toFixed(2); }
+function setSig(d) {
+  const lvl = d.valid ? (d.sqi >= 0.45 ? 'Good' : 'Fair') : 'Poor';
+  $('sig').textContent = lvl; $('sig-u').textContent = Number.isFinite(d.sqi) ? 'quality ' + d.sqi.toFixed(2) : '';
+}
 
 function checkCalibration() {
-  const s = chain.calibrationSummary(); const med = [...calSqi].sort((a, b) => a - b)[Math.floor(calSqi.length / 2)];
-  if (mode === 'live' && cam && cam.info.maxGap > 1.5) return 'The camera stalled during calibration.';
+  const s = chain.calibrationSummary();
+  if (kind === 'live' && calFps.length && Math.min(...calFps) < CAL_FPS_MIN) return 'The camera frame rate was too low during calibration.';
+  if (kind === 'live' && cam && cam.stats.gaps - calGaps0 > CAL_GAPS_MAX) return 'The camera dropped too many frames during calibration.';
   if (!Number.isFinite(s.hr)) return 'No pulse was found during calibration.';
-  if (med < SQI_MIN) return 'The pulse signal was too weak during calibration.';
+  const cw = calWin.filter((x) => x[0] > CAL_WARM_S), vf = cw.length ? cw.filter((x) => x[1]).length / cw.length : 0;
+  if (vf < CAL_VALID_MIN) return `The pulse was only clearly detected in ${Math.round(vf * 100)}% of the calibration minute (need ${Math.round(CAL_VALID_MIN * 100)}%).`;
   if (s.hr < MIN_HR || s.hr > MAX_HR) return `Your resting heart rate during calibration was ${Math.round(s.hr)} bpm, outside the ${MIN_HR}-${MAX_HR} range this prototype assumes.`;
   if (s.hrSpread > 30) return 'Your heart rate was not steady during calibration.';
   if (calMotion.length && calMotion.filter(Boolean).length / calMotion.length > 0.25) return 'You moved too much during calibration.';
@@ -141,4 +295,14 @@ function drawWave(cv, data) {
   let mn = Infinity, mx = -Infinity; for (const v of data) { if (v < mn) mn = v; if (v > mx) mx = v; } const sc = (mx - mn) || 1;
   c.strokeStyle = '#3ad0c0'; c.lineWidth = 2; c.beginPath();
   data.forEach((v, i) => { const x = (i / (data.length - 1)) * w, y = h - 8 - ((v - mn) / sc) * (h - 16); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.stroke();
+}
+function drawRaw(cv) { // last 10 s of raw R, G, B means, each scaled to its own range
+  const c = cv.getContext('2d'), w = cv.width, h = cv.height; c.clearRect(0, 0, w, h);
+  const n = Math.min(rawN, 10 * FS, RAW_MAX); if (n < 10) return;
+  ['#ff6b7a', '#3ddc97', '#6aa8ff'].forEach((col, ch) => {
+    let mn = Infinity, mx = -Infinity; const v = new Array(n);
+    for (let k = 0; k < n; k++) { const x = raw[(((rawN - n + k) % RAW_MAX) * 3) + ch]; v[k] = x; if (x < mn) mn = x; if (x > mx) mx = x; }
+    const sc = (mx - mn) || 1; c.strokeStyle = col; c.lineWidth = 1.5; c.beginPath();
+    v.forEach((x, k) => { const px = (k / (n - 1)) * w, py = h - 6 - ((x - mn) / sc) * (h - 12); k ? c.lineTo(px, py) : c.moveTo(px, py); }); c.stroke();
+  });
 }

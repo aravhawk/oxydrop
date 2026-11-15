@@ -30,10 +30,11 @@
 
     <div class="card">
       <h2>What it does</h2>
-      <p>Rest for 60 seconds so it learns <em>your</em> normal. Then, every 2 seconds, it says <b class="c-green">normal</b>, <b class="c-red">possible low-oxygen episode</b> (SpO₂ below 90%), or <b class="c-amber">unsure, re-measure</b>.</p>
+      <p>Rest for 60 seconds so it learns <em>your</em> normal. Then, every 2 seconds, it shows one of three results: <b class="c-green">Normal vs your baseline</b>, <b class="c-red">Possible low oxygen: re-check with a pulse oximeter</b> (a drop toward SpO₂ below 90%), or <b class="c-amber">Unsure, re-measure</b>. It shows &ldquo;unsure&rdquo; and no heart-rate number whenever the signal is poor, you move, the camera stutters, or the pulse cannot be locked.</p>
       <ul class="facts">
         <li>Works only <b>seated at rest</b>. Exercise raises heart rate and causes false alarms.</li>
         <li>Detects a <b>drop from your own first minute</b>. It cannot tell if you are already low at the start.</li>
+        <li>Validated on <b>only 6 people</b>. It cannot follow a resting heart rate below about 51 bpm (it says &ldquo;unsure&rdquo;).</li>
         <li>Your camera video never leaves your phone. Everything runs in this page.</li>
       </ul>
     </div>
@@ -48,7 +49,7 @@
     <details class="card">
       <summary>How it works</summary>
       <p>A small chain of stages turns camera frames into a decision: average colour per frame, a band-pass filter, beat detection (heart rate, variability, breathing, pulse strength), red/green light-absorption features, subtraction of <em>your</em> first-minute median, then two logistic regressions averaged. The whole model is 62 numbers. The data-rich stages carry the signal because only 6 people with phone video and real SpO₂ below 90% exist in open data.</p>
-      <p>Held-out accuracy on those 6 people: 87.0% on every window; 92.5% on the 85% of windows it answers when it is allowed to say &ldquo;unsure&rdquo;. A clock-only baseline gets 83.5%, but only 52% once time is controlled. Exercise falsely flags 63% of windows. See the project page for the full audit.</p>
+      <p>Held-out accuracy on those 6 people (each tested with a model fitted on the other 5): 87.0% on the 82% of windows where the pulse locks; 94.7% on the 68% of windows where it is also confident enough to answer. One person (resting heart rate 43 bpm) never locks, so every window for them is &ldquo;unsure&rdquo;. A clock-only baseline gets 83.5%, but only 52% once time is controlled. Exercise falsely flags 63% of windows. See the project page for the full audit.</p>
       <p><a id="repo" href="https://github.com/aravhawk/oxydrop" target="_blank" rel="noopener">Code, results and limitations on GitHub</a></p>
     </details>
   </section>
@@ -108,7 +109,7 @@
     <div class="tile wide" id="ref-tile" hidden><span class="k">Study reference oximeter (replay only)</span><span class="v" id="ref">–</span><span class="u">SpO₂ %</span></div>
 
     <canvas id="wave" class="wave" width="600" height="120" aria-label="Pulse waveform"></canvas>
-    <div class="strip-label">Last decisions <span class="legend"><i class="d-normal"></i>normal <i class="d-hyp"></i>low-oxygen <i class="d-uns"></i>unsure <i class="d-pause"></i>paused</span></div>
+    <div class="strip-label">Last decisions <span class="legend"><i class="d-normal"></i>normal <i class="d-hyp"></i>possible low oxygen <i class="d-uns"></i>unsure <i class="d-pause"></i>unsure (moving)</span></div>
     <div id="strip" class="strip" aria-hidden="true"></div>
     <p class="fine" id="tally"></p>
 
