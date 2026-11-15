@@ -1,7 +1,8 @@
 import { Chain, FS, CAL, WIN } from './engine.js';
-import { CameraSource, Motion, listBackCameras, pickDefault } from './camera.js';
+import { CameraSource, Motion, listBackCameras, pickDefault, listCameras, probeCamFactory } from './camera.js';
+import { runProbeLadder, liveQuality, ringState, probeSummary } from './lensprobe.js';
 import { MIN_TRACKABLE_BPM } from './hr.js';
-import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, STATE, MOTION_MAX, STALL_MS } from './decision.js';
+import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, STATE, STATE_TEXT, MOTION_MAX, STALL_MS } from './decision.js';
 
 const $ = (id) => document.getElementById(id);
 const MIN_HR = MIN_TRACKABLE_BPM, MAX_HR = 110; // plausible *resting* heart rate at calibration; MIN_HR follows the HR estimator's band edge (F_LO = 0.85 Hz = 51 bpm)
@@ -12,6 +13,10 @@ const CAL_FPS_MIN = 20, CAL_GAPS_MAX = 20, CAL_GAP_S_MAX = 1.5;   // a single fr
 const LOCK_AFTER_MS = 3000;     // fingertip placement must read "good" this long before exposure/white balance/focus are locked
 const UNLOCK_AFTER_MS = 2000;   // in setup, lift the lock again if the placement has been bad this long (the next lock is taken on the new scene)
 const CAL_WARM_S = 20;          // windows starting at s <= 20 still contain the band-pass filter's start-up transient (always invalid, even on a clean signal), so they are not counted
+const PROBE_MAX_LENSES = 4;     // back lenses probed (about 3.7 s each, so the torch probe stays under ~15 s)
+const GET_READY_S = 3;          // countdown so the finger is on the plateau before the first probe
+const WEAK_PROMPT_MS = 4000;    // live signal quality must stay in 'reposition' this long before the re-position prompt replaces a reading
+const WEAK_MSG = 'Weak signal: slide your finger so it covers the lens and the flash, press lightly.';
 const RAW_MAX = 15 * 60 * FS;   // raw trace ring buffer: 15 minutes at 30 Hz
 
 let mode = null;                // null | 'setup' | 'measure'
@@ -20,6 +25,7 @@ let chain = null, weights = null, cam = null, motion = null, wake = null, camGen
 let replay = null, replayTimer = null, uiTimer = null, anywayTimer = null, tickN = 0;
 let strip = [], tally = {}, calMotion = [], calFps = [], calWin = [], calGaps0 = 0, calFailed = false, calChecked = false, calOk = true;
 let lockHist = [], lockRun = 0, camStartedAt = 0, place = { level: 'warn', title: '', msg: '' }, fingerHist = [], gapLog = [], lastGaps = 0, lastD = null, lastDecision = null, lastWaveCh = 1;
+let probe = null, qual = null, weakSince = 0, weakNow = false, weakShown = false, chosenLabel = '';
 let goodSince = 0, badSince = 0, lockBusy = false, stalledShown = false, calStartN = 0;
 const raw = new Float32Array(RAW_MAX * 3); let rawN = 0, decLog = [];
 
@@ -37,8 +43,14 @@ function cleanup() {
   camGen++; clearInterval(replayTimer); clearInterval(uiTimer); clearTimeout(anywayTimer); uiTimer = null;
   if (cam) { cam.stop(); cam = null; } if (motion) { motion.stop(); motion = null; }
   if (wake) { try { wake.release(); } catch (e) { /* ignore */ } wake = null; }
+  hideWhite(); weakSince = 0; weakNow = false; weakShown = false;
   replay = null; mode = null; kind = null; chain = null;
 }
+const isFront = () => lightMode() === 'front';
+function showWhite() { $('white').hidden = false; }
+function hideWhite() { $('white').hidden = true; }
+$('wm-stop').addEventListener('click', () => { cleanup(); show('home'); });
+$('wm-begin').addEventListener('click', () => { if (mode === 'setup') startMeasure('live'); else if (mode === 'measure') startMeasure('live'); });
 async function keepAwake() { try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) { /* ignore */ } }
 function startUi() { clearInterval(uiTimer); tickN = 0; uiTimer = setInterval(uiTick, 250); }
 
@@ -85,7 +97,10 @@ function debugText() {
     L.push(`torch ${cam.info.torchSupported ? (cam.info.torch ? 'on' : 'off') : 'unsupported'}  locks ${JSON.stringify(cam.info.locks)}`);
     L.push(`mean RGB ${st.mean.map((v) => v.toFixed(1)).join(' / ')}  frame-saturated ${(st.satFrac * 100).toFixed(1)}%  spatialCV ${st.spatialCV.toFixed(3)}  luma ${st.luma.toFixed(1)}`);
     L.push(`placement ${place.level}: ${place.title}`);
+    if (cam.info.adapt) L.push(`adaptive exposure: ${cam.info.adapt.result}  luma ${f2(cam.info.adapt.lumaBefore)} -> ${f2(cam.info.adapt.lumaAfter)}  sat ${f4(cam.info.adapt.satAfter)}  applied ${JSON.stringify(cam.info.adapt.applied)}  supported ${(cam.info.adapt.supported || []).join(',') || 'none'}`);
   }
+  L.push(`light mode ${lightMode()}  chosen lens "${chosenLabel || '-'}"${qual ? `  live quality ${qual.level} (score ${qual.score.toFixed(0)}, acdc ${(qual.acdc * 100).toFixed(2)}%, sqi ${f2(qual.sqi)})` : ''}${weakNow ? '  REPOSITION PROMPT SHOWN' : ''}`);
+  if (probe) { L.push('lens probe scores (per lens, 0-100, usable >= 35):'); L.push(probeSummary(probe.results, probe.choice)); } else L.push('lens probe: not run');
   if (lastD) {
     const d = lastD; L.push(`window s=${d.s}  SQI ${f4(d.sqi)}  ACF ${f4(d.acf)}  hrEst ${f2(d.hrEst)}  hrBeat ${f2(d.hrBeat)}  ch ${d.ch}  sat ${f4(d.sat)}  valid ${d.valid}  label ${d.label || 'calibrating'}  p ${f4(d.p)}`);
     if (lastDecision) L.push(`decision ${lastDecision.state}${lastDecision.reason ? ' (' + lastDecision.reason + ')' : ''}  hr shown ${lastDecision.hr != null ? lastDecision.hr.toFixed(1) : '-'}`);
@@ -98,7 +113,7 @@ function debugText() {
 // ---------------- live camera flow ----------------
 const lightMode = () => (document.querySelector('input[name=light]:checked') || { value: 'flash' }).value;
 
-$('btn-live').addEventListener('click', () => { cleanup(); show('setup'); $('setup-live').hidden = true; $('btn-cam').hidden = false; $('cam-state').textContent = 'Camera off'; $('checks').innerHTML = ''; });
+$('btn-live').addEventListener('click', () => { cleanup(); show('setup'); $('setup-live').hidden = true; $('btn-cam').hidden = false; $('cam-state').textContent = 'Camera off'; $('checks').innerHTML = ''; $('probe').hidden = true; probe = null; qual = null; chosenLabel = ''; });
 
 $('btn-cam').addEventListener('click', async () => {
   $('btn-cam').hidden = true; $('cam-state').textContent = 'Starting camera…';
@@ -106,18 +121,48 @@ $('btn-cam').addEventListener('click', async () => {
     cleanup(); motion = new Motion(); const mp = motion.start();   // start the motion permission prompt first: iOS needs it inside the tap
     await loadWeights(); await keepAwake();
     kind = 'live'; mode = 'setup'; startUi();
-    await startCamera(null);
-    // if the browser picked an ultra-wide / telephoto lens, move to the main one once
-    const cams = await populateLens(); const cur = cam.info.deviceId, pd = pickDefault(cams);
-    const curLabel = (cams.find((c) => c.id === cur) || {}).label || '';
-    if (pd && cur && pd.id !== cur && /ultra|0\.5|tele|zoom|macro|depth/i.test(curLabel)) { $('lens').value = pd.id; await startCamera(pd.id); await populateLens(); }
+    const gen = camGen, choice = await runProbe(gen);
+    if (gen !== camGen) return;
+    const lm = choice.mode === 'torch' ? 'flash' : choice.mode;
+    const radio = document.querySelector(`input[name=light][value=${lm}]`); if (radio) radio.checked = true;
+    chosenLabel = choice.label || '';
+    await startCamera(choice.mode === 'front' ? null : choice.deviceId);
+    if (gen !== camGen) return;
+    await populateLens(); if (choice.mode !== 'front' && choice.deviceId) $('lens').value = choice.deviceId;
     await mp;
     $('setup-live').hidden = false; renderChecks(); renderPlace();
   } catch (e) {
     cleanup(); $('cam-state').textContent = 'Could not start the camera: ' + (e && e.message ? e.message : e) + '. Allow camera access and reload, or use the recorded demo.';
-    $('btn-cam').hidden = false; $('setup-live').hidden = true;
+    $('btn-cam').hidden = false; $('setup-live').hidden = true; $('probe').hidden = true;
   }
 });
+
+// Lens probe: every back lens for ~3 s under the torch, best pulse wins; if none works, ambient light or the front camera + white screen (lensprobe.js).
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function runProbe(gen) {
+  $('probe').hidden = false; $('probe-scores').textContent = ''; probe = null; qual = null;
+  const gum = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });   // one grant first: device labels are empty until the camera is allowed
+  gum.getTracks().forEach((t) => t.stop());
+  const all = await listCameras(), pd = pickDefault(all.back), back = [...all.back].sort((a, b) => (b === pd) - (a === pd)).slice(0, PROBE_MAX_LENSES);
+  const say = (t) => { $('probe-text').textContent = t; $('cam-state').textContent = t; if (!$('white').hidden) { $('wm-title').textContent = t; $('wm-msg').textContent = ''; } };
+  for (let k = GET_READY_S; k > 0; k--) { say(`Lay your finger flat across the whole camera plateau now (lens and flash), light pressure. Testing starts in ${k}…`); await sleep(1000); if (gen !== camGen) return null; }
+  const video = document.createElement('video'), base = probeCamFactory(video), partial = [];
+  const factory = (cb) => { if (gen !== camGen) throw new Error('cancelled'); return base(cb); };
+  say(`Testing lens 1 of ${back.length}, keep your finger flat across the camera plateau`);
+  const out = await runProbeLadder(factory, { back, front: all.front }, {
+    ambientMax: 1,
+    onProgress: (r, k) => {
+      partial.push(r); $('probe-scores').textContent = probeSummary(partial, null);
+      say(k < back.length ? `Testing lens ${k + 1} of ${back.length}, keep your finger flat across the camera plateau` : 'Back lenses gave no clear pulse. Trying the fallback mode (ambient light, then front camera with white screen)…');
+    },
+    beforeFront: async () => { showWhite(); say('Testing the front camera. Cover it with your fingertip.'); await sleep(1200); },
+    afterFront: async () => { hideWhite(); },
+  });
+  if (gen !== camGen) return null;
+  probe = out; $('probe-scores').textContent = probeSummary(out.results, out.choice);
+  $('probe-text').textContent = out.choice.reason + (out.choice.usable ? '' : ' Re-position your finger and try again, or pick a mode below.');
+  return out.choice;
+}
 
 async function startCamera(deviceId) {
   const gen = ++camGen;
@@ -125,25 +170,34 @@ async function startCamera(deviceId) {
   chain = new Chain(weights); resetRecorder(); lockHist = []; lockRun = 0; fingerHist = []; gapLog = []; lastGaps = 0; goodSince = 0; badSince = 0; lockBusy = false; stalledShown = false; place = { level: 'warn', title: 'Looking for your fingertip…', msg: '' };
   $('btn-begin').disabled = true; $('btn-begin-anyway').hidden = true; $('q-fill').style.width = '0%'; $('q-text').textContent = 'Signal quality: waiting for a pulse lock';
   const c = new CameraSource((r, g, b) => { if (gen === camGen) sink(r, g, b); });
-  cam = c;
-  await c.start(document.createElement('video'), { deviceId, torch: lightMode() === 'ambient' ? 'off' : 'auto' });
+  cam = c; weakSince = 0; weakNow = false; weakShown = false; qual = null;
+  const front = isFront(); if (front) showWhite(); else hideWhite();
+  await c.start(document.createElement('video'), { deviceId: front ? null : deviceId, torch: lightMode() === 'flash' ? 'auto' : 'off', facing: front ? 'user' : 'environment' });
   camStartedAt = performance.now();
   clearTimeout(anywayTimer); anywayTimer = setTimeout(() => { if (mode === 'setup' && $('btn-begin').disabled) $('btn-begin-anyway').hidden = false; }, ANYWAY_AFTER_S * 1000);
-  $('cam-state').textContent = c.info.torch ? 'Camera on, flash on' : (lightMode() === 'ambient' ? 'Camera on, flash off (ambient light)' : 'Camera on (flash control not available in this browser)');
+  $('cam-state').textContent = front ? 'Front camera on, white screen is the light' : c.info.torch ? 'Camera on, flash on' : (lightMode() === 'ambient' ? 'Camera on, flash off (ambient light)' : 'Camera on (flash control not available in this browser)');
 }
 async function populateLens() {
   const cams = await listBackCameras(), sel = $('lens'); sel.innerHTML = '';
   for (const c of cams) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.label; sel.appendChild(o); }
   if (cam && cam.info.deviceId && cams.some((c) => c.id === cam.info.deviceId)) sel.value = cam.info.deviceId;
-  $('lens-help').textContent = cams.length > 1 ? 'Pick the lens that sits closest to the flash, usually “Back Camera” (the main one). Not the ultra-wide or zoom lens.' : 'Only one camera was found.';
+  $('lens-help').textContent = cams.length > 1 ? 'The app picked the lens with the strongest pulse (see the probe scores in the debug view). You can override it here.' : 'Only one back camera was found.';
   return cams;
 }
 $('lens').addEventListener('change', async () => {
   if (mode !== 'setup' || !cam) return;
+  if (isFront()) document.querySelector('input[name=light][value=flash]').checked = true;
+  chosenLabel = $('lens').selectedOptions[0] ? $('lens').selectedOptions[0].textContent : '';
   try { await startCamera($('lens').value); renderChecks(); } catch (e) { $('cam-state').textContent = 'Could not switch lens: ' + (e && e.message ? e.message : e); }
 });
 document.querySelectorAll('input[name=light]').forEach((r) => r.addEventListener('change', async () => {
   if (mode !== 'setup' || !cam) return;
+  const front = isFront(), wasFront = cam.info.facing === 'user';
+  if (front || wasFront) {   // the front camera is a different device: restart on it (or back on the chosen back lens)
+    try { chosenLabel = front ? 'Front camera' : ($('lens').selectedOptions[0] ? $('lens').selectedOptions[0].textContent : ''); await startCamera(front ? null : $('lens').value || null); renderChecks(); }
+    catch (e) { $('cam-state').textContent = 'Could not switch mode: ' + (e && e.message ? e.message : e); }
+    return;
+  }
   const on = lightMode() !== 'ambient'; await cam.setTorch(on); await cam.unlockExposure(); goodSince = 0; badSince = 0;   // the scene brightness just changed by a large factor: re-lock on the new scene
   chain = new Chain(weights); lockHist = []; lockRun = 0; $('btn-begin').disabled = true; camStartedAt = performance.now();
   clearTimeout(anywayTimer); $('btn-begin-anyway').hidden = true; anywayTimer = setTimeout(() => { if (mode === 'setup' && $('btn-begin').disabled) $('btn-begin-anyway').hidden = false; }, ANYWAY_AFTER_S * 1000);
@@ -169,6 +223,7 @@ function liveCtx() {
 // wall-clock stall: no frame for STALL_MS, or the track ended / was muted / the page was hidden (reported as an arbitrarily long stall)
 function camStalledMs(st) { return st.interrupted ? 1e9 : st.staleMs; }
 function stalledNow() { return kind === 'live' && cam ? camStalledMs(cam.stats) > STALL_MS : false; }
+async function lockWithAdapt(c) { try { await c.tryAdaptExposure(); } catch (e) { /* adaptive exposure is best effort */ } await c.lockExposure(); }
 function resetSetupChain() { chain = new Chain(weights); lockHist = []; lockRun = 0; $('btn-begin').disabled = true; }
 
 function onSetupWindow(d) {
@@ -176,11 +231,10 @@ function onSetupWindow(d) {
   logDecision(d, null);
   lockHist.push(!!d.valid); if (lockHist.length > 5) lockHist.shift(); lockRun = d.valid ? lockRun + 1 : 0;
   const q = lockHist.filter(Boolean).length / 5, good = lockRun >= LOCK_NEED || q >= 0.8;
-  $('q-fill').style.width = (q * 100) + '%'; $('q-fill').style.background = good ? 'var(--green)' : 'var(--amber)';
-  $('q-text').textContent = good ? 'Good pulse lock. Keep still.' : q > 0 ? 'Weak pulse lock. Cover the lens and flash fully, press lightly.' : 'No pulse lock yet. Follow the fingertip message above.';
-  $('btn-begin').disabled = lockRun < LOCK_NEED; if (lockRun >= LOCK_NEED) $('btn-begin-anyway').hidden = true;
+  $('btn-begin').disabled = lockRun < LOCK_NEED || weakNow; if (lockRun >= LOCK_NEED) $('btn-begin-anyway').hidden = true;
 }
-function renderPlace() { const el = $('place'); el.className = 'place ' + place.level; $('place-title').textContent = place.title; $('place-msg').textContent = place.msg; }
+const WEAK_PLACE = { level: 'bad', title: 'Weak signal: re-position', msg: WEAK_MSG };
+function renderPlace(p = place) { const el = $('place'); el.className = 'place ' + p.level; $('place-title').textContent = p.title; $('place-msg').textContent = p.msg; }
 function renderChecks() {
   if (!cam) return; const st = cam.stats, li = [], lk = cam.info.locks || {}, ambient = lightMode() === 'ambient';
   if (ambient) li.push([true, 'Flash off (ambient light). Face a bright lamp or window.']);
@@ -190,6 +244,8 @@ function renderChecks() {
   if (!canLock) li.push([false, 'This browser cannot lock exposure, white balance or focus (common on iPhone Safari; can reduce accuracy)']);
   else if (!cam.locked) li.push([true, goodSince ? 'Hold still: locking exposure, white balance and focus…' : 'Exposure locks once your fingertip is steady on the lens']);
   else li.push([locked.includes('exposure') && locked.includes('wb'), locked.length ? `Locked: ${locked.join(', ')}` + (missed.length ? `. Not lockable here: ${missed.join(', ')}` : '') : 'Exposure and white balance could not be locked on this device (can reduce accuracy)']);
+  const ad = cam.info.adapt; if (ad) li.push([ad.result === 'in_band' || ad.result === 'already_in_band', `Exposure for weak or diffuse light: ${ad.result.replace(/_/g, ' ')} (brightness ${Math.round(ad.lumaBefore)} to ${Math.round(ad.lumaAfter)})`]);
+  li.push([true, `Mode: ${isFront() ? 'front camera + white screen' : ambient ? 'ambient light' : 'torch'}; lens: ${chosenLabel || cam.info.lens || '-'}`]);
   li.push([st.fps >= CAL_FPS_MIN, st.fps ? `Camera ${st.fps.toFixed(0)} fps, jitter ${st.jitterMs.toFixed(1)} ms` + (st.fps < CAL_FPS_MIN ? ' (too low)' : '') : 'Measuring camera speed…']);
   const g = gapLog.reduce((a, x) => a + x[1], 0);
   li.push([g === 0, g === 0 ? `No dropped frames (${st.gaps} total)` : `${g} dropped-frame gaps in the last 10 s`]);
@@ -219,7 +275,7 @@ $('btn-replay').addEventListener('click', async () => {
 // ---------------- shared measurement logic ----------------
 function startMeasure(k, w) {
   kind = k; mode = 'measure'; chain = new Chain(w || weights); chain.n = 0;
-  stalledShown = false; calStartN = cam ? cam.rs.n : 0; if (k === 'live' && cam && !cam.locked && !lockBusy) { lockBusy = true; cam.lockExposure().then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
+  stalledShown = false; calStartN = cam ? cam.rs.n : 0; if (k === 'live' && cam && !cam.locked && !lockBusy) { lockBusy = true; lockWithAdapt(cam).then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
   calMotion = []; calFps = []; calWin = []; calFailed = false; calChecked = false; calOk = true; strip = []; $('strip').innerHTML = ''; lastD = null; lastDecision = null;
   if (k === 'live') { calGaps0 = cam ? cam.stats.gaps : 0; decLog = []; }
   tally = { normal: 0, low: 0, uns: 0, pause: 0, right: 0, wrong: 0 };
@@ -240,15 +296,18 @@ function uiTick() {
     if (st.gaps > lastGaps) { gapLog.push([now, st.gaps - lastGaps]); lastGaps = st.gaps; }
     while (gapLog.length && now - gapLog[0][0] > 10000) gapLog.shift();
     place = assessPlacement(st, { torch: cam.info.torch });
+    if (isFront() && place.level !== 'good' && place.title !== 'Looking for your fingertip…') place = { level: place.level, title: 'Cover the front camera completely', msg: 'Light pressure. The white screen must shine through your fingertip, and nothing else should cover the screen.' };
     const stalled = camStalledMs(st) > STALL_MS;
     if (stalled) place = { level: 'bad', title: 'Camera stalled', msg: st.interrupted || 'No camera frames are arriving. Keep the screen on and the page in front.' };
     // exposure / white balance / focus lock: taken on the covered lens once the placement has been good for LOCK_AFTER_MS
     if (place.level === 'good') { badSince = 0; if (!goodSince) goodSince = now; } else { goodSince = 0; if (!badSince) badSince = now; }
-    if (!cam.locked && !lockBusy && goodSince && now - goodSince >= LOCK_AFTER_MS) { const c0 = cam; lockBusy = true; c0.lockExposure().then(() => { lockBusy = false; if (cam === c0 && mode === 'setup') resetSetupChain(); }, () => { lockBusy = false; }); }
+    if (!cam.locked && !lockBusy && goodSince && now - goodSince >= LOCK_AFTER_MS) { const c0 = cam; lockBusy = true; lockWithAdapt(c0).then(() => { lockBusy = false; if (cam === c0 && mode === 'setup') resetSetupChain(); }, () => { lockBusy = false; }); }
     else if (mode === 'setup' && cam.locked && !lockBusy && badSince && now - badSince >= UNLOCK_AFTER_MS) { const c0 = cam; lockBusy = true; c0.unlockExposure().then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
     if (!stalled) { fingerHist.push(place.level === 'good'); if (fingerHist.length > 40) fingerHist.shift(); }   // a stall is not evidence about the finger
-    if (mode === 'setup') { renderPlace(); if (tickN % 4 === 0) renderChecks(); if (stalled) { $('btn-begin').disabled = true; lockRun = 0; } }
-    if (mode === 'measure') watchStall(stalled, st);
+    updateQuality(st, now, stalled);
+    if (mode === 'setup') { renderPlace(weakNow && !stalled ? WEAK_PLACE : place); if (tickN % 4 === 0) renderChecks(); if (stalled) { $('btn-begin').disabled = true; lockRun = 0; } }
+    if (mode === 'measure') { watchStall(stalled, st); if (!stalled) watchWeak(); }
+    updateRing(st); updateWhite();
     if (mode === 'measure') { const m = motion && motion.level(10); if (m != null) { $('mot').textContent = m < MOTION_MAX ? 'Still' : 'Moving'; $('mot-u').textContent = m.toFixed(2) + ' m/s²'; } else { $('mot').textContent = '?'; $('mot-u').textContent = 'no sensor'; } }
   }
   if (mode === 'setup' && chain) drawWave($('wave-setup'), chain.ac[lastWaveCh].slice(-300));
@@ -273,6 +332,50 @@ function watchStall(stalled, st) {
   }
 }
 
+// Live signal-quality meter: AC/DC + spectral SNR + periodicity over the last ~8 s (lensprobe.liveQuality). A sustained 'reposition' verdict that the
+// engine's own pulse lock does not contradict replaces the reading with a re-position prompt. The Chain math and decision thresholds are untouched.
+function recentRgb(sec) {
+  const n = Math.min(rawN, Math.round(sec * FS), RAW_MAX), rgb = new Array(n);
+  for (let k = 0; k < n; k++) { const i = (((rawN - n + k) % RAW_MAX) * 3); rgb[k] = [raw[i], raw[i + 1], raw[i + 2]]; }
+  return rgb;
+}
+function updateQuality(st, now, stalled) {
+  if (stalled || rawN < 6 * FS) return;
+  if (tickN % 4 === 0) {
+    qual = liveQuality(recentRgb(8));
+    const contradicted = !!(lastD && lastD.valid);
+    if (qual.level === 'reposition' && !contradicted) { if (!weakSince) weakSince = now; } else weakSince = 0;
+    weakNow = !!weakSince && now - weakSince >= WEAK_PROMPT_MS;
+    const pct = Math.max(0, Math.min(100, qual.score));
+    $('q-fill').style.width = pct + '%'; $('q-fill').style.background = qual.level === 'good' ? 'var(--green)' : qual.level === 'weak' ? 'var(--amber)' : 'var(--red)';
+    $('q-text').textContent = weakNow ? WEAK_MSG : qual.level === 'good' ? `Good signal quality (score ${pct.toFixed(0)} of 100). Keep still.` : `Signal quality ${pct.toFixed(0)} of 100. ` + (qual.prompt || 'Keep still, holding the finger flat.');
+  }
+}
+function watchWeak() {
+  if (weakNow && !calFailed) {
+    if (!weakShown) { weakShown = true; pushStrip('d-uns', 'unsure: weak_signal'); }
+    setStatus('uns', '?', STATE_TEXT.UNSURE, WEAK_MSG); $('hr').textContent = '–'; $('dhr').textContent = '–'; $('sig').textContent = 'Weak'; $('sig-u').textContent = 're-position';
+  } else if (weakShown) {
+    weakShown = false;
+    if (!calFailed && chain && chain.n < (CAL + WIN) * FS) setStatus('calibrating', '◔', 'Calibrating', 'Rest, keep still. Learning your normal heart-rate and light baseline.');
+  }
+}
+// live preview ring: brightness and redness of the picked lens's image; green border when it looks covered by a fingertip
+function updateRing(st) {
+  const rs = ringState(st.mean, st.satFrac), [r, g, b] = st.mean, ring = $('ring');
+  ring.style.background = `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`; ring.classList.toggle('on', rs.covered);
+  $('ring-name').textContent = 'Cover this camera: ' + (isFront() ? 'Front camera' : (chosenLabel || cam.info.lens || '-'));
+  $('ring-msg').textContent = `brightness ${Math.round(rs.brightness * 100)}%, redness ${Math.round(rs.redness * 100)}%` + (rs.covered ? ': covered' : ': not covered yet. Lay the finger flat over this lens and the flash.');
+}
+// the front-camera mode shows a full-white screen; this bar mirrors the placement / status text on top of it
+function updateWhite() {
+  if ($('white').hidden) return;
+  if (mode === 'setup') { const p = weakNow ? WEAK_PLACE : place; $('wm-title').textContent = p.title; $('wm-msg').textContent = p.msg; }
+  else if (mode === 'measure') { $('wm-title').textContent = $('status-main').textContent; $('wm-msg').textContent = $('status-sub').textContent + ($('hr').textContent !== '–' ? `  Heart rate ${$('hr').textContent} bpm.` : ''); }
+  const canBegin = mode === 'setup' && (!$('btn-begin').disabled || !$('btn-begin-anyway').hidden), canRestart = mode === 'measure' && !$('btn-restart').hidden && kind === 'live' && calFailed;
+  $('wm-begin').hidden = !(canBegin || canRestart); $('wm-begin').textContent = canRestart ? 'Restart calibration' : 'Start 60-second calibration';
+}
+
 function setStatus(cls, icon, main, sub) { const el = $('status'); el.className = 'status-card ' + cls; $('status-icon').textContent = icon; $('status-main').textContent = main; $('status-sub').textContent = sub; }
 function pushStrip(cls, title) { strip.push([cls, title]); if (strip.length > 90) strip.shift(); $('strip').innerHTML = strip.map(([c, t]) => `<i class="${c}" title="${t}"></i>`).join(''); }
 
@@ -293,8 +396,10 @@ function onWindow(d) {
     else { $('phase').textContent = why ? 'Measuring (no baseline)' : 'Measuring'; $('cal-progress').hidden = true; }
   }
   if (calFailed) { logDecision(d, null); showHr(d, ctx); return; }
-  const dec = decide(d, ctx); lastDecision = dec; logDecision(d, dec);
-  showHr(d, ctx); setSig(d); $('dhr').textContent = d.valid && dec.hr != null && Number.isFinite(d.dHR) ? (d.dHR >= 0 ? '+' : '') + d.dHR.toFixed(0) : '–';
+  let dec = decide(d, ctx);
+  if (weakNow && kind === 'live') dec = { state: STATE.UNSURE, reason: 'weak_signal', text: STATE_TEXT.UNSURE, detail: WEAK_MSG, hr: null };
+  lastDecision = dec; logDecision(d, dec);
+  showHr(d, ctx); if (weakNow && kind === 'live') $('hr').textContent = '–'; setSig(d); $('dhr').textContent = d.valid && dec.hr != null && Number.isFinite(d.dHR) ? (d.dHR >= 0 ? '+' : '') + d.dHR.toFixed(0) : '–';
   let ref = null; if (kind === 'replay') { ref = refAt(d.s); $('ref').textContent = ref == null ? '–' : ref.toFixed(0); }
   const t = `${d.s + WIN}s` + (Number.isFinite(d.p) ? ` p=${d.p.toFixed(2)}` : '');
   if (dec.state === STATE.NORMAL) { tally.normal++; setStatus('normal', '✓', dec.text, 'No drop from your own baseline detected in this window.'); pushStrip('d-normal', 'normal ' + t); }

@@ -1,6 +1,6 @@
 { "name": "oxydrop", "version": "2.0.0", "private": true, "type": "module", "license": "MIT",
   "scripts": {
-    "test": "npm run test:decision && npm run test:parity:v2 && npm run test:parity:v1 && npm run test:hr && npm run test:capture && npm run test:stall",
+    "test": "npm run test:decision && npm run test:parity:v2 && npm run test:parity:v1 && npm run test:hr && npm run test:capture && npm run test:stall && npm run test:lens",
     "test:parity:v2": "node tests/parity.mjs v2 tests/fixtures/ref_2rec_v2.json tests/fixtures/ppg-csv",
     "test:parity:v1": "node tests/parity.mjs v1 tests/fixtures/ref_2rec.json tests/fixtures/ppg-csv",
     "test:decision": "node tests/decision.mjs",
@@ -8,4 +8,5 @@
     "test:hr": "node tests/hr_parity.mjs",
     "test:capture": "node tests/capture_sim.mjs",
     "test:stall": "node tests/stall.mjs",
+    "test:lens": "node tests/lensprobe.mjs",
     "serve": "python3 -m http.server 8080 --directory app" } }

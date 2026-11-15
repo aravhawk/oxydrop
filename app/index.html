@@ -60,20 +60,23 @@
     <h2>Set up your fingertip</h2>
     <ol class="steps">
       <li>Sit down and rest for 2 minutes. Rest the phone and your hand on a table.</li>
-      <li>Cover the <b>rear camera lens</b> completely with your fingertip, pressing lightly. If the flash is next to the lens, cover it too when you can. If your finger can&rsquo;t cover both, cover just the lens and use <b>Ambient light</b> below.</li>
-      <li>Keep still. Don&rsquo;t talk. Keep the screen on.</li>
+      <li>Lay your fingertip <b>flat across the whole camera plateau</b>, covering the <b>lens the app picks</b> and, if you can, the <b>flash</b> under the same finger. Light pressure, do not press hard. Phones differ: on newer iPhone Pro models the flash is 2-3 cm from the main lens, so a flat finger over both gives a weaker but usable glow.</li>
+      <li>Keep still. Don&rsquo;t talk. Keep the screen on. After you tap the button the app tests every camera for about 3 seconds each and picks the one with the strongest pulse. If no back lens works it switches to the front camera with a white screen.</li>
     </ol>
     <div class="status-line"><span id="cam-state">Camera off</span></div>
     <button id="btn-cam" class="primary">Turn on camera</button>
+    <div id="probe" class="probe" hidden><b id="probe-text">Testing lenses…</b><pre id="probe-scores" class="dbg"></pre></div>
     <div id="setup-live" hidden>
       <div class="mode" role="radiogroup" aria-label="Light source">
         <label><input type="radio" name="light" value="flash" checked> <span>Flash on <small>(recommended)</small></span></label>
         <label><input type="radio" name="light" value="ambient"> <span>Ambient light <small>(no flash: face a lamp or window)</small></span></label>
+        <label><input type="radio" name="light" value="front"> <span>Front camera + white screen <small>(cover the front camera; the screen is the light)</small></span></label>
       </div>
       <label class="lens">Camera lens
         <select id="lens" aria-label="Camera lens"></select>
       </label>
-      <p class="fine" id="lens-help">Pick the lens that sits closest to the flash, usually &ldquo;Back Camera&rdquo; (the main one).</p>
+      <p class="fine" id="lens-help">The app picks the lens with the strongest pulse. You can override it here.</p>
+      <div class="ringrow"><div id="ring" class="ring" aria-hidden="true"></div><div><b id="ring-name">Camera: –</b><span id="ring-msg" class="fine">Live preview: ring is red and bright when the finger covers this lens.</span></div></div>
       <div id="place" class="place warn"><b id="place-title">Looking for your fingertip…</b><span id="place-msg"></span></div>
       <div class="meter"><div class="meter-fill" id="q-fill"></div></div>
       <p id="q-text" class="fine">Signal quality</p>
@@ -122,6 +125,10 @@
     <p class="fine foot">Prototype. Not medical advice. Not a medical device.</p>
   </section>
 </main>
+<div id="white" class="white" hidden>
+  <div class="white-top">Front camera mode. Cover the <b>front camera</b> (top of the screen, near the speaker) with your fingertip, light pressure. Turn the screen brightness to maximum.</div>
+  <div class="white-bar"><b id="wm-title"></b><span id="wm-msg"></span><div class="row"><button id="wm-begin" class="primary" hidden>Start 60-second calibration</button><button id="wm-stop" class="secondary">Stop</button></div></div>
+</div>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

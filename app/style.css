@@ -67,3 +67,10 @@ select{font:inherit;color:var(--text);background:var(--surf2);border:1px solid v
 button.link{background:none;border:none;color:var(--mute);text-decoration:underline;font-weight:400;min-height:44px;width:100%}
 .debug summary{font-weight:600}.dbg{white-space:pre-wrap;word-break:break-word;font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--mute);margin:8px 0}
 .wave.small{height:70px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.row button{min-height:44px;font-size:.85rem}
+
+.probe{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;background:var(--surf)}.probe pre{margin:6px 0 0;white-space:pre-wrap;font-size:.75rem}
+.ringrow{display:flex;gap:12px;align-items:center;margin:8px 0}.ringrow>div:last-child{display:grid;gap:2px}
+.ring{width:56px;height:56px;border-radius:50%;border:6px solid var(--amber);background:#000;flex:none;transition:border-color .3s}.ring.on{border-color:var(--green)}
+.white{position:fixed;inset:0;background:#fff;color:#111;z-index:100;display:flex;flex-direction:column;justify-content:space-between;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}
+.white[hidden]{display:none}.white-top{padding:18px 8px;font-size:1.05rem;text-align:center}
+.white-bar{background:#fff;border-top:3px solid #111;padding:12px 4px 16px;display:grid;gap:6px}.white-bar span{color:#333;font-size:.9rem}.white-bar .row{display:flex;gap:8px}
