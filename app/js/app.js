@@ -1,14 +1,16 @@
 import { Chain, FS, CAL, WIN } from './engine.js';
 import { CameraSource, Motion, listBackCameras, pickDefault } from './camera.js';
 import { MIN_TRACKABLE_BPM } from './hr.js';
-import { decide, hrToShow, assessPlacement, STATE, MOTION_MAX } from './decision.js';
+import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, STATE, MOTION_MAX, STALL_MS } from './decision.js';
 
 const $ = (id) => document.getElementById(id);
 const MIN_HR = MIN_TRACKABLE_BPM, MAX_HR = 110; // plausible *resting* heart rate at calibration; MIN_HR follows the HR estimator's band edge (F_LO = 0.85 Hz = 51 bpm)
 const LOCK_NEED = 3;            // consecutive valid-lock windows before calibration can start
 const ANYWAY_AFTER_S = 20;      // seconds without a lock before "start anyway" is offered
 const CAL_VALID_MIN = 0.6;      // fraction of calibration windows that must have a valid pulse lock
-const CAL_FPS_MIN = 20, CAL_GAPS_MAX = 20;
+const CAL_FPS_MIN = 20, CAL_GAPS_MAX = 20, CAL_GAP_S_MAX = 1.5;   // a single frame stall longer than 1.5 s anywhere in the calibration minute rejects it (as in v1)
+const LOCK_AFTER_MS = 3000;     // fingertip placement must read "good" this long before exposure/white balance/focus are locked
+const UNLOCK_AFTER_MS = 2000;   // in setup, lift the lock again if the placement has been bad this long (the next lock is taken on the new scene)
 const CAL_WARM_S = 20;          // windows starting at s <= 20 still contain the band-pass filter's start-up transient (always invalid, even on a clean signal), so they are not counted
 const RAW_MAX = 15 * 60 * FS;   // raw trace ring buffer: 15 minutes at 30 Hz
 
@@ -18,6 +20,7 @@ let chain = null, weights = null, cam = null, motion = null, wake = null, camGen
 let replay = null, replayTimer = null, uiTimer = null, anywayTimer = null, tickN = 0;
 let strip = [], tally = {}, calMotion = [], calFps = [], calWin = [], calGaps0 = 0, calFailed = false, calChecked = false, calOk = true;
 let lockHist = [], lockRun = 0, camStartedAt = 0, place = { level: 'warn', title: '', msg: '' }, fingerHist = [], gapLog = [], lastGaps = 0, lastD = null, lastDecision = null, lastWaveCh = 1;
+let goodSince = 0, badSince = 0, lockBusy = false, stalledShown = false, calStartN = 0;
 const raw = new Float32Array(RAW_MAX * 3); let rawN = 0, decLog = [];
 
 function show(id) { document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id)); window.scrollTo(0, 0); }
@@ -77,6 +80,7 @@ function debugText() {
   L.push(`mode ${mode || '-'} / ${kind || '-'}   samples ${rawN}   t ${(rawN / FS).toFixed(1)} s`);
   if (cam && st) {
     L.push(`fps ${st.fps.toFixed(1)}  jitter ${st.jitterMs.toFixed(1)} ms  gaps ${st.gaps} (max ${(st.maxGap * 1000).toFixed(0)} ms)  skipped ${st.skipped}  frames ${st.frames}`);
+    L.push(`last frame ${(st.staleMs / 1000).toFixed(1)} s ago  interrupted ${st.interrupted || 'no'}  longest gap in last 30 s ${(cam.rs.gapStats(cam.rs.n - 30 * FS).max * 1000).toFixed(0)} ms`);
     L.push(`lens "${cam.info.lens}"  ${cam.info.width}x${cam.info.height}`);
     L.push(`torch ${cam.info.torchSupported ? (cam.info.torch ? 'on' : 'off') : 'unsupported'}  locks ${JSON.stringify(cam.info.locks)}`);
     L.push(`mean RGB ${st.mean.map((v) => v.toFixed(1)).join(' / ')}  frame-saturated ${(st.satFrac * 100).toFixed(1)}%  spatialCV ${st.spatialCV.toFixed(3)}  luma ${st.luma.toFixed(1)}`);
@@ -118,7 +122,7 @@ $('btn-cam').addEventListener('click', async () => {
 async function startCamera(deviceId) {
   const gen = ++camGen;
   if (cam) { cam.stop(); cam = null; }
-  chain = new Chain(weights); resetRecorder(); lockHist = []; lockRun = 0; fingerHist = []; gapLog = []; lastGaps = 0; place = { level: 'warn', title: 'Looking for your fingertip…', msg: '' };
+  chain = new Chain(weights); resetRecorder(); lockHist = []; lockRun = 0; fingerHist = []; gapLog = []; lastGaps = 0; goodSince = 0; badSince = 0; lockBusy = false; stalledShown = false; place = { level: 'warn', title: 'Looking for your fingertip…', msg: '' };
   $('btn-begin').disabled = true; $('btn-begin-anyway').hidden = true; $('q-fill').style.width = '0%'; $('q-text').textContent = 'Signal quality: waiting for a pulse lock';
   const c = new CameraSource((r, g, b) => { if (gen === camGen) sink(r, g, b); });
   cam = c;
@@ -140,7 +144,7 @@ $('lens').addEventListener('change', async () => {
 });
 document.querySelectorAll('input[name=light]').forEach((r) => r.addEventListener('change', async () => {
   if (mode !== 'setup' || !cam) return;
-  const on = lightMode() !== 'ambient'; await cam.setTorch(on);
+  const on = lightMode() !== 'ambient'; await cam.setTorch(on); await cam.unlockExposure(); goodSince = 0; badSince = 0;   // the scene brightness just changed by a large factor: re-lock on the new scene
   chain = new Chain(weights); lockHist = []; lockRun = 0; $('btn-begin').disabled = true; camStartedAt = performance.now();
   clearTimeout(anywayTimer); $('btn-begin-anyway').hidden = true; anywayTimer = setTimeout(() => { if (mode === 'setup' && $('btn-begin').disabled) $('btn-begin-anyway').hidden = false; }, ANYWAY_AFTER_S * 1000);
   $('cam-state').textContent = on ? (cam.info.torch ? 'Camera on, flash on' : 'Camera on (flash control not available in this browser)') : 'Camera on, flash off (ambient light)';
@@ -159,8 +163,13 @@ function liveCtx() {
   if (kind !== 'live' || !cam) return { fps: 30, recentGaps: 0, finger: true, moving: false, calOk };
   const st = cam.stats, m = motion && motion.level(10);
   const finger = fingerHist.length < 4 ? place.level === 'good' : fingerHist.filter(Boolean).length / fingerHist.length >= 0.8;
-  return { fps: st.fps > 0 ? st.fps : 30, recentGaps: gapLog.reduce((a, x) => a + x[1], 0), finger, moving: m != null && m > MOTION_MAX, calOk };
+  return { fps: st.fps > 0 ? st.fps : 30, recentGaps: gapLog.reduce((a, x) => a + x[1], 0), ...gapContext(cam.rs, FS), stalledMs: camStalledMs(st), finger, moving: m != null && m > MOTION_MAX, calOk };
 }
+
+// wall-clock stall: no frame for STALL_MS, or the track ended / was muted / the page was hidden (reported as an arbitrarily long stall)
+function camStalledMs(st) { return st.interrupted ? 1e9 : st.staleMs; }
+function stalledNow() { return kind === 'live' && cam ? camStalledMs(cam.stats) > STALL_MS : false; }
+function resetSetupChain() { chain = new Chain(weights); lockHist = []; lockRun = 0; $('btn-begin').disabled = true; }
 
 function onSetupWindow(d) {
   lastD = d; lastDecision = null; lastWaveCh = d.ch;
@@ -177,7 +186,9 @@ function renderChecks() {
   if (ambient) li.push([true, 'Flash off (ambient light). Face a bright lamp or window.']);
   else li.push([cam.info.torch, cam.info.torch ? 'Flash on' : 'No flash control here (common on iPhone Safari). Use bright light; accuracy is unvalidated.']);
   const locked = ['exposure', 'wb', 'focus'].filter((k) => lk[k]), missed = ['exposure', 'wb', 'focus'].filter((k) => !lk[k]);
-  if (performance.now() - camStartedAt < 3000) li.push([true, 'Locking exposure, white balance and focus…']);
+  const cp = cam.caps || {}, canLock = !!(cp.exposureMode || cp.whiteBalanceMode || cp.focusMode);
+  if (!canLock) li.push([false, 'This browser cannot lock exposure, white balance or focus (common on iPhone Safari; can reduce accuracy)']);
+  else if (!cam.locked) li.push([true, goodSince ? 'Hold still: locking exposure, white balance and focus…' : 'Exposure locks once your fingertip is steady on the lens']);
   else li.push([locked.includes('exposure') && locked.includes('wb'), locked.length ? `Locked: ${locked.join(', ')}` + (missed.length ? `. Not lockable here: ${missed.join(', ')}` : '') : 'Exposure and white balance could not be locked on this device (can reduce accuracy)']);
   li.push([st.fps >= CAL_FPS_MIN, st.fps ? `Camera ${st.fps.toFixed(0)} fps, jitter ${st.jitterMs.toFixed(1)} ms` + (st.fps < CAL_FPS_MIN ? ' (too low)' : '') : 'Measuring camera speed…']);
   const g = gapLog.reduce((a, x) => a + x[1], 0);
@@ -208,6 +219,7 @@ $('btn-replay').addEventListener('click', async () => {
 // ---------------- shared measurement logic ----------------
 function startMeasure(k, w) {
   kind = k; mode = 'measure'; chain = new Chain(w || weights); chain.n = 0;
+  stalledShown = false; calStartN = cam ? cam.rs.n : 0; if (k === 'live' && cam && !cam.locked && !lockBusy) { lockBusy = true; cam.lockExposure().then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
   calMotion = []; calFps = []; calWin = []; calFailed = false; calChecked = false; calOk = true; strip = []; $('strip').innerHTML = ''; lastD = null; lastDecision = null;
   if (k === 'live') { calGaps0 = cam ? cam.stats.gaps : 0; decLog = []; }
   tally = { normal: 0, low: 0, uns: 0, pause: 0, right: 0, wrong: 0 };
@@ -227,8 +239,16 @@ function uiTick() {
     const st = cam.stats, now = performance.now();
     if (st.gaps > lastGaps) { gapLog.push([now, st.gaps - lastGaps]); lastGaps = st.gaps; }
     while (gapLog.length && now - gapLog[0][0] > 10000) gapLog.shift();
-    place = assessPlacement(st, { torch: cam.info.torch }); fingerHist.push(place.level === 'good'); if (fingerHist.length > 40) fingerHist.shift();
-    if (mode === 'setup') { renderPlace(); if (tickN % 4 === 0) renderChecks(); }
+    place = assessPlacement(st, { torch: cam.info.torch });
+    const stalled = camStalledMs(st) > STALL_MS;
+    if (stalled) place = { level: 'bad', title: 'Camera stalled', msg: st.interrupted || 'No camera frames are arriving. Keep the screen on and the page in front.' };
+    // exposure / white balance / focus lock: taken on the covered lens once the placement has been good for LOCK_AFTER_MS
+    if (place.level === 'good') { badSince = 0; if (!goodSince) goodSince = now; } else { goodSince = 0; if (!badSince) badSince = now; }
+    if (!cam.locked && !lockBusy && goodSince && now - goodSince >= LOCK_AFTER_MS) { const c0 = cam; lockBusy = true; c0.lockExposure().then(() => { lockBusy = false; if (cam === c0 && mode === 'setup') resetSetupChain(); }, () => { lockBusy = false; }); }
+    else if (mode === 'setup' && cam.locked && !lockBusy && badSince && now - badSince >= UNLOCK_AFTER_MS) { const c0 = cam; lockBusy = true; c0.unlockExposure().then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
+    if (!stalled) { fingerHist.push(place.level === 'good'); if (fingerHist.length > 40) fingerHist.shift(); }   // a stall is not evidence about the finger
+    if (mode === 'setup') { renderPlace(); if (tickN % 4 === 0) renderChecks(); if (stalled) { $('btn-begin').disabled = true; lockRun = 0; } }
+    if (mode === 'measure') watchStall(stalled, st);
     if (mode === 'measure') { const m = motion && motion.level(10); if (m != null) { $('mot').textContent = m < MOTION_MAX ? 'Still' : 'Moving'; $('mot-u').textContent = m.toFixed(2) + ' m/s²'; } else { $('mot').textContent = '?'; $('mot-u').textContent = 'no sensor'; } }
   }
   if (mode === 'setup' && chain) drawWave($('wave-setup'), chain.ac[lastWaveCh].slice(-300));
@@ -238,6 +258,19 @@ function uiTick() {
   }
   const rawCv = mode === 'setup' ? $('raw-setup') : $('raw-measure'); drawRaw(rawCv);
   if (tickN % 2 === 0) { $(mode === 'setup' ? 'dbg-setup' : 'dbg-measure').textContent = debugText(); }
+}
+
+// Between windows no decision is produced, so a stalled camera would leave the last answer on screen. Force UNSURE and drop the heart-rate tile.
+function watchStall(stalled, st) {
+  if (stalled) {
+    if (!stalledShown) { stalledShown = true; pushStrip('d-uns', 'unsure: camera_stalled'); }
+    const dec = stalledDecision(); lastDecision = dec;
+    if (calFailed) return;
+    setStatus('uns', '?', dec.text, (st && st.interrupted ? st.interrupted + ' ' : '') + dec.detail); $('hr').textContent = '–'; $('dhr').textContent = '–'; $('sig').textContent = 'No signal'; $('sig-u').textContent = '';
+  } else if (stalledShown) {
+    stalledShown = false;
+    if (!calFailed && chain && chain.n < (CAL + WIN) * FS) setStatus('calibrating', '◔', 'Calibrating', 'Rest, keep still. Learning your normal heart-rate and light baseline.');
+  }
 }
 
 function setStatus(cls, icon, main, sub) { const el = $('status'); el.className = 'status-card ' + cls; $('status-icon').textContent = icon; $('status-main').textContent = main; $('status-sub').textContent = sub; }
@@ -280,6 +313,7 @@ function setSig(d) {
 function checkCalibration() {
   const s = chain.calibrationSummary();
   if (kind === 'live' && calFps.length && Math.min(...calFps) < CAL_FPS_MIN) return 'The camera frame rate was too low during calibration.';
+  if (kind === 'live' && cam && cam.rs.gapStats(calStartN).max > CAL_GAP_S_MAX) return 'The camera stalled during calibration.';
   if (kind === 'live' && cam && cam.stats.gaps - calGaps0 > CAL_GAPS_MAX) return 'The camera dropped too many frames during calibration.';
   if (!Number.isFinite(s.hr)) return 'No pulse was found during calibration.';
   const cw = calWin.filter((x) => x[0] > CAL_WARM_S), vf = cw.length ? cw.filter((x) => x[1]).length / cw.length : 0;

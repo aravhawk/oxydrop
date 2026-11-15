@@ -48,7 +48,7 @@ This is a normoxic cohort. Real hypoxemia detection cannot be tested here. What 
 * Learned correction: ridge regression (alpha by inner GroupKFold on training people) and a small gradient-boosted tree model as a sensitivity check.
 * Validation: leave-one-person-out, 95% intervals by person bootstrap (1,000 draws). No window-level split anywhere (the script uses only `LeaveOneGroupOut` and `GroupKFold` by person).
 * Every model and baseline is scored on the identical windows and people.
-* Ranking metrics (AUROC, across-person correlation) use each model's deviation from its own fold's training mean. Without that, a held-out person with a high label gets a lower training mean and a plain mean baseline scores an AUROC near 0 for a purely mechanical reason.
+* **AUROC is not quoted for the learned models.** `results/mths_spo2/summary.csv` still has an AUROC column, but it is unreliable: even after centring each model on its fold's training mean, "ridge HR only" scores 0.05 [0.00, 0.21] and most learned rows fall below 0.5. In leave-one-person-out the training mean moves opposite to the held-out person's label, so the ranking is anti-correlated for a mechanical reason that says nothing about oxygen sensing. The MAE comparison is not affected by this. The one AUROC kept in the text below (textbook formula, 0.79) rests on 3 people and is not evidence of tracking.
 
 ### Gate coverage: the red channel is saturated
 
@@ -58,21 +58,21 @@ On this phone the red channel is at or above 250 of 255 in more than 10% of fram
 
 Labels in this set: 59 windows below 95 (from only 3 people), 2 below 90, 13 windows with a drop of at least 2 points from the person's start (from 2 people). The drop and "below 95" detection numbers therefore rest on 2 to 3 people and are not evidence.
 
-Task A, absolute SpO2 from uncalibrated features (MAE in SpO2 points, 95% person-bootstrap interval):
+Task A, absolute SpO2 from uncalibrated features (MAE in SpO2 points, 95% person-bootstrap interval; AUROC columns removed, see the method note above):
 
-| Model | MAE [95% CI] | Within 2 / 3 / 5 | AUROC SpO2<95 [95% CI] |
-|---|---|---|---|
-| Baseline: training-set mean | 2.21 [1.66, 2.68] | 0.52 / 0.85 / 0.97 | 0.50 (constant) |
-| Baseline: textbook 110 - 25 R (R = red/blue ratio-of-ratios, uncorrected, clipped to 70-100) | 3.49 [2.51, 4.63] | 0.43 / 0.53 / 0.81 | 0.79 [0.60, 0.92] |
-| Baseline: textbook, R = red/green | 6.19 [4.02, 9.00] | 0.36 / 0.42 / 0.53 | 0.43 [0.24, 0.89] |
-| HR only | 2.21 | 0.52 / 0.85 / 0.97 | 0.05 [0.00, 0.21] |
-| Time in recording only | 2.37 | 0.52 / 0.74 / 0.95 | 0.23 [0.21, 0.30] |
-| DC only | 2.34 | 0.44 / 0.79 / 0.98 | 0.62 [0.28, 0.84] |
-| Ratio-of-ratios only | 2.27 | 0.51 / 0.75 / 0.97 | 0.12 [0.01, 0.60] |
-| Ridge, optics (RoR + PI + DC + CV) | 2.29 | 0.48 / 0.85 / 0.97 | 0.27 [0.05, 0.72] |
-| Ridge, optics + HR | 2.22 | 0.52 / 0.85 / 0.97 | 0.31 [0.08, 0.65] |
-| Ridge, optics + HR + calibrated deltas | 2.21 | 0.52 / 0.85 / 0.97 | 0.25 [0.06, 0.54] |
-| GBM, optics + HR | 2.28 [1.44, 3.04] | 0.55 / 0.69 / 0.97 | 0.36 [0.06, 0.75] |
+| Model | MAE [95% CI] | Within 2 / 3 / 5 |
+|---|---|---|
+| Baseline: training-set mean | 2.21 [1.66, 2.68] | 0.52 / 0.85 / 0.97 |
+| Baseline: textbook 110 - 25 R (R = red/blue ratio-of-ratios, uncorrected, clipped to 70-100) | 3.49 [2.51, 4.63] | 0.43 / 0.53 / 0.81 |
+| Baseline: textbook, R = red/green | 6.19 [4.02, 9.00] | 0.36 / 0.42 / 0.53 |
+| HR only | 2.21 | 0.52 / 0.85 / 0.97 |
+| Time in recording only | 2.37 | 0.52 / 0.74 / 0.95 |
+| DC only | 2.34 | 0.44 / 0.79 / 0.98 |
+| Ratio-of-ratios only | 2.27 | 0.51 / 0.75 / 0.97 |
+| Ridge, optics (RoR + PI + DC + CV) | 2.29 | 0.48 / 0.85 / 0.97 |
+| Ridge, optics + HR | 2.22 | 0.52 / 0.85 / 0.97 |
+| Ridge, optics + HR + calibrated deltas | 2.21 | 0.52 / 0.85 / 0.97 |
+| GBM, optics + HR | 2.28 [1.44, 3.04] | 0.55 / 0.69 / 0.97 |
 
 No learned model has a lower MAE than the training-mean baseline (no paired difference to the mean baseline is negative; several intervals are wide because the evaluation set has 20 people). Ridge shrinks to almost the mean (alpha 10^4 to 10^5 chosen in most folds), which is the model saying the features carry no usable signal. The textbook map is worse than predicting the mean by 1.3 points (difference 1.28 [0.40, 2.28]). Its AUROC of 0.79 comes from 3 people and has a wide interval, while its within-person correlation with SpO2 is negative (-0.40), so it is not tracking oxygen inside a person.
 
@@ -107,7 +107,7 @@ MTHS has no Fitzpatrick or skin-tone labels (`gender.xlsx` holds only id and gen
 * One phone model in MTHS, auto exposure, a clipped red channel, and mostly healthy adults at 94 to 100%. These results say nothing about phones with locked exposure in the app.
 * Per-recording lengths are 26 to 134 s (median 60 s). The calibration is 30 s here versus 60 s in the app, and 40 of 62 people lack 3 gated calibration windows under the strict gate.
 * Reference labels are 1 Hz integer readings from a consumer oximeter with its own error (about 2 points).
-* Few people have positives, so every detection number is fragile. A clean negative on 62 people is more informative than the "below 95" AUROC.
+* Few people have positives, so every detection number is fragile. A clean negative on 62 people is more informative than any detection number here.
 
 ## Hoffman cross-check (6 people, already computed, not rerun)
 
@@ -124,7 +124,7 @@ OpenOximetry (phone fingertip video during controlled desaturation, with skin-to
 ## Reproduce
 
 ```
-PY=/home/aravhawk/.t3/scratch/veritas/oxy_push/.venv/bin/python
+PY=python3   # or the path of a Python environment with numpy, scipy, scikit-learn, pandas
 $PY -s scripts/mths_spo2.py        # needs OXY_MTHS (MTHS Data dir); about 1 minute, 172 MB peak memory; caches per-person features in $OXY_TMP/mths_feats
 $PY -s scripts/optics_experiment.py  # Hoffman experiment (about 1 minute); writes scores.pkl used next
 $PY -s scripts/optics_decision.py  # applies the decision rule against TINY v2

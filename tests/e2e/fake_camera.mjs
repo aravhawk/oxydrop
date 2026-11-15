@@ -2,7 +2,7 @@
 // Case "good": a 72 bpm pulse. Expect: lens select works, ambient/flash toggle works, placement reads "Fingertip detected", calibration begins and completes,
 //              heart rate within +-3 of 72, state "Normal vs your baseline", debug CSV non-empty, zero console errors.
 // Case "bad":  grey noise, no finger. Expect: placement refuses, "start anyway" appears after 20 s, result is "Unsure, re-measure", and no heart-rate number.
-// Usage: see tests/e2e/README.md. Env: CHROME (chromium binary), FAKE_GOOD / FAKE_BAD (y4m files), PLAYWRIGHT_CORE (path to playwright-core/index.mjs if not installed locally), CASES=good,bad,replay
+// Usage: see tests/e2e/README.md. Env: CHROME (chromium binary), FAKE_GOOD / FAKE_BAD (y4m files), PLAYWRIGHT_CORE (path to playwright-core/index.mjs if not installed locally), CASES=good,bad,replay,stall,calstall
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,6 +27,8 @@ async function open(y4m, url = URL0) {
   const b = await chromium.launch({ executablePath: process.env.CHROME, args: ['--no-sandbox', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-file-for-fake-video-capture=' + y4m] });
   const ctx = await b.newContext({ permissions: ['camera', 'clipboard-read', 'clipboard-write'], viewport: { width: 414, height: 860 }, acceptDownloads: true });
   const p = await ctx.newPage(); const errs = [];
+  // test hook: window.__freeze = true makes the page stop receiving camera frames (a stalled / interrupted camera), without touching app code
+  await p.addInitScript(() => { const o = HTMLVideoElement.prototype.requestVideoFrameCallback; if (!o) return; HTMLVideoElement.prototype.requestVideoFrameCallback = function (cb) { return o.call(this, (now, meta) => { if (window.__freeze) { this.requestVideoFrameCallback(cb); return; } cb(now, meta); }); }; });
   p.on('pageerror', (e) => errs.push(String(e))); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   await p.goto(url);
   return { b, p, errs };
@@ -109,8 +111,49 @@ async function replayCase(rec) {
   await b.close();
 }
 
-const cases = (process.env.CASES || 'good,bad,replay').split(',');
-try { if (cases.includes('good')) await good(); if (cases.includes('bad')) await bad(); if (cases.includes('replay')) { await replayCase('100001L'); await replayCase('100004R'); } }
+async function startLive(p) {
+  await p.check('#ack'); await p.click('#btn-live'); await p.click('#btn-cam');
+  await p.waitForSelector('#setup-live:not([hidden])', { timeout: 20000 });
+  await p.waitForFunction(() => !document.getElementById('btn-begin').disabled, null, { timeout: 90000 });
+  await p.click('#btn-begin');
+}
+const txt = (p, id) => p.textContent('#' + id);
+
+// A stalled camera must flip the answer to UNSURE within ~2 s (no frames, so no new window would ever replace the old one), hide the HR, and recover afterwards.
+async function stall() {
+  console.log('--- case stall: camera stops delivering frames for 4 s after calibration');
+  const { b, p, errs } = await open(process.env.FAKE_GOOD || 'fake_good.y4m');
+  await startLive(p);
+  await p.waitForFunction(() => document.getElementById('status-main').textContent === 'Normal vs your baseline', null, { timeout: 150000 });
+  check('NORMAL before the stall', true, 'hr=' + await txt(p, 'hr'));
+  await p.evaluate(() => { window.__freeze = true; }); await p.waitForTimeout(2600);
+  check('stalled camera: state flips to UNSURE within 2.6 s', await txt(p, 'status-main') === UNSURE, await txt(p, 'status-main') + ' | ' + await txt(p, 'status-sub'));
+  check('stalled camera: reason names the camera', /camera stopped delivering/i.test(await txt(p, 'status-sub')));
+  check('stalled camera: heart-rate tile is an en dash', await txt(p, 'hr') === '–', await txt(p, 'hr'));
+  await p.waitForTimeout(1400); await p.evaluate(() => { window.__freeze = false; });
+  await p.waitForTimeout(3000);
+  check('after the stall: still UNSURE, for the right reason (dropped frames, not "no fingertip")', await txt(p, 'status-main') === UNSURE && /dropped frames/i.test(await txt(p, 'status-sub')), await txt(p, 'status-main') + ' | ' + await txt(p, 'status-sub'));
+  await p.waitForFunction(() => document.getElementById('status-main').textContent === 'Normal vs your baseline', null, { timeout: 90000 });
+  check('recovers to NORMAL after the gap leaves the window', true, 'hr=' + await txt(p, 'hr'));
+  check('no console errors', errs.length === 0, JSON.stringify(errs));
+  await b.close();
+}
+// A single stall longer than 1.5 s anywhere in the calibration minute rejects the calibration.
+async function calstall() {
+  console.log('--- case calstall: camera stops for 3 s during calibration');
+  const { b, p, errs } = await open(process.env.FAKE_GOOD || 'fake_good.y4m');
+  await startLive(p);
+  await p.waitForTimeout(25000); await p.evaluate(() => { window.__freeze = true; }); await p.waitForTimeout(3000); await p.evaluate(() => { window.__freeze = false; });
+  await p.waitForFunction(() => /Measuring|Restart/.test(document.getElementById('phase').textContent), null, { timeout: 120000 });
+  check('calibration is rejected', /Restart/.test(await txt(p, 'phase')), await txt(p, 'phase') + ' | ' + await txt(p, 'status-sub'));
+  check('reason says the camera stalled', /stalled during calibration/i.test(await txt(p, 'status-sub')), await txt(p, 'status-sub'));
+  check('state is UNSURE', await txt(p, 'status-main') === UNSURE);
+  check('no console errors', errs.length === 0, JSON.stringify(errs));
+  await b.close();
+}
+
+const cases = (process.env.CASES || 'good,bad,replay,stall,calstall').split(',');
+try { if (cases.includes('good')) await good(); if (cases.includes('bad')) await bad(); if (cases.includes('replay')) { await replayCase('100001L'); await replayCase('100004R'); } if (cases.includes('stall')) await stall(); if (cases.includes('calstall')) await calstall(); }
 catch (e) { console.log('FAIL  exception:', e.message); failures++; }
 server.close();
 console.log(failures ? `E2E FAIL (${failures})` : 'E2E PASS');

@@ -31,8 +31,8 @@ The app never shows an SpO₂ value and never gives a confident answer from a si
 | Part | v1 (first version) | v2 (this version) |
 |---|---|---|
 | Heart rate | Peak-interval beat counter. A strong dicrotic notch (the second bump in each pulse) was counted as a second beat, so a person at about 75 bpm could read about 150 | Spectral harmonic-sum plus autocorrelation fundamental, accepted only if the two agree and the signal-quality gate passes. Otherwise no number is shown |
-| Frame timing | Assumed 30 fps | True frame timestamps (`requestVideoFrameCallback`) and a resampler to a uniform 30 Hz; frame gaps and a low frame rate make the result "Unsure" |
-| Camera | Browser defaults | Rear camera, torch where supported, exposure, white-balance and focus lock where the browser allows it; lens selection (auto-switch away from ultra-wide and tele lenses) |
+| Frame timing | Assumed 30 fps | True frame timestamps (`requestVideoFrameCallback`) and a resampler to a uniform 30 Hz. The resampler records how long each gap lasted: a single gap over 1 s inside the 10 s window, more than 3 s missing in the last 30 s, or 3 or more gap events in 10 s make the result "Unsure". A calibration minute containing a stall over 1.5 s is rejected. If no frame arrives for 1.5 s (screen lock, app switch, camera interruption, track ended) the screen switches to "Unsure, re-measure" with the heart-rate tile cleared, without waiting for the next window |
+| Camera | Browser defaults | Rear camera, torch where supported, exposure, white-balance and focus lock where the browser allows it (taken after the fingertip placement has read "good" for 3 s, released if the placement is lost in setup, and retaken when Flash/Ambient is switched); lens selection (auto-switch away from ultra-wide and tele lenses) |
 | Quality gate | Weak | Strict: finger-placement check, saturation (clipped red) check, frame rate and gap check, motion, calibration plausibility (51 to 110 bpm resting), and a lock requirement on every window |
 | Output | Normal / hypoxic / unsure | Three states with fixed wording (above), plus reasons for "Unsure" |
 | Optical SpO₂ (ratio-of-ratios) | Not tried | Tried on MTHS and Hoffman, **did not help, not used by the model** (see below) |
@@ -41,7 +41,7 @@ The app never shows an SpO₂ value and never gives a confident answer from a si
 
 ### v1 vs v2 on Hoffman (leave-one-person-out, same windows, `scripts/eval_v2.py`)
 
-Fixed-hyperparameter protocol (C = 0.01 and 0.1 as shipped), 5,646 windows from t = 60 s. v1 here scores 87.5% instead of the 87.0% in the research table further down because that table uses nested hyperparameter selection. Source: `results/eval_v1_vs_v2.csv`.
+Fixed-hyperparameter protocol (C = 0.01 and 0.1 as shipped; these are the values the shipped weights use; where they were first chosen is not documented, and if it was in the earlier nested search over the same six people the fixed-hyperparameter rows are not fully free of that choice), 5,644 windows from t = 60 s (`results/loPO_v*_windows.csv`; the parity test below covers 5,646 windows, 1 more each in 100002R and 100006R that has no row in the evaluation files). v1 here scores 87.5% instead of the 87.0% in the research table further down because that table uses nested hyperparameter selection. Source: `results/eval_v1_vs_v2.csv`.
 
 | Model | Coverage | Accuracy on answered | Balanced acc. | Missed hypoxemia | False alarms | AUROC | Worst person |
 |---|---|---|---|---|---|---|---|
@@ -56,7 +56,8 @@ Baseline for reference: the time-only clock scores 83.5% raw but 51.9% time-matc
 Read this table carefully:
 - **v2 does not improve accuracy on Hoffman.** On these clean, resting, locked-camera recordings v1's heart rate was already good (1.2 bpm error). v2 matches v1 on the windows it answers (87.0% vs 87.5%) and answers fewer of them (68% with the abstain band, against 84% for v1).
 - **The "worst person 0.892" is among people who get answers.** Person 4 (resting heart rate 43 bpm) is below the 51 bpm floor of the heart-rate estimator, so v2 never locks and he gets "Unsure, re-measure" on every window. That is the honest failure for an unsupported pulse, not an accuracy. Forced to answer, v2 is worse than v1 (80.5%, worst person 0.489).
-- The gain of v2 is not Hoffman accuracy. It is that doubled or invented heart rates are withheld (BUT PPG and field-case results below).
+- The gain of v2 is not Hoffman accuracy. It is that doubled or invented heart rates are withheld (BUT PPG and field-case results below). Like for like, the v1 + abstain row (93.9% on 84.4% of windows) sits beside the shipped row (94.7% on 68.0%): the extra 0.8 points cost 16 points of coverage.
+- Without a pulse lock the shipped model answers nothing, so its "possible low oxygen" output rests on heart-rate rise, which has a 63% exercise false-alarm rate (rest required).
 - The abstain band 0.10 was fixed in advance, as in the research table. The nested-cutoff version of that protocol has not been rerun for v2.
 
 ## Results (honest version)
@@ -108,7 +109,7 @@ Heart-rate rise is not oxygen-specific. On normoxic people exercising (moshekam 
 5. A perfect-heart-rate oracle only lifts TINY to 0.879, so the heart-rate stage is not the ceiling; the data is.
 6. Not headlined: a pooled 105-person 0.911 accuracy, because 99 of those people are normoxic and trivially correct.
 7. The shipped weights are fit on all 6 people, so **in-sample numbers are never reported**. The in-app replay uses weights fit **without** the replayed person.
-8. **v2 additions.** The heart-rate gate (`F_LO`, `SQI_MIN`, `ACF_MIN`, `AGREE`) was chosen by **subject-level cross-fit** on BUT PPG: select on even-numbered subjects, score odd, then swap. An earlier sweep that picked the gate on all clips and reported the same clips was deleted. The expert quality label only sets a coverage floor and splits the report; the app never sees it. BUT PPG and MTHS are **never used to fit the shipped weights**. The optics decision rule was written before the MTHS run. MTHS ranking metrics use deviations from each fold's training mean (a plain mean baseline otherwise scores an AUROC near 0 for a mechanical reason). In the v1 vs v2 table the abstain band was fixed in advance, and the lock gate comes from BUT PPG, not Hoffman.
+8. **v2 additions.** The heart-rate gate (`F_LO`, `SQI_MIN`, `ACF_MIN`, `AGREE`) was chosen by **subject-level cross-fit** on BUT PPG: select on even-numbered subjects, score odd, then swap. An earlier sweep that picked the gate on all clips and reported the same clips was deleted. The expert quality label only sets a coverage floor and splits the report; the app never sees it. BUT PPG and MTHS are **never used to fit the shipped weights**. The optics decision rule was written before the MTHS run. MTHS AUROC values are not quoted: leave-one-person-out has a mechanical anti-correlation that the fold-mean correction does not remove (the MAE comparison is unaffected). In the v1 vs v2 table the abstain band was fixed in advance. Of the lock gate, `F_LO`, `SQI_MIN`, `ACF_MIN` and `AGREE` come from the BUT PPG cross-fit; the two further constants in the engine's validity rule, `BEAT_AGREE` = 0.12 and `SAT_MAX` = 0.10, are fixed heuristics that no result file selects or evaluates.
 9. **Still weak.** About 10 chain variants and 16 optics variants were compared on the same 6 Hoffman people, `F_LO` was chosen with BUT's rate distribution (which has few slow pulses), and the BUT folds split by subject number parity, not at random. Treat small differences as ties.
 Full audit: `results/RESULTS_full_audit.md`.
 
@@ -116,7 +117,7 @@ Full audit: `results/RESULTS_full_audit.md`.
 
 | Stage | Evidence (details in `docs/HR_VALIDATION.md` and `docs/SPO2_OPTICS.md`) |
 |---|---|
-| Heart-rate extraction (v2) | **BUT PPG** (CC BY 4.0, 3,840 smartphone clips, 38 subjects, ECG reference), gate chosen by subject-level cross-fit. Gate-accepted clips (35% of all clips): **MAE 11.9 bpm, 47% within 5 bpm, doubling 0.07%**. Expert-good clips accepted (71% of the good clips): **MAE 3.7 bpm, 84.5% within 5 bpm**. The old peak counter: MAE 15.3 bpm, 33% within 5 bpm, **doubling 3.1%** of all clips. **The target (MAE below 5 bpm) is met only on clean, accepted clips, not overall.** |
+| Heart-rate extraction (v2) | **BUT PPG** (CC BY 4.0, 3,840 smartphone clips, 38 subjects, ECG reference), gate chosen by subject-level cross-fit. Gate-accepted clips (35% of all clips): **MAE 11.9 bpm, 47% within 5 bpm, doubling 0.07%, halving 4.5%**. Expert-good clips accepted (71% of the good clips): **MAE 3.7 bpm, 84.5% within 5 bpm**. The old peak counter on all clips: MAE 15.3 bpm, 33% within 5 bpm, **doubling 3.1%, halving 1.1%**. Like for like (all clips), v2 without the gate doubles 0.4% and halves 6.0%: doubling is traded for halving. **The target (MAE below 5 bpm) is met only on clean, accepted clips, not overall.** |
 | Heart rate on Hoffman and MTHS (oximeter pulse as reference) | Hoffman: old peak 1.2 bpm, v2 accepted 1.8 bpm (83% coverage). MTHS (62 people): old peak 11.2 bpm, v2 accepted 6.2 bpm, 72% within 5 bpm |
 | Doubling in the field case | Simulated fingertip pulses with a strong dicrotic notch (52 to 75 bpm): old counter doubled 90% of cases (28.8% for ordinary resting 55 to 100 bpm); v2 0%. At 110 to 160 bpm the old counter was not doubled either (the second harmonic is above the 4 Hz band-pass). These are code-path checks on a simulator, not physiology |
 | Optical ratio-of-ratios (red/green/blue) | **Negative.** MTHS (62 people, phone video, oximeter SpO₂, person-level leave-one-person-out): no model beats the training-mean baseline (MAE 2.22 for ridge on optics + HR against 2.21 for the mean; textbook 110 - 25R gives 3.49). On Hoffman, no optics variant beats TINY v2 in nested leave-one-person-out. **So the ratio is not a model input.** MTHS is normoxic (1% of seconds below 90), so it cannot test hypoxemia. OpenOximetry (the desaturation and skin-tone dataset) was **not available** (credentialed access never activated) |
@@ -128,17 +129,17 @@ BUT PPG and MTHS **validated and informed the design; they never train the shipp
 
 ### Heart rate on BUT PPG (v2 gate, `results/hr_validation/HR_SUMMARY.csv`)
 
-| Subset | Estimator | Clips | Coverage | MAE (bpm) | Within 5 bpm | Doubling |
-|---|---|---|---|---|---|---|
-| All clips | old peak interval | 3,840 | 98.1% | 15.30 | 33.1% | 3.1% |
-| All clips | v2, no gate | 3,840 | 100% | 16.56 | 30.6% | 0.4% |
-| All clips | v2, accepted by gate | 3,840 | 35.2% | 11.87 | 47.2% | 0.07% |
-| Expert-good | old peak interval | 795 | 99.0% | 6.49 | 71.2% | 2.0% |
-| Expert-good | v2, accepted by gate | 795 | 70.6% | 3.74 | 84.5% | 0.0% |
-| Finger at rest, good | v2, accepted by gate | 443 | 76.7% | 3.27 | 85.6% | 0.0% |
-| Ear, good | v2, accepted by gate | 207 | 64.3% | 6.00 | 78.9% | 0.0% |
+| Subset | Estimator | Clips | Coverage | MAE (bpm) | Within 5 bpm | Doubling | Halving |
+|---|---|---|---|---|---|---|---|
+| All clips | old peak interval | 3,840 | 98.1% | 15.30 | 33.1% | 3.1% | 1.1% |
+| All clips | v2, no gate | 3,840 | 100% | 16.56 | 30.6% | 0.4% | 6.0% |
+| All clips | v2, accepted by gate | 3,840 | 35.2% | 11.87 | 47.2% | 0.07% | 4.5% |
+| Expert-good | old peak interval | 795 | 99.0% | 6.49 | 71.2% | 2.0% | 0.1% |
+| Expert-good | v2, accepted by gate | 795 | 70.6% | 3.74 | 84.5% | 0.0% | 0.9% |
+| Finger at rest, good | v2, accepted by gate | 443 | 76.7% | 3.27 | 85.6% | 0.0% | 0.0% |
+| Ear, good | v2, accepted by gate | 207 | 64.3% | 6.00 | 78.9% | 0.0% | 3.8% |
 
-Held-out gate result (each clip scored with a gate chosen on the other half of the subjects): 1,359 of 3,840 clips accepted, MAE 11.89 bpm, 47.0% within 5 bpm, doubling 0.07%; expert-good 70.6% coverage, MAE 3.74 bpm, 84.5% within 5 bpm. Without the gate v2 is **not** better than the old counter on all clips (16.6 vs 15.3 bpm). The gain is that wrong answers are withheld. 40% of accepted clips are still more than 10 bpm off (mostly expert-bad clips that pass the gate), so a better signal-quality index is an open problem.
+Held-out gate result (each clip scored with a gate chosen on the other half of the subjects): 1,359 of 3,840 clips accepted, MAE 11.89 bpm, 47.0% within 5 bpm, doubling 0.07%, halving 4.5%; expert-good 70.6% coverage, MAE 3.74 bpm, 84.5% within 5 bpm. Without the gate v2 is **not** better than the old counter on all clips (16.6 vs 15.3 bpm). The gain is that wrong answers are withheld, at the cost of coverage (35%). Quote the 0.07% doubling only together with that 35%. 40% of accepted clips are still more than 10 bpm off (mostly expert-bad clips that pass the gate), so a better signal-quality index is an open problem.
 
 ![HR validation](docs/figures/fig_hr_validation.png)
 
@@ -148,7 +149,7 @@ Per-frame red/green/blue AC/DC ratio-of-ratios, quality gate, per-person calibra
 
 ## Limitations
 - 6 test people, one phone (Nexus 6P), fingertip only, one-way desaturation protocol, controlled FiO₂. Wide confidence intervals.
-- **Not tested on a real phone.** v2's capture path (frame timestamps, exposure and white-balance lock, torch, placement check, motion sensor) was checked only against a synthetic fake camera in headless Chromium and a simulator. The decision thresholds for frame gaps and finger placement are untuned heuristics. Run the [2-minute phone retest](docs/PHONE_RETEST.md) and send back the trace.
+- **Not tested on a real phone.** v2's capture path (frame timestamps, exposure and white-balance lock, torch, placement check, motion sensor) was checked only against a synthetic fake camera in headless Chromium and a simulator. The decision thresholds for frame gaps, stalls and finger placement are untuned heuristics. The finger check is a colour test (red at least 50 and at least 1.4 times green and blue, little saturation, even image), so a warm lit surface can read "Fingertip detected"; the pulse lock is what then refuses it. A pulsatile-amplitude test would be a better finger check, but its threshold needs real-phone data and was not guessed. The exposure lock timing and the stall watchdog have only been exercised in headless Chromium with a fake camera (stalls are injected by withholding frames). Run the [2-minute phone retest](docs/PHONE_RETEST.md) and send back the trace.
 - **Heart-rate floor of 51 bpm.** A resting rate below that cannot lock, so the app says "Unsure, re-measure" and gives no answer. Hoffman person 4 (43 bpm) is always "Unsure".
 - **The HR target (MAE below 5 bpm) is met only on clean accepted clips** (3.7 bpm on expert-good BUT clips). Over all accepted clips it is 11.9 bpm, and the gate accepts only 35% of BUT clips.
 - **Optical oxygen sensing is not implemented.** The model reads the heart-rate response to low oxygen, not the colour ratio. A ratio-of-ratios test on MTHS (normoxic) and Hoffman gave no gain, and OpenOximetry was not available, so there is also no skin-tone result.
@@ -178,7 +179,7 @@ scripts/reproduce.sh /path/to/oximetry-phone-cam-data   # figures + tables + ref
 ```
 Datasets are not in the repo. `scripts/reproduce.sh` with no argument runs the figure and bundled-fixture checks. With the optional dataset environment variables (`OXY_BUT`, `OXY_MTHS`, see the script header) it also reruns the v2 evaluation, the BUT PPG heart-rate validation and cross-fit, and the MTHS optics experiment. `scripts/optics_experiment.py`, `optics_feats.py` and `optics_decision.py` still contain host-specific scratch paths that need editing on another machine.
 
-**Parity result:** the JavaScript v2 engine reproduces the Python reference on all 12 Hoffman recordings, 5,646 windows: max |Δp| = 2.1×10⁻¹³, 0 decision mismatches (v1: 3.2×10⁻¹³). The JavaScript heart-rate estimator matches the Python one to a relative difference of 7×10⁻¹⁵ on 240 BUT windows plus edge cases. `npm test` also runs a 48-trial capture-path simulation (jittered timestamps, 24/30/60 fps, dropped frames, exposure step). An end-to-end browser test with a synthetic 72 bpm fingertip video (`tests/e2e/`) passes: calibration completes, the app reads 72 bpm and "Normal vs your baseline", a grey frame is refused by the placement check, and the replay of person 4 shows only "Unsure". None of this validates real fingertips or real phones.
+**Parity result:** the JavaScript v2 engine reproduces the Python reference on all 12 Hoffman recordings, 5,646 windows: max |Δp| = 2.1×10⁻¹³, 0 decision mismatches (v1: 3.2×10⁻¹³). The JavaScript heart-rate estimator matches the Python one to a relative difference of 7×10⁻¹⁵ on 240 BUT windows plus edge cases. `npm test` also runs a 48-trial capture-path simulation (jittered timestamps, 24/30/60 fps, dropped frames, exposure step) and `tests/stall.mjs` (16 checks: resampler gap-duration accounting, a 0 / 0.5 / 3 / 6 s stall through the shipped engine and decision rule, staleness and gating boundaries). An end-to-end browser test with a synthetic 72 bpm fingertip video (`tests/e2e/`) passes: calibration completes, the app reads 72 bpm and "Normal vs your baseline", a grey frame is refused by the placement check, and the replay of person 4 shows only "Unsure". Two further e2e cases (`CASES=stall,calstall`) freeze the camera frames: a 4 s stall after calibration must show "Unsure, re-measure" with the heart-rate tile cleared within 2.6 s and recover to "Normal" afterwards, and a 3 s stall inside calibration must reject the calibration. None of this validates real fingertips or real phones.
 
 ## Deploy
 The site is the `app/` folder served from the `gh-pages` branch (`scripts/deploy_pages.sh`). Any static host works (Cloudflare Pages / Netlify / Vercel: set the output directory to `app`). HTTPS is required for the camera.

@@ -1,4 +1,4 @@
-const V = 'oxydrop-v2';
+const V = 'oxydrop-v2.1';
 const ASSETS = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon.svg',
   'js/app.js', 'js/decision.js', 'js/camera.js', 'js/resample.js', 'js/engine.js', 'js/hr.js', 'data/weights.json',
   'data/replay/100001L.json', 'data/replay/100001L.bin', 'data/replay/100004R.json', 'data/replay/100004R.bin'];

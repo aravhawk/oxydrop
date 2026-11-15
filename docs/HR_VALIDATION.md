@@ -33,11 +33,11 @@ The folds disagreed slightly (even half chose `SQI_MIN` 0.25, odd half 0.30). Th
 
 ### Held-out results (each clip scored with a gate chosen without its own subject half)
 
-| Selection | Held-out accepted clips | Accepted MAE (bpm) | Accepted within 5 bpm | Wrong-accepted (>10 bpm) | Doubling | Expert-good accepted: coverage / MAE / within 5 |
+| Selection | Held-out accepted clips | Accepted MAE (bpm) | Accepted within 5 bpm | Wrong-accepted (>10 bpm) | Doubling | Halving | Expert-good accepted: coverage / MAE / within 5 |
 |---|---|---|---|---|---|---|
-| Fold A (select even, score odd) | 701 of 1,962 | 10.97 | 48.9% | 38.1% | 0.00% | 70.6% / 3.46 / 85.3% |
-| Fold B (select odd, score even) | 658 of 1,878 | 12.88 | 45.0% | 42.4% | 0.15% | 70.5% / 4.09 / 83.5% |
-| Pooled held-out | 1,359 of 3,840 | 11.89 | 47.0% | 40.2% | 0.07% | 70.6% / 3.74 / 84.5% |
+| Fold A (select even, score odd) | 701 of 1,962 | 10.97 | 48.9% | 38.1% | 0.00% | 2.7% | 70.6% / 3.46 / 85.3% |
+| Fold B (select odd, score even) | 658 of 1,878 | 12.88 | 45.0% | 42.4% | 0.15% | 6.4% | 70.5% / 4.09 / 83.5% |
+| Pooled held-out | 1,359 of 3,840 | 11.89 | 47.0% | 40.2% | 0.07% | 4.5% | 70.6% / 3.74 / 84.5% |
 
 (`results/hr_validation/crossfit_summary.csv`, full grid in `crossfit_grid.csv`, choice in `crossfit_choice.json`.)
 
@@ -79,8 +79,9 @@ Coverage is the share of clips for which the estimator outputs a number. Doublin
 
 * **Target (MAE below 5 bpm on clean clips): met for expert-good accepted clips, 3.7 bpm held out (84.5% within 5 bpm), and for finger-at-rest expert-good accepted clips, 3.3 bpm.** It is not met for ear clips of good quality (6.0 bpm), and it is not met overall: across all accepted clips the MAE is 11.9 bpm with 47% within 5 bpm.
 * The gate is what produces the improvement. Without it v2 is not better than the old peak counter on all clips (MAE 16.6 versus 15.3 bpm, 30.6% versus 33.1% within 5 bpm). The gain is that wrong answers are withheld, and the cost is coverage: only 35% of all BUT clips and 70.6% of the good ones are accepted.
-* 40% of accepted clips are still wrong by more than 10 bpm. Most of them are expert-bad clips that pass the gate (790 of the 1,359 accepted clips are expert-bad, MAE 17.6 bpm). The gate cannot see the expert label, and a better signal quality index is the open problem.
-* Doubling is largely solved: 0.07% of accepted clips, against 3.1% for the old peak counter on all clips (and 2.0% on expert-good clips).
+* 40% of accepted clips are still wrong by more than 10 bpm. Most of them are expert-bad clips that pass the gate (in the in-sample table, 790 of the 1,351 accepted clips are expert-bad, MAE 17.6 bpm; held out, 798 of the 1,359). The gate cannot see the expert label, and a better signal quality index is the open problem.
+* **Doubling is traded for halving.** On all BUT clips the old peak counter doubles 3.1% and halves 1.1%. v2 without the gate doubles 0.4% and halves 6.0%. v2 accepted doubles 0.07% and halves 4.5% (held out, pooled: 0.07% and 4.5%), on 35% of the clips. The like-for-like pair is v2 ungated against the old counter on all clips: doubling 0.4% against 3.1%, halving 6.0% against 1.1%, and MAE 16.6 against 15.3 bpm. The 0.07% figure applies to the clips the gate accepts and should always be quoted with its 35% coverage. On expert-good clips, accepted: 0.0% doubling, 0.9% halving.
+* The engine's own validity rule also requires the beat-interval rate to match the spectral rate within 12% (`BEAT_AGREE`) and at most 10% saturated frames (`SAT_MAX`). These two constants are fixed heuristics. They were not in the cross-fit grid and no result file selects or evaluates them: BUT clips are 10 s long and the engine works on a 30 s buffer. Only `F_LO`, `SQI_MIN`, `ACF_MIN` and `AGREE` come from the BUT PPG cross-fit.
 
 ## Other datasets (oximeter pulse as reference)
 
@@ -110,7 +111,7 @@ On clean resting Hoffman recordings the old peak counter is already fine (1.2 bp
 | Fast 130 to 160 bpm | 0.0% | 0.00% | 100% |
 | Resting 52 to 75 bpm, dicrotic 2nd harmonic 1.2 to 2.0x the fundamental (the field failure) | 90.0% | 0.00% | 100% |
 
-The request asked for strong-notch 130 to 160 bpm cases. There the v1 estimate is not doubled either, because the second harmonic of a 130+ bpm pulse (4.3 Hz and above) is removed by the 0.7 to 4 Hz band-pass. Doubling is a problem for rates below about 120 bpm, which is where the field failure happened, so the table includes the 75 bpm field case. These synthetic tests pass by construction of the simulator, so they check the code path, not the physiology.
+The request asked for strong-notch 130 to 160 bpm cases. There the v1 estimate is not doubled either, because the second harmonic of a 130+ bpm pulse (4.3 Hz and above) is removed by the 0.7 to 4 Hz band-pass. Doubling is a problem for rates below about 120 bpm, which is where the field failure happened, so the table includes the 75 bpm field case. These synthetic tests pass by construction of the simulator, so they check the code path, not the physiology. The 90% and 28.8% doubling rates for the old counter are simulator rates for a worst-case waveform. They are not field rates; the field-like figure is the 3.1% on BUT PPG.
 
 ## Limits of this validation
 

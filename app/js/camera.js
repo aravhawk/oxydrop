@@ -19,6 +19,7 @@ export class CameraSource {
     this.onSample = onSample; this.onStats = onStats || (() => {}); this.rs = new Resampler((r, g, b) => this.onSample(r, g, b));
     this.info = { torchSupported: false, torch: false, locks: {}, lens: '', width: 0, height: 0, settings: {} };
     this.stopped = false; this.frames = 0; this.t0 = 0; this.stat = { mean: [0, 0, 0], satFrac: 0, spatialCV: 0, luma: 0 }; this.lastPresented = null; this.skipped = 0;
+    this.lastFrameAt = 0; this.interrupted = null; this.locked = false;
   }
   async start(video, { deviceId = null, torch = 'auto' } = {}) {
     this.video = video; this.torchMode = torch;
@@ -34,13 +35,31 @@ export class CameraSource {
     await this.setTorch(torch !== 'off');
     this.canvas = document.createElement('canvas'); this.canvas.width = 32; this.canvas.height = 24;
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-    this.t0 = performance.now() / 1000; this.lockTimer = setTimeout(() => this.lockExposure(), 2500);
+    this.t0 = performance.now() / 1000; this.lastFrameAt = performance.now();
+    // Exposure/WB/focus are NOT locked here: the app calls lockExposure() once the fingertip has been placed correctly for a few seconds,
+    // so the lock is taken on the covered lens and not on the open scene.
+    this.onTrackEnd = () => { this.interrupted = 'The camera track ended.'; };
+    this.onTrackMute = () => { this.interrupted = 'The camera was muted by the browser.'; };
+    this.onTrackUnmute = () => { if (this.interrupted === 'The camera was muted by the browser.') this.interrupted = null; };
+    this.onVis = () => { if (document.hidden) this.interrupted = 'The page was sent to the background.'; else if (this.interrupted === 'The page was sent to the background.') this.interrupted = null; };
+    this.track.addEventListener('ended', this.onTrackEnd); this.track.addEventListener('mute', this.onTrackMute); this.track.addEventListener('unmute', this.onTrackUnmute);
+    document.addEventListener('visibilitychange', this.onVis);
     this.loop();
   }
   async setTorch(on) {
     if (!this.info.torchSupported) { this.info.torch = false; return false; }
     try { await this.track.applyConstraints({ advanced: [{ torch: !!on }] }); this.info.torch = !!on; } catch (e) { this.info.torch = false; }
     return this.info.torch;
+  }
+  /** Wall-clock ms since the last camera frame arrived (0 before the first frame). Large when the camera stalls or is interrupted. */
+  get staleMs() { return this.lastFrameAt ? performance.now() - this.lastFrameAt : 0; }
+  async unlockExposure() {
+    // Back to continuous auto modes (used when the light mode changes or the fingertip is lifted), so the next lock is taken on the new scene.
+    const c = this.caps || {}, tryC = async (adv) => { try { await this.track.applyConstraints({ advanced: [adv] }); return true; } catch (e) { return false; } };
+    if (c.exposureMode && c.exposureMode.includes('continuous')) await tryC({ exposureMode: 'continuous' });
+    if (c.whiteBalanceMode && c.whiteBalanceMode.includes('continuous')) await tryC({ whiteBalanceMode: 'continuous' });
+    if (c.focusMode && c.focusMode.includes('continuous')) await tryC({ focusMode: 'continuous' });
+    this.info.locks = {}; this.locked = false;
   }
   async lockExposure() {
     // Freeze auto-exposure / white balance / focus so the camera does not cancel or add to the pulse signal. Best effort, support varies (Android Chrome yes; iOS Safari no).
@@ -49,7 +68,7 @@ export class CameraSource {
     if (c.exposureMode && c.exposureMode.includes('manual')) ok.exposure = await tryC({ exposureMode: 'manual' });
     if (c.whiteBalanceMode && c.whiteBalanceMode.includes('manual')) ok.wb = await tryC({ whiteBalanceMode: 'manual' });
     if (c.focusMode && c.focusMode.includes('manual')) ok.focus = await tryC({ focusMode: 'manual' });
-    this.info.locks = ok;
+    this.info.locks = ok; this.locked = true;
   }
   loop() {
     if (this.stopped) return;
@@ -65,12 +84,14 @@ export class CameraSource {
     const d = this.ctx.getImageData(0, 0, 32, 24).data, n = d.length / 4; let r = 0, g = 0, b = 0, sat = 0, l1 = 0, l2 = 0;
     for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; if (d[i] >= 250 || d[i + 1] >= 250 || d[i + 2] >= 250) sat++; const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; l1 += l; l2 += l * l; }
     const mean = [r / n, g / n, b / n], lm = l1 / n, lsd = Math.sqrt(Math.max(l2 / n - lm * lm, 0));
+    this.lastFrameAt = performance.now();
     this.stat = { mean, satFrac: sat / n, spatialCV: lm > 1 ? lsd / lm : 0, luma: lm }; this.frames++;
     this.rs.push(t, mean[0], mean[1], mean[2]);
   }
-  get stats() { return { ...this.stat, fps: this.rs.fps, jitterMs: this.rs.jitterMs, gaps: this.rs.gaps, maxGap: this.rs.maxGap, skipped: this.skipped, samples: this.rs.n, frames: this.frames }; }
+  get stats() { return { ...this.stat, staleMs: this.staleMs, interrupted: this.interrupted, fps: this.rs.fps, jitterMs: this.rs.jitterMs, gaps: this.rs.gaps, maxGap: this.rs.maxGap, skipped: this.skipped, samples: this.rs.n, frames: this.frames }; }
   stop() {
-    this.stopped = true; clearTimeout(this.lockTimer);
+    this.stopped = true;
+    if (this.track && this.onTrackEnd) { this.track.removeEventListener('ended', this.onTrackEnd); this.track.removeEventListener('mute', this.onTrackMute); this.track.removeEventListener('unmute', this.onTrackUnmute); document.removeEventListener('visibilitychange', this.onVis); }
     if (this.track && this.info.torch) { try { this.track.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) { /* ignore */ } }
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
   }

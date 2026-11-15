@@ -13,12 +13,12 @@ Purpose: find out whether the v2 capture path works on a **real phone**. So far 
 
 | Time | What to do | What you should see |
 |---|---|---|
-| 0:00 to 0:20 **Setup** | Open https://aravhawk.github.io/oxydrop/ and tap *Measure with my camera*. Tap *Turn on camera* and allow it. Pick the **main (wide) rear lens** (the app avoids ultra-wide and tele). Choose **Flash** (Android) or **Ambient** (iPhone, bright lamp). Cover the lens and light **fully** with a fingertip, light pressure. | The placement indicator turns to "Fingertip detected". The start button enables after about 3 locked windows. If it never does, note the message and go to *If it fails*. |
+| 0:00 to 0:20 **Setup** | Open https://aravhawk.github.io/oxydrop/ and tap *Measure with my camera*. Tap *Turn on camera* and allow it. Pick the **main (wide) rear lens** (the app avoids ultra-wide and tele). Choose **Flash** (Android) or **Ambient** (iPhone, bright lamp). Cover the lens and light **fully** with a fingertip, light pressure. | The placement indicator turns to "Fingertip detected". About 3 s later the checklist changes from "Hold still: locking exposure, white balance and focus…" to "Locked: …" (the lock is taken on the covered lens, not on the open scene, and is taken again if you switch Flash/Ambient). The start button enables after about 3 locked windows. If it never does, note the message and go to *If it fails*. |
 | 0:20 to 1:20 **Calibration (60 s)** | Tap *Start 60-second calibration*. Sit still, breathe normally, do not talk. Do not move the finger. | Calibration bar fills. The clock reaches 1:00. The first answer arrives about 10 s later because the first window needs 10 s of data. |
-| 1:20 to 2:00 **Measurement (about 40 s)** | Keep still. Write down the reference pulse once, about 10 s after calibration ends. For the last 10 s, **lift your finger off the lens** for about 5 s, then put it back. | HR tile near your reference. State **Normal vs your baseline**. With the finger lifted, the state should change to **Unsure, re-measure** and the HR should disappear. |
+| 1:20 to 2:00 **Measurement (about 40 s)** | Keep still. Write down the reference pulse once, about 10 s after calibration ends. For the last 10 s, **lift your finger off the lens** for about 5 s, then put it back. | HR tile near your reference. State **Normal vs your baseline**. With the finger lifted, the state should change to **Unsure, re-measure** and the HR should disappear. Also write down what the placement indicator says while the finger is lifted (a warm lit surface can read "Fingertip detected"; the pulse lock should still refuse it). |
 | 2:00 | Tap **Copy debug summary**, paste it into a note. Tap **Download raw trace (CSV)** and keep the file. | |
 
-The calibration check reports a failed calibration as "Unsure, re-measure" with a reason (pulse found in too few windows, frame rate under 20 fps, too many dropped frames, resting HR outside 51 to 110 bpm, or motion). That is a valid result for this test, so copy the reason.
+The calibration check reports a failed calibration as "Unsure, re-measure" with a reason (pulse found in too few windows, frame rate under 20 fps, too many dropped frames, a camera stall longer than 1.5 s, resting HR outside 51 to 110 bpm, or motion). That is a valid result for this test, so copy the reason.
 
 ## What to send back
 1. The **Copy debug summary** text.
@@ -36,7 +36,8 @@ The calibration check reports a failed calibration as "Unsure, re-measure" with 
 | 3 | State at rest | The state is **Normal vs your baseline** in most answered windows at rest. A few "Unsure, re-measure" windows are acceptable. **"Possible low oxygen: re-check with a pulse oximeter" in a healthy seated person is a failure** (note the time) |
 | 4 | Finger lifted | The state becomes **Unsure, re-measure** within about 10 s of lifting the finger, with no confident HR |
 | 5 | Camera facts | Frame rate at least 20 fps and few dropped-frame warnings in the debug summary |
-| 6 | Resting HR floor | If your resting pulse is below 51 bpm, "Unsure, re-measure" is the expected and correct behaviour (the estimator cannot lock below 51 bpm) |
+| 6 | Camera stall | Optional, 10 s: at any time after calibration, switch to another app or lock the screen for about 3 s, then come back. Within about 2 s of the stall the state must read **Unsure, re-measure** ("The camera stopped delivering frames") with no HR, and it must stay unsure for up to about 30 s after the camera resumes, then return to Normal. The 60-second calibration is rejected if the camera stalls for more than 1.5 s inside it |
+| 7 | Resting HR floor | If your resting pulse is below 51 bpm, "Unsure, re-measure" is the expected and correct behaviour (the estimator cannot lock below 51 bpm) |
 
 If the reference pulse is below 51 bpm or above about 110 bpm, record it but treat checks 1 and 3 as not applicable.
 
