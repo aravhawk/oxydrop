@@ -1143,7 +1143,7 @@ def block_app_state() -> str:
         win = _deploy_value(r'full hybrid window[^|]*\|\s*([\d]+ to [\d]+ ms)')
         mb = sum(os.path.getsize(os.path.join(ROOT, f'app/data/hybrid_R_s{i}.json')) for i in range(3)) / 1e6
         return ('**What the app runs.** The hybrid is the on-device default path: the v1 physiological chain logit plus the residual of three CNN seeds, then the logistic meta-learner and the conformal three-state rule (`app/js/hybrid_engine.js`, `docs/APP_INTEGRATION.md`). '
-                'The CNN runs in a Web Worker so a forward pass never delays camera frames, with an in-page fallback when module workers are unavailable; the v2 logistic chain stays behind `?engine=logistic`. '
+                'The CNN runs in a Web Worker so a forward pass never delays camera frames, with logistic-chain fallback when module workers are unavailable or exceed the 2 s window deadline; the v2 logistic chain stays behind `?engine=logistic`. '
                 'A generic low-amplitude guard (AC/DC below the 0.1th percentile of the Hoffman training windows, ' + pct(_row(rd('ood_ac_range.csv'), dataset='hoffman', percentile=0.1).ac_ratio_percent / 100, 2) + ') answers *Unsure* and shows the spectral heart rate only. '
                 + guard_sentence() + ' '
                 f'Latency measured on a development laptop (`results/ml/DEPLOY.md`): {fwd} ms for one forward pass, {win} per 2 s window including all three seeds; phones are slower and unmeasured. '

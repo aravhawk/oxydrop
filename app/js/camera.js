@@ -12,7 +12,7 @@ export async function listBackCameras() {
 export async function listCameras() { return { back: await listBackCameras(), front: true }; }
 /** Default lens: the plain main/wide back camera. Ultra-wide and telephoto sit farther from the torch; virtual multi-lens devices may switch lenses mid-measurement. */
 export function pickDefault(cams) {
-  const score = (l) => (/ultra|0\.5|tele|zoom|macro|depth/i.test(l) ? -5 : 0) + (/back camera$|wide|main|camera2 0,/i.test(l) ? 3 : 0) + (/dual|triple/i.test(l) ? -1 : 0);
+  const score = (l) => (/dual|triple|virtual|fusion/i.test(l) ? -100 : 0) + (/ultra|0\.5|tele|zoom|macro|depth/i.test(l) ? -5 : 0) + (/back camera$|wide|main|camera2 0,/i.test(l) ? 3 : 0);
   return [...cams].sort((a, b) => score(b.label) - score(a.label))[0] || null;
 }
 
@@ -34,12 +34,41 @@ export function probeCamFactory(video) {
 /** getUserMedia failures that mean 'this deviceId is not available' (as opposed to a denied permission or a busy camera). */
 export const isDeviceGone = (e) => !!e && /^(NotFoundError|OverconstrainedError|DevicesNotFoundError)$/.test(e.name || '');
 
+/** Actual channel means and clipping in a rectangular region; no channel remapping. */
+export function regionStats(data, width, roi) {
+  const sum = [0, 0, 0], clipped = [0, 0, 0]; let allClip = 0, l1 = 0, l2 = 0, n = 0;
+  for (let y = roi.y; y < roi.y + roi.h; y++) for (let x = roi.x; x < roi.x + roi.w; x++) {
+    const i = 4 * (y * width + x); let count = 0;
+    for (let c = 0; c < 3; c++) { sum[c] += data[i + c]; if (data[i + c] >= 250) { clipped[c]++; count++; } }
+    if (count === 3) allClip++;
+    const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]; l1 += l; l2 += l * l; n++;
+  }
+  const luma = l1 / n;
+  return { mean: sum.map(v => v / n), channelSat: clipped.map(v => v / n), satFrac: allClip / n,
+    spatialCV: luma > 1 ? Math.sqrt(Math.max(0, l2 / n - luma * luma)) / luma : 0, luma };
+}
+
+/** Prefer a well-lit region with an unclipped channel. Red may clip while green/blue remain useful for HR. */
+export function selectROI(data, width = 32, height = 24) {
+  let best = { x: 0, y: 0, w: width, h: height }, bestScore = -1;
+  const candidates = [best];
+  const w = Math.floor(width / 4), h = Math.floor(height / 3);
+  for (let y = 0; y + h <= height; y += h) for (let x = 0; x + w <= width; x += w) candidates.push({ x, y, w, h });
+  for (const roi of candidates) {
+    const s = regionStats(data, width, roi);
+    const usable = Math.max(...s.mean.map((dc, c) => dc > 8 && dc < 245 ? dc * (1 - s.channelSat[c]) : 0));
+    const score = usable / (1 + s.spatialCV) * (roi === candidates[0] ? 1.05 : 1);
+    if (score > bestScore) { bestScore = score; best = roi; }
+  }
+  return best;
+}
+
 const LUMA_LO = 90, LUMA_HI = 200, SAT_CAP = 0.10, ADAPT_STEPS = 6;
 export class CameraSource {
   constructor(onSample, onStats) {
     this.onSample = onSample; this.onStats = onStats || (() => {}); this.rs = new Resampler((r, g, b) => this.onSample(r, g, b));
-    this.info = { torchSupported: false, torch: false, locks: {}, lens: '', width: 0, height: 0, settings: {} };
-    this.stopped = false; this.frames = 0; this.t0 = 0; this.stat = { mean: [0, 0, 0], satFrac: 0, spatialCV: 0, luma: 0 }; this.lastPresented = null; this.skipped = 0;
+    this.info = { torchSupported: false, torch: false, torchState: 'off', locks: {}, lens: '', width: 0, height: 0, settings: {} };
+    this.stopped = false; this.frames = 0; this.t0 = 0; this.stat = { mean: [0, 0, 0], satFrac: 0, channelSat: [0, 0, 0], spatialCV: 0, luma: 0 }; this.roi = null; this.lastMediaTime = null; this.lastPresented = null; this.skipped = 0;
     this.lastFrameAt = 0; this.interrupted = null; this.locked = false;
   }
   async start(video, { deviceId = null, torch = 'auto', facing = 'environment' } = {}) {
@@ -56,7 +85,7 @@ export class CameraSource {
       this.info.fallback = `exact deviceId rejected (${e.name || 'error'}: ${e.message || 'no message'}); reopened by facingMode ${facing === 'user' ? 'user' : 'environment'}`;
       stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...base, facingMode } });
     }
-    this.stream = stream; video.srcObject = stream; video.muted = true; video.playsInline = true; await video.play();
+    this.stream = stream; video.srcObject = stream; video.muted = true; video.playsInline = true; try { await video.play(); } catch (e) { stream.getTracks().forEach(t => t.stop()); throw e; }
     this.track = stream.getVideoTracks()[0];
     this.caps = this.track.getCapabilities ? this.track.getCapabilities() : {};
     const st = this.track.getSettings ? this.track.getSettings() : {};
@@ -77,8 +106,21 @@ export class CameraSource {
     this.loop();
   }
   async setTorch(on) {
-    if (!this.info.torchSupported) { this.info.torch = false; return false; }
-    try { await this.track.applyConstraints({ advanced: [{ torch: !!on }] }); this.info.torch = !!on; } catch (e) { this.info.torch = false; }
+    this.info.torchRequested = !!on;
+    const cap = this.caps?.torch;
+    if (cap === false || (Array.isArray(cap) && !cap.includes(true))) {
+      this.info.torch = false; this.info.torchState = 'unsupported'; return false;
+    }
+    // Some WebKit builds omit torch from capabilities. Still try it; a resolved
+    // constraint alone is not proof that the LED turned on (unknown keys may be ignored).
+    try {
+      await this.track.applyConstraints({ torch: !!on, advanced: [{ torch: !!on }] });
+      const settings = this.track.getSettings?.() || {};
+      const confirmed = typeof settings.torch === 'boolean';
+      this.info.torch = on && (!confirmed || settings.torch);
+      this.info.torchSupported = !!cap || (confirmed && settings.torch === !!on);
+      this.info.torchState = !on ? 'off' : confirmed ? (settings.torch ? 'confirmed' : 'failed') : 'on-unverified';
+    } catch (e) { this.info.torch = false; this.info.torchState = 'failed'; this.info.torchError = e.name || 'constraint_failed'; }
     return this.info.torch;
   }
   /** Wall-clock ms since the last camera frame arrived (0 before the first frame). Large when the camera stalls or is interrupted. */
@@ -89,15 +131,16 @@ export class CameraSource {
     if (c.exposureMode && c.exposureMode.includes('continuous')) await tryC({ exposureMode: 'continuous' });
     if (c.whiteBalanceMode && c.whiteBalanceMode.includes('continuous')) await tryC({ whiteBalanceMode: 'continuous' });
     if (c.focusMode && c.focusMode.includes('continuous')) await tryC({ focusMode: 'continuous' });
-    this.info.locks = {}; this.locked = false;
+    this.info.locks = {}; this.locked = false; this.roi = null;
   }
   async lockExposure() {
-    // Freeze auto-exposure / white balance / focus so the camera does not cancel or add to the pulse signal. Best effort, support varies (Android Chrome yes; iOS Safari no).
+    // Freeze auto-exposure / white balance / focus so the camera does not cancel or add to the pulse signal. Best effort; support varies by browser and camera track.
     const c = this.caps || {}, ok = {};
     const tryC = async (adv) => { try { await this.track.applyConstraints({ advanced: [adv] }); return true; } catch (e) { return false; } };
-    if (c.exposureMode && c.exposureMode.includes('manual')) ok.exposure = await tryC({ exposureMode: 'manual' });
-    if (c.whiteBalanceMode && c.whiteBalanceMode.includes('manual')) ok.wb = await tryC({ whiteBalanceMode: 'manual' });
-    if (c.focusMode && c.focusMode.includes('manual')) ok.focus = await tryC({ focusMode: 'manual' });
+    const st = this.track.getSettings?.() || {};
+    if (c.exposureMode && c.exposureMode.includes('manual')) ok.exposure = await tryC({ exposureMode: 'manual', ...(Number.isFinite(st.exposureTime) ? { exposureTime: st.exposureTime } : {}), ...(Number.isFinite(st.iso) ? { iso: st.iso } : {}) });
+    if (c.whiteBalanceMode && c.whiteBalanceMode.includes('manual')) ok.wb = await tryC({ whiteBalanceMode: 'manual', ...(Number.isFinite(st.colorTemperature) ? { colorTemperature: st.colorTemperature } : {}) });
+    if (c.focusMode && c.focusMode.includes('manual')) ok.focus = await tryC({ focusMode: 'manual', ...(Number.isFinite(st.focusDistance) ? { focusDistance: st.focusDistance } : {}) });
     this.info.locks = ok; this.locked = true;
   }
   /**
@@ -113,14 +156,15 @@ export class CameraSource {
     const a = { supported: knobs, applied: [], lumaBefore: this.stat.luma, lumaAfter: this.stat.luma, satAfter: this.stat.satFrac, result: 'none' };
     this.info.adapt = a;
     if (!knobs.length) { a.result = 'unsupported_left_on_auto'; return a; }
-    const inBand = () => this.stat.luma >= LUMA_LO && this.stat.luma <= LUMA_HI && this.stat.satFrac < SAT_CAP;
+    const clipped = () => Math.max(...(this.stat.channelSat || [this.stat.satFrac]));
+    const inBand = () => this.stat.luma >= LUMA_LO && this.stat.luma <= LUMA_HI && clipped() < SAT_CAP;
     if (inBand()) { a.result = 'already_in_band'; return a; }
     const cur = {}, set = async (k, val) => {
       try { await this.track.applyConstraints({ advanced: [{ [k]: val }] }); cur[k] = val; a.applied.push({ k, val: Math.round(val * 1000) / 1000 }); return true; } catch (e) { return false; }
     };
     let ki = 0;
     for (let i = 0; i < steps && ki < knobs.length; i++) {
-      const up = this.stat.luma < LUMA_LO && this.stat.satFrac < SAT_CAP, k = knobs[ki], r = rng(k), st = r.step || (r.max - r.min) / 8;
+      const up = this.stat.luma < LUMA_LO && clipped() < SAT_CAP, k = knobs[ki], r = rng(k), st = r.step || (r.max - r.min) / 8;
       const base = cur[k] ?? (this.track.getSettings ? (this.track.getSettings()[k] ?? (r.min + r.max) / 2) : (r.min + r.max) / 2);
       const stepSize = k === 'iso' || k === 'exposureTime' ? base * 0.5 : Math.max(st, (r.max - r.min) / 6);   // multiplicative for iso/time, additive otherwise
       const next = Math.min(r.max, Math.max(r.min, up ? base + stepSize : base - stepSize));
@@ -138,23 +182,37 @@ export class CameraSource {
     else requestAnimationFrame((now) => { this.frame(now, null); this.loop(); });
   }
   frame(now, meta) {
-    const v = this.video; if (!v.videoWidth) return;
-    // true capture time when the browser provides it (Chrome), else callback time (Safari); the Resampler de-jitters either
-    const t = (meta && Number.isFinite(meta.captureTime) ? meta.captureTime : now) / 1000;
-    if (meta && Number.isFinite(meta.presentedFrames)) { if (this.lastPresented !== null && meta.presentedFrames - this.lastPresented > 1) this.skipped += meta.presentedFrames - this.lastPresented - 1; this.lastPresented = meta.presentedFrames; }
+    const v = this.video; if (this.stopped || !v.videoWidth) return;
+    // Video media time prevents Safari rAF from counting the same camera frame
+    // multiple times. rVFC mediaTime is also independent of main-thread latency.
+    const mediaTime = Number.isFinite(meta?.mediaTime) ? meta.mediaTime : Number.isFinite(v.currentTime) ? v.currentTime : null;
+    if (mediaTime !== null && mediaTime === this.lastMediaTime) return;
+    if (meta && Number.isFinite(meta.presentedFrames)) {
+      if (this.lastPresented === meta.presentedFrames) return;
+      if (this.lastPresented !== null && meta.presentedFrames - this.lastPresented > 1) this.skipped += meta.presentedFrames - this.lastPresented - 1;
+      this.lastPresented = meta.presentedFrames;
+    }
+    this.lastMediaTime = mediaTime;
+    const t = Number.isFinite(meta?.captureTime) ? meta.captureTime / 1000 : mediaTime ?? now / 1000;
     this.ctx.drawImage(v, 0, 0, 32, 24);
-    const d = this.ctx.getImageData(0, 0, 32, 24).data, n = d.length / 4; let r = 0, g = 0, b = 0, sat = 0, l1 = 0, l2 = 0;
-    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; if (d[i] >= 250 || d[i + 1] >= 250 || d[i + 2] >= 250) sat++; const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; l1 += l; l2 += l * l; }
-    const mean = [r / n, g / n, b / n], lm = l1 / n, lsd = Math.sqrt(Math.max(l2 / n - lm * lm, 0));
+    const d = this.ctx.getImageData(0, 0, 32, 24).data;
+    // Pick a region once, after exposure settles. Keep it fixed while measuring:
+    // chasing the brightest tile each frame would create an artificial AC signal.
+    let roiChanged = false;
+    if (!this.roi || (!this.locked && (this.frames === 15 || (this.frames % 60 === 0 && (Math.max(...this.stat.mean) <= 3 || this.stat.satFrac > 0.1))))) {
+      this.roi = selectROI(d, 32, 24); roiChanged = true;
+    }
+    const region = regionStats(d, 32, this.roi), { mean } = region;
+    const fullMean = regionStats(d, 32, { x: 0, y: 0, w: 32, h: 24 }).mean;
     this.lastFrameAt = performance.now();
-    this.stat = { mean, satFrac: sat / n, spatialCV: lm > 1 ? lsd / lm : 0, luma: lm }; this.frames++;
-    this.rs.push(t, mean[0], mean[1], mean[2]);
+    this.stat = { ...region, fullMean, roi: { ...this.roi }, roiChanged }; this.frames++;
+    this.rs.push(t, mean[0], mean[1], mean[2]); this.onStats(this.stats);
   }
   get stats() { return { ...this.stat, staleMs: this.staleMs, interrupted: this.interrupted, fps: this.rs.fps, jitterMs: this.rs.jitterMs, gaps: this.rs.gaps, maxGap: this.rs.maxGap, skipped: this.skipped, samples: this.rs.n, frames: this.frames }; }
   stop() {
     this.stopped = true;
     if (this.track && this.onTrackEnd) { this.track.removeEventListener('ended', this.onTrackEnd); this.track.removeEventListener('mute', this.onTrackMute); this.track.removeEventListener('unmute', this.onTrackUnmute); document.removeEventListener('visibilitychange', this.onVis); }
-    if (this.track && this.info.torch) { try { this.track.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) { /* ignore */ } }
+    if (this.track && this.info.torch) { try { this.track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {}); } catch (e) { /* ignore */ } }
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
   }
 }

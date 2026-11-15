@@ -62,7 +62,7 @@ README.md,hv:butppg/vote+harmonic+octave+median5/clean:mae,10.94
 README.md,hv:mths/vote+harmonic+octave+median5/clean:mae,5.22
 README.md,hvs:hof_100004/spec_band51:mae,14.3
 README.md,hvs:hof_100004/spec_band40:mae,1.9
-README.md,@app_state,<block 1205 chars>
+README.md,@app_state,<block 1243 chars>
 README.md,v:guard_mths,6.7%
 README.md,v:guard_but,8.8%
 README.md,v:guard_hof,0.1%
@@ -163,7 +163,7 @@ MODEL.md,v:deploy_scale,4.275
 MODEL.md,v:deploy_inner_cv,0.818
 MODEL.md,hy:default_R:tm_bacc|full,"0.809 [0.644, 0.863]"
 MODEL.md,hy:HYBRID_FINAL:tm_bacc|full,"0.779 [0.638, 0.831]"
-MODEL.md,@app_state,<block 1205 chars>
+MODEL.md,@app_state,<block 1243 chars>
 MODEL.md,b1:ror_textbook_RB:tm_bacc,0.535
 MODEL.md,b1:ror_textbook_RG:tm_bacc,0.498
 MODEL.md,b3:ror_textbook_RB:mae,3.332
@@ -209,7 +209,7 @@ WHITEPAPER.md,v:deploy_scale,4.275
 WHITEPAPER.md,v:deploy_inner_cv,0.818
 WHITEPAPER.md,hy:default_R:tm_bacc,0.809
 WHITEPAPER.md,hy:HYBRID_FINAL:tm_bacc,0.779
-WHITEPAPER.md,@app_state,<block 1205 chars>
+WHITEPAPER.md,@app_state,<block 1243 chars>
 WHITEPAPER.md,v:prereg_commit,3e708fe
 WHITEPAPER.md,v:n_windows_p1,"5,644"
 WHITEPAPER.md,v:majority_share,57.48%
@@ -303,4 +303,4 @@ docs/WRITEUP.md,ab:full/p23:p3_mae,1.457
 docs/WRITEUP.md,b3:train_mean:mae,1.354
 docs/WRITEUP.md,ab:no_openox/p23k:p1_tm_bacc,0.577
 docs/WRITEUP.md,ab:full/p23:p1_tm_bacc,0.739
-docs/WRITEUP.md,@app_state,<block 1205 chars>
+docs/WRITEUP.md,@app_state,<block 1243 chars>

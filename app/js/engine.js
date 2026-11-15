@@ -97,7 +97,7 @@ function respRate(x) {
 }
 
 // ---------- per-window features ----------
-function winFeats(lgR, lgG, lgB, acR, acG, acB, te) {
+function winFeats(lgR, lgG, lgB, acR, acG, acB, te, hrGate) {
   const lgs = [lgR, lgG, lgB];
   const f = {}, s10 = te - 10 * FS, s30 = Math.max(0, te - 30 * FS);
   const a10 = [], a30 = [];
@@ -112,10 +112,15 @@ function winFeats(lgR, lgG, lgB, acR, acG, acB, te) {
   f.pi_R = Math.log(sd[0]); f.pi_G = Math.log(sd[1]); f.pi_B = Math.log(sd[2]);
   const primary = sd[1] > sd[0] * 0.3 ? 1 : 0;
   const chans = [0, 1, 2].map((c) => a30.map((r) => r[c]));
-  const { est, ch } = bestChannelEstimate(chans, primary);
+  // Live acquisition must try an unclipped channel before accepting a red-channel lock.
+  const eligible = hrGate?.harmonicGuard ? chans.map((x, c) => {
+    const clipped = lgs[c].slice(s10, te).filter(v => v >= LOG251).length / (te - s10);
+    return clipped > SAT_MAX ? x.map(() => 0) : x;
+  }) : chans;
+  const { est, ch } = bestChannelEstimate(eligible, primary, FS, hrGate);
   const x = chans[ch].map((v) => -v);
   const fHr = Number.isFinite(est.hr) ? est.hr / 60 : null;
-  const dist = fHr ? Math.max(Math.trunc(FS * 0.33), Math.trunc(0.55 * FS / fHr)) : Math.trunc(FS * 0.33);
+  const dist = fHr ? Math.max(Math.trunc(FS * 0.33), Math.trunc((hrGate?.harmonicGuard ? 0.8 : 0.55) * FS / fHr)) : Math.trunc(FS * 0.33);
   const pk = findPeaks(x, dist, stdp(x) * 0.3);
   let ibi = [];
   if (pk.length >= 6) { for (let i = 1; i < pk.length; i++) { const v = (pk[i] - pk[i - 1]) / FS; if (v > 0.3 && v < 1.6) ibi.push(v); } }
@@ -148,7 +153,7 @@ function lr(m, x) { let z = m.b; for (let i = 0; i < x.length; i++) z += ((x[i] 
 // ---------- streaming chain ----------
 export class Chain {
   constructor(weights, opts = {}) {
-    this.W = weights; this.band = opts.band ?? BAND;
+    this.hrGate = opts.hrGate; this.W = weights; this.band = opts.band ?? BAND;
     this.z = [0, 1, 2].map(() => SOS.map(() => [0, 0]));  // sosfilt state per channel/section
     this.lg = [[], [], []]; this.ac = [[], [], []]; this.n = 0;
     this.last = new Array(FUSION.length).fill(NaN); this.calRows = []; this.calValid = []; this.calHr = []; this.base = null; this.noBase = false;
@@ -170,7 +175,7 @@ export class Chain {
     return this._window(this.n);
   }
   _window(te) {
-    const s = te / FS - WIN, f = winFeats(...this.lg, ...this.ac, te); let v = f._valid;
+    const s = te / FS - WIN, f = winFeats(...this.lg, ...this.ac, te, this.hrGate); let v = f._valid;
     const row = FUSION.map((k, j) => { const val = (v && f[k] !== undefined) ? f[k] : NaN; return Number.isNaN(val) ? this.last[j] : val; });
     this.last = row.slice();                       // causal forward fill (invalid windows contribute nothing)
     const q = { sqi: f._sqi, acf: f._acf, ch: f._ch, sat: f._sat, hrEst: f._hrEst, hrBeat: f._hrBeat, valid: v };

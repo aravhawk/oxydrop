@@ -91,16 +91,17 @@ Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices, userAgen
 globalThis.window = { scrollTo: noop, addEventListener: noop, removeEventListener: noop };
 globalThis.document = document;
 const LOGISTIC_REQ = process.env.FLOW_ENGINE === 'logistic';
-globalThis.location = { search: LOGISTIC_REQ ? '?engine=logistic' : '' };
+globalThis.location = { search: LOGISTIC_REQ ? '?engine=logistic&debug=1' : '?debug=1' };
 const HYBRID_FAIL = process.env.FLOW_HYBRID_FAIL === '1';
 const WORKER_FAIL = process.env.FLOW_WORKER_FAIL === '1';
-if (WORKER_FAIL) {
+if (!LOGISTIC_REQ) {
   // A stand-in module Worker: it starts and reports ready (so the app commits to the worker path), never answers a window, and raises an error event 1 s after the measurement's engine is created.
   globalThis.Worker = class {
     constructor() { this.onmessage = null; this.onerror = null; this.terminated = false; globalThis.__fakeWorker = this; }
     postMessage(m) {
-      if (m.type === 'init') setTimeout(() => this.onmessage && this.onmessage({ data: { type: 'ready', info: { model: 'OxyNet residual CNN', params: 167588, paramsTotal: 502764, alpha: 0.1, thresholds: { normal_below: 0, low_above: 0 } } } }), 20);
-      else if (m.type === 'reset') setTimeout(() => { if (!this.terminated && this.onerror) this.onerror({ message: 'simulated worker crash' }); }, 1000);
+      if (m.type === 'init') setTimeout(() => this.onmessage && this.onmessage({ data: { type: 'ready', info: { model: 'OxyNet residual CNN, 3 seeds', params: 167588, paramsTotal: 502764, alpha: 0.1, thresholds: { normal_below: 0, low_above: 0 } } } }), 20);
+      else if (m.type === 'win') setTimeout(() => { if (!this.terminated && this.onmessage) this.onmessage({ data: { type: 'res', gen: m.gen, id: m.id, h: { calibrating: true } } }); }, 1);
+      else if (WORKER_FAIL && m.type === 'reset') setTimeout(() => { if (!this.terminated && this.onerror) this.onerror({ message: 'simulated worker crash' }); }, 1000);
     }
     terminate() { this.terminated = true; }
   };
@@ -111,6 +112,10 @@ globalThis.fetch = async (url) => {
 };
 
 await import(process.env.FLOW_APP || '../app/js/app.js');
+assert.equal(document.body.children.find(e => e.id === 'capture-debug').hidden, false, '?debug=1 opens overlay');
+await document.body.children.find(e => e.id === 'capture-debug-toggle').click();
+assert.equal(document.body.children.find(e => e.id === 'capture-debug').hidden, true, 'overlay toggle closes it');
+await document.body.children.find(e => e.id === 'capture-debug-toggle').click();
 
 const openTracks = () => log.tracks.filter((t) => !t.stopped).length;
 const fresh = () => { log.gum = []; log.tracks = []; $('setup-live').hidden = true; };

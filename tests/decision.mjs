@@ -62,8 +62,8 @@ const st = (mean, o = {}) => ({ mean, satFrac: 0, spatialCV: 0.05, frames: 30, .
 t('placement: waiting for frames', () => { assert.equal(assessPlacement(null).level, 'warn'); assert.equal(assessPlacement(st([200, 80, 60], { frames: 2 })).level, 'warn'); });
 t('placement: good finger with flash', () => { const p = assessPlacement(st([197, 76, 60]), { torch: true }); assert.equal(p.level, 'good'); assert.equal(p.title, 'Fingertip detected'); });
 t('placement: good finger ambient', () => { assert.equal(assessPlacement(st([140, 50, 35]), { torch: false }).level, 'good'); });
-t('placement: dark with flash', () => { const p = assessPlacement(st([20, 10, 8]), { torch: true }); assert.equal(p.level, 'bad'); assert.equal(p.title, 'Cover the lens AND the flash'); });
-t('placement: dark ambient', () => { assert.equal(assessPlacement(st([20, 10, 8]), { torch: false }).title, 'Too dark'); });
+t('placement: dark with flash', () => { const p = assessPlacement(st([2, 1, 1]), { torch: true }); assert.equal(p.level, 'bad'); assert.equal(p.title, 'Cover the lens AND the flash'); });
+t('placement: dark ambient', () => { assert.equal(assessPlacement(st([2, 1, 1]), { torch: false }).title, 'Too dark'); });
 t('placement: open scene (grey, not finger)', () => { const p = assessPlacement(st([128, 128, 128]), { torch: true }); assert.equal(p.level, 'bad'); assert.equal(p.title, 'Cover the lens AND the flash'); });
 t('placement: saturated', () => { const p = assessPlacement(st([255, 120, 90], { satFrac: 0.6 }), { torch: true }); assert.equal(p.level, 'bad'); assert.equal(p.title, 'Press more lightly (too bright/saturated)'); });
 t('placement: uneven image', () => { assert.equal(assessPlacement(st([197, 76, 60], { spatialCV: 0.5 })).level, 'warn'); });
@@ -86,3 +86,5 @@ t('calibration finger coverage: needs 90% good placement, ignores too few ticks'
 });
 
 console.log(`DECISION PASS (${n} checks)`);
+
+t('placement: dim red tissue passes without a phone-specific brightness floor', () => { assert.equal(assessPlacement(st([20, 3, 1]), { torch: true }).level, 'good'); assert.equal(assessPlacement(st([90, 1, 0]), { torch: true }).level, 'good'); });

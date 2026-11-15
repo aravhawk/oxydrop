@@ -1,7 +1,7 @@
 import { Chain, FS, CAL, WIN } from './engine.js';
 import { CameraSource, Motion, listBackCameras, pickDefault, listCameras, probeCamFactory } from './camera.js';
 import { runProbeLadder, liveQuality, ringState, probeSummary } from './lensprobe.js';
-import { MIN_TRACKABLE_BPM } from './hr.js';
+import { MIN_TRACKABLE_BPM, GATE } from './hr.js';
 import { HybridEngine, loadHybridAssets, ENGINE_ID } from './hybrid_engine.js';
 import { HybridWorker, HybridWorkerEngine, loadHybridLite } from './hybrid_async.js';
 import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, calibrationInterrupt, calibrationFingerReason, STATE, STATE_TEXT, MOTION_MAX, STALL_MS } from './decision.js';
@@ -15,7 +15,7 @@ const CAL_FPS_MIN = 20, CAL_GAPS_MAX = 20, CAL_GAP_S_MAX = 1.5;   // a single fr
 const LOCK_AFTER_MS = 3000;     // fingertip placement must read "good" this long before exposure/white balance/focus are locked
 const UNLOCK_AFTER_MS = 2000;   // in setup, lift the lock again if the placement has been bad this long (the next lock is taken on the new scene)
 const CAL_WARM_S = 20;          // windows starting at s <= 20 still contain the band-pass filter's start-up transient (always invalid, even on a clean signal), so they are not counted
-const PROBE_MAX_LENSES = 4;     // back lenses probed (about 3.7 s each, so the torch probe stays under ~15 s)
+const PROBE_MAX_LENSES = Infinity;     // enumerate and probe every exposed back lens; no model-specific lens count
 const GET_READY_S = 3;          // countdown so the finger is on the plateau before the first probe
 const WEAK_PROMPT_MS = 4000;    // live signal quality must stay in 'reposition' this long before the re-position prompt replaces a reading
 const WEAK_MSG = 'Weak signal: slide your finger so it covers the lens and the flash, press lightly.';
@@ -24,6 +24,7 @@ const RAW_MAX = 15 * 60 * FS;   // raw trace ring buffer: 15 minutes at 30 Hz
 // (the baseline of the evaluation). ?alpha=0.05 sets the conformal level (debug; default is the pre-declared 0.10).
 const QS = new URLSearchParams(location.search);
 const ENGINE_REQ = QS.get('engine') === 'logistic' ? 'logistic' : 'hybrid';
+const CAMERA_HR_GATE = { ...GATE, harmonicGuard: true };
 const ALPHA_REQ = QS.get('alpha') ? Number(QS.get('alpha')) : null;
 let engineUsed = ENGINE_REQ, engineNote = '', hybridLite = null, hybridFull = null, hybridWorker = null, hybridAlpha = null;
 
@@ -46,10 +47,16 @@ $('compat').textContent = hasCam ? '' : 'Camera access is not available in this 
 if (!hasCam) { $('btn-live').disabled = true; $('ack').disabled = true; }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
+let debugVisible = QS.get('debug') === '1';
+const debugToggle = document.createElement('button'); debugToggle.id = 'capture-debug-toggle'; debugToggle.textContent = 'Capture debug'; debugToggle.className = 'capture-debug-toggle';
+const debugPanel = document.createElement('section'); debugPanel.id = 'capture-debug'; debugPanel.className = 'capture-debug'; debugPanel.hidden = !debugVisible;
+const debugPre = document.createElement('pre'); debugPre.id = 'capture-debug-text'; debugPre.textContent = 'Waiting for camera. Cover the light AND the lens; press lightly.';
+debugPanel.appendChild(debugPre); document.body.appendChild(debugPanel); document.body.appendChild(debugToggle);
+debugToggle.addEventListener('click', () => { debugVisible = !debugVisible; debugPanel.hidden = !debugVisible; });
+
 const fetchJson = async (rel) => { const r = await fetch(rel); if (!r.ok) throw new Error(`${rel}: HTTP ${r.status}`); return r.json(); };
 async function loadWeights() { if (!weights) weights = await fetchJson('data/weights.json'); return weights; }
-// Hybrid assets. Live: the CNN runs in a module Web Worker (a CNN pass on a slow phone must not delay camera frames); if no worker can be started the same engine
-// runs in the page thread. Any load failure falls back to the logistic chain and says so in the debug text (never silently).
+// Hybrid assets. Live CNN runs in a module Web Worker; heavy in-page inference is reserved for replay. Any live worker startup failure falls back to the logistic chain and says so in the debug text (never silently).
 async function loadHybrid(needFull) {
   if (ENGINE_REQ !== 'hybrid' || engineUsed !== 'hybrid') return;
   try {
@@ -61,16 +68,16 @@ async function loadHybrid(needFull) {
     if (needFull) { if (!hybridFull) hybridFull = await loadHybridAssets(fetchJson); return; }
     if (!hybridWorker && !hybridFull && typeof Worker !== 'undefined') {
       try { const w = new HybridWorker(new URL('./hybrid_worker.js', import.meta.url), hybridAlpha); await w.ready; hybridWorker = w; hybridWorker.onError = (m) => workerFailed(m); }
-      catch (e) { engineNote += `model worker unavailable (${e && e.message ? e.message : e}); running the model in the page thread. `; }
+      catch (e) { throw new Error(`model worker unavailable (${e && e.message ? e.message : e})`); }
     }
-    if (!hybridWorker && !hybridFull) hybridFull = await loadHybridAssets(fetchJson);
+    if (!hybridWorker) throw new Error('model worker unavailable; capture requires a free page thread');
   } catch (e) { engineUsed = 'logistic'; engineNote = `hybrid model could not be loaded (${e && e.message ? e.message : e}); using the logistic chain. `; }
 }
 // The hybrid model failing must never be silent: the page switched to the logistic chain alone, so the measurement screen says so (text only, no device logic).
 // Two cases: the assets could not be loaded, or the Web Worker errored or stopped answering after it had loaded. Not shown when the chain was asked for on purpose (?engine=logistic).
 const FALLBACK_NOTICE = 'Notice: the neural-network part of the model could not be loaded, so these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
 const WORKER_NOTICE = 'Notice: the neural-network part of the model stopped working, so from now on these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
-const WORKER_STALL_MS = 10000;  // a window the worker has not answered for this long counts as a dead worker (normal latency is 50 to 300 ms)
+const WORKER_STALL_MS = 2000;  // a window the worker has not answered for this long counts as a dead worker (normal latency is 50 to 300 ms)
 let noticeText = FALLBACK_NOTICE;
 function showEngineNotice() {
   const el = $('engine-note'), fell = ENGINE_REQ === 'hybrid' && engineUsed === 'logistic';
@@ -88,12 +95,15 @@ function workerFailed(msg) {
 // a fresh engine for one measurement (calibration restarts get a new one)
 function newMeasureEngine(w) {
   if (engineUsed === 'hybrid' && hybridLite) {
-    if (kind === 'live' && hybridWorker) { const e = new HybridWorkerEngine(hybridLite, hybridWorker, hybridAlpha, (d) => { if (chain === e) dispatchWindow(d); }); return e; }
+    if (kind === 'live' && hybridWorker) { const e = new HybridWorkerEngine(hybridLite, hybridWorker, hybridAlpha, (d) => { if (chain === e) dispatchWindow(d); }, { hrGate: CAMERA_HR_GATE }); return e; }
     if (hybridFull) return new HybridEngine(hybridFull, { alpha: hybridAlpha });
   }
-  return new Chain(w || weights);
+  return new Chain(w || weights, kind === 'live' ? { hrGate: CAMERA_HR_GATE } : {});
 }
-function dispatchWindow(d) { if (mode === 'setup') onSetupWindow(d); else if (mode === 'measure') onWindow(d); }
+function dispatchWindow(d) {
+  // Live HR requires the spectral/ACF/beat consensus; a disagreeing CNN cannot override it.
+  if (kind === 'live' && d.valid && Number.isFinite(d.hrEst) && Number.isFinite(d.hr) && Math.abs(d.hr - d.hrEst) > 5) { d = { ...d, hr: d.hrEst, cameraHrOverride: true }; }
+  if (mode === 'setup') onSetupWindow(d); else if (mode === 'measure') onWindow(d); }
 
 function cleanup() {
   sessionGen++; camGen++; clearInterval(replayTimer); clearInterval(uiTimer); clearTimeout(anywayTimer); uiTimer = null;
@@ -160,15 +170,16 @@ function debugText() {
     L.push(`last frame ${(st.staleMs / 1000).toFixed(1)} s ago  interrupted ${st.interrupted || 'no'}  longest gap in last 30 s ${(cam.rs.gapStats(cam.rs.n - 30 * FS).max * 1000).toFixed(0)} ms`);
     L.push(`lens "${cam.info.lens}"  ${cam.info.width}x${cam.info.height}`);
     if (cam.info.fallback) L.push(`device fallback: ${cam.info.fallback}`);
-    L.push(`torch ${cam.info.torchSupported ? (cam.info.torch ? 'on' : 'off') : 'unsupported'}  locks ${JSON.stringify(cam.info.locks)}`);
+    L.push(`torch ${cam.info.torchState || (cam.info.torchSupported ? (cam.info.torch ? 'on-unverified' : 'off') : 'unsupported')}  locks ${JSON.stringify(cam.info.locks)}`);
     L.push(`mean RGB ${st.mean.map((v) => v.toFixed(1)).join(' / ')}  frame-saturated ${(st.satFrac * 100).toFixed(1)}%  spatialCV ${st.spatialCV.toFixed(3)}  luma ${st.luma.toFixed(1)}`);
-    L.push(`placement ${place.level}: ${place.title}`);
+    L.push(`placement ${place.level}: ${place.title}; near-black maxDC<=3, red ratios R/G=${f2(st.mean[0] / Math.max(st.mean[1], 0.01))} R/B=${f2(st.mean[0] / Math.max(st.mean[2], 0.01))} (need >=1.4); channel saturation ${(st.channelSat || []).map(v => (100*v).toFixed(1)).join('/')}%; ROI ${JSON.stringify(st.roi || 'full')}`);
+    if (st.fullMean) L.push(`full-frame RGB DC ${st.fullMean.map(f2).join('/')} (ROI RGB DC above)`);
     if (cam.info.adapt) L.push(`adaptive exposure: ${cam.info.adapt.result}  luma ${f2(cam.info.adapt.lumaBefore)} -> ${f2(cam.info.adapt.lumaAfter)}  sat ${f4(cam.info.adapt.satAfter)}  applied ${JSON.stringify(cam.info.adapt.applied)}  supported ${(cam.info.adapt.supported || []).join(',') || 'none'}`);
   }
-  L.push(`light mode ${lightMode()}  chosen lens "${chosenLabel || '-'}"${qual ? `  live quality ${qual.level} (score ${qual.score.toFixed(0)}, acdc ${(qual.acdc * 100).toFixed(2)}%, sqi ${f2(qual.sqi)})` : ''}${weakNow ? '  REPOSITION PROMPT SHOWN' : ''}`);
+  L.push(`light mode ${lightMode()}  chosen lens "${chosenLabel || '-'}"${qual ? `  live quality ${qual.level} (score ${qual.score.toFixed(0)}, acdc ${(qual.acdc * 100).toFixed(2)}%, SNR ${f2(qual.snr)}, sqi ${f2(qual.sqi)}, gate ${qual.reason})` : ''}${weakNow ? '  REPOSITION PROMPT SHOWN' : ''}`);
   if (probe) { L.push('lens probe scores (per lens, 0-100, usable >= 35):'); L.push(probeSummary(probe.results, probe.choice)); } else L.push('lens probe: not run');
   if (lastD) {
-    const d = lastD; L.push(`window s=${d.s}  SQI ${f4(d.sqi)}  ACF ${f4(d.acf)}  hrEst ${f2(d.hrEst)}  hrBeat ${f2(d.hrBeat)}  ch ${d.ch}  sat ${f4(d.sat)}  valid ${d.valid}  label ${d.label || 'calibrating'}  p ${f4(d.p)}`);
+    const d = lastD; L.push(`live HR override ${!!d.cameraHrOverride}; window s=${d.s}  SQI ${f4(d.sqi)}  ACF ${f4(d.acf)}  hrEst ${f2(d.hrEst)}  hrBeat ${f2(d.hrBeat)}  ch ${d.ch}  sat ${f4(d.sat)}  valid ${d.valid}  label ${d.label || 'calibrating'}  p ${f4(d.p)}`);
     if (Number.isFinite(d.z)) L.push(`hybrid: chain logit c ${f2(d.c)}  CNN correction ${f2(d.corr)}  z ${f2(d.z)}  CNN HR ${f2(d.cnnHr)}  spectral HR ${f2(d.specHr)}  | EXPERIMENTAL SpO2 from the CNN head (not validated, do not use): ${f2(d.spo2Exp)}`);
     if (lastDecision) L.push(`decision ${lastDecision.state}${lastDecision.reason ? ' (' + lastDecision.reason + ')' : ''}  hr shown ${lastDecision.hr != null ? lastDecision.hr.toFixed(1) : '-'}`);
   } else L.push('no window yet');
@@ -211,7 +222,7 @@ $('btn-cam').addEventListener('click', async () => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function runProbe(gen) {
   $('probe').hidden = false; $('probe-scores').textContent = ''; probe = null; qual = null;
-  const gum = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });   // one grant first: device labels are empty until the camera is allowed
+  const gum = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' } } });   // one grant first: device labels are empty until the camera is allowed
   gum.getTracks().forEach((t) => t.stop());
   const all = await listCameras(), pd = pickDefault(all.back), back = [...all.back].sort((a, b) => (b === pd) - (a === pd)).slice(0, PROBE_MAX_LENSES);
   const say = (t) => { $('probe-text').textContent = t; $('cam-state').textContent = t; if (!$('white').hidden) { $('wm-title').textContent = t; $('wm-msg').textContent = ''; } };
@@ -237,9 +248,9 @@ async function runProbe(gen) {
 async function startCamera(deviceId) {
   const gen = ++camGen;
   if (cam) { cam.stop(); cam = null; }
-  chain = new Chain(weights); resetRecorder(); lockHist = []; lockRun = 0; fingerHist = []; gapLog = []; lastGaps = 0; goodSince = 0; badSince = 0; lockBusy = false; stalledShown = false; place = { level: 'warn', title: 'Looking for your fingertip…', msg: '' };
+  chain = new Chain(weights, { hrGate: CAMERA_HR_GATE }); resetRecorder(); lockHist = []; lockRun = 0; fingerHist = []; gapLog = []; lastGaps = 0; goodSince = 0; badSince = 0; lockBusy = false; stalledShown = false; place = { level: 'warn', title: 'Looking for your fingertip…', msg: '' };
   $('btn-begin').disabled = true; $('btn-begin-anyway').hidden = true; $('q-fill').style.width = '0%'; $('q-text').textContent = 'Signal quality: waiting for a pulse lock';
-  const c = new CameraSource((r, g, b) => { if (gen === camGen) sink(r, g, b); });
+  const c = new CameraSource((r, g, b) => { if (gen === camGen) sink(r, g, b); }, (st) => { if (gen === camGen && mode === 'setup' && st.roiChanged && st.frames > 1) resetSetupChain(); });
   cam = c; weakSince = 0; weakNow = false; weakShown = false; qual = null;
   const front = isFront(); if (front) showWhite(); else hideWhite();
   try { await c.start(document.createElement('video'), { deviceId: front ? null : deviceId, torch: lightMode() === 'flash' ? 'auto' : 'off', facing: front ? 'user' : 'environment' }); }
@@ -271,7 +282,7 @@ document.querySelectorAll('input[name=light]').forEach((r) => r.addEventListener
     return;
   }
   const on = lightMode() !== 'ambient'; await cam.setTorch(on); await cam.unlockExposure(); goodSince = 0; badSince = 0;   // the scene brightness just changed by a large factor: re-lock on the new scene
-  chain = new Chain(weights); lockHist = []; lockRun = 0; $('btn-begin').disabled = true; camStartedAt = performance.now();
+  chain = new Chain(weights, { hrGate: CAMERA_HR_GATE }); lockHist = []; lockRun = 0; $('btn-begin').disabled = true; camStartedAt = performance.now();
   clearTimeout(anywayTimer); $('btn-begin-anyway').hidden = true; anywayTimer = setTimeout(() => { if (mode === 'setup' && $('btn-begin').disabled) $('btn-begin-anyway').hidden = false; }, ANYWAY_AFTER_S * 1000);
   $('cam-state').textContent = on ? (cam.info.torch ? 'Camera on, flash on' : 'Camera on (flash control not available in this browser)') : 'Camera on, flash off (ambient light)';
   renderChecks();
@@ -296,7 +307,7 @@ function liveCtx() {
 function camStalledMs(st) { return st.interrupted ? 1e9 : st.staleMs; }
 function stalledNow() { return kind === 'live' && cam ? camStalledMs(cam.stats) > STALL_MS : false; }
 async function lockWithAdapt(c) { try { await c.tryAdaptExposure(); } catch (e) { /* adaptive exposure is best effort */ } await c.lockExposure(); }
-function resetSetupChain() { chain = new Chain(weights); lockHist = []; lockRun = 0; $('btn-begin').disabled = true; }
+function resetSetupChain() { chain = new Chain(weights, { hrGate: CAMERA_HR_GATE }); lockHist = []; lockRun = 0; $('btn-begin').disabled = true; }
 
 function onSetupWindow(d) {
   lastD = d; lastDecision = null; lastWaveCh = d.ch;
@@ -400,6 +411,7 @@ function watchCalibration(now, stalled) {
 
 function uiTick() {
   tickN++;
+  if (chain && chain.degraded && engineUsed === 'hybrid') workerFailed('model latency exceeded capture budget');
   if (chain && chain.worker && chain.oldestPendingMs && chain.oldestPendingMs() > WORKER_STALL_MS) workerFailed('no answer from the model worker for ' + Math.round(WORKER_STALL_MS / 1000) + ' s');
   if (kind === 'live' && cam) {
     const st = cam.stats, now = performance.now();
@@ -427,7 +439,7 @@ function uiTick() {
     drawWave($('wave'), chain.ac[lastWaveCh].slice(-300));
   }
   const rawCv = mode === 'setup' ? $('raw-setup') : $('raw-measure'); drawRaw(rawCv);
-  if (tickN % 2 === 0) { $(mode === 'setup' ? 'dbg-setup' : 'dbg-measure').textContent = debugText(); }
+  if (tickN % 2 === 0) { const txt = debugText(); $(mode === 'setup' ? 'dbg-setup' : 'dbg-measure').textContent = txt; if (debugVisible) $('capture-debug-text').textContent = txt; }
 }
 
 // Between windows no decision is produced, so a stalled camera would leave the last answer on screen. Force UNSURE and drop the heart-rate tile.

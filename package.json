@@ -6,7 +6,7 @@
     "test:decision": "node tests/decision.mjs",
     "test:e2e": "node tests/e2e/fake_camera.mjs",
     "test:hr": "node tests/hr_parity.mjs",
-    "test:capture": "node tests/capture_sim.mjs",
+    "test:capture": "node tests/capture_sim.mjs && node tests/camera_roi.mjs && node tests/camera_signal.mjs",
     "test:stall": "node tests/stall.mjs",
     "test:lens": "node tests/lensprobe.mjs",
     "test:cnn": "node tests/cnn_parity.mjs",
