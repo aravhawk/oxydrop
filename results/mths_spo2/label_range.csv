@@ -1,0 +1,17 @@
+,value
+n_label_seconds,4646.0
+min,86.0
+p5,93.0
+median,97.0
+max,100.0
+frac_below_95,0.11106328024106758
+frac_below_90,0.010116229014205768
+n_below_90_seconds,47.0
+people_mean_below_95,6.0
+people_mean_below_90,0.0
+people_any_below_95,15.0
+people_any_below_90,4.0
+person_mean_min,91.22950819672131
+person_mean_max,100.0
+sd_between_person_means,1.6763223602878625
+mean_within_person_sd,0.6505828102877266
