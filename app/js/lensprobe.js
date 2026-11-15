@@ -69,7 +69,7 @@ export function scoreSignal(rgb, fs = FS, opts = {}) {
  */
 export async function probeLens(camFactory, target, opts = {}) {
   const sec = opts.sec ?? PROBE_SEC, settle = opts.settleSec ?? SETTLE_SEC, need = Math.round((sec + settle) * FS), settleN = Math.round(settle * FS);
-  const out = { deviceId: target.id ?? null, label: target.label || '', mode: target.mode || 'torch', ok: false, error: '', torchSupported: false, torchOn: false, samples: 0, score: 0, usable: false, reason: '' };
+  const out = { deviceId: target.id ?? null, label: target.label || '', mode: target.mode || 'torch', ok: false, error: '', fallback: '', torchSupported: false, torchOn: false, samples: 0, score: 0, usable: false, reason: '' };
   const buf = []; let satSum = 0, satN = 0, cam = null, started = false, timer = null, poll = null, aborted = false, done;
   const abortNow = () => !!(opts.shouldAbort && opts.shouldAbort());
   const finished = new Promise((r) => { done = r; });
@@ -80,6 +80,7 @@ export async function probeLens(camFactory, target, opts = {}) {
     started = true;
     out.torchSupported = !!(cam.info && cam.info.torchSupported); out.torchOn = !!(cam.info && cam.info.torch);
     if (!out.label && cam.info && cam.info.lens) out.label = cam.info.lens;
+    if (cam.info && cam.info.fallback) { out.fallback = cam.info.fallback; if (cam.info.deviceId) out.deviceId = cam.info.deviceId; }   // the requested id was gone: report the lens that really opened
     if (wantTorch && !out.torchOn) { out.error = out.torchSupported ? 'torch_apply_failed' : 'torch_unsupported'; out.reason = out.error; return out; }
     timer = setTimeout(done, opts.timeoutMs ?? (sec + settle) * 1000 + 3000);
     if (opts.shouldAbort) poll = setInterval(() => { if (abortNow()) { aborted = true; done(); } }, 100);
@@ -120,7 +121,7 @@ const bestOf = (rs, min) => rs.filter((r) => r.ok && r.score >= min).sort((a, b)
 export function chooseMode(results, ctx = {}) {
   const min = ctx.minScore ?? SCORE_MIN, by = (m) => results.filter((r) => r.mode === m);
   const torch = by('torch'), amb = by('ambient'), front = by('front');
-  const scores = results.map((r) => ({ mode: r.mode, deviceId: r.deviceId, label: r.label, score: Math.round(r.score * 10) / 10, acdc: r.acdc, sqi: r.sqi, acf: r.acf, snr: r.snr, sat: r.sat, reason: r.reason || r.error }));
+  const scores = results.map((r) => ({ mode: r.mode, deviceId: r.deviceId, label: r.label, score: Math.round(r.score * 10) / 10, acdc: r.acdc, sqi: r.sqi, acf: r.acf, snr: r.snr, sat: r.sat, reason: r.reason || r.error, fallback: r.fallback || '' }));
   const pack = (r, mode, reason, usable = true) => ({ mode, deviceId: r ? r.deviceId : null, label: r ? r.label : '', score: r ? r.score : 0, usable, reason, scores });
   const t = bestOf(torch, min);
   if (t) return pack(t, 'torch', `Back lens "${t.label || t.deviceId}" had the strongest pulse under the torch (score ${t.score.toFixed(0)}).`);
@@ -186,6 +187,6 @@ export function ringState(mean3, satFrac = 0) {
 
 /** Human readable per-lens probe table for the debug view. */
 export function probeSummary(results, choice) {
-  const rows = results.map((r) => `${r.mode.padEnd(7)} ${(r.label || r.deviceId || '?').slice(0, 28).padEnd(28)} score ${r.score.toFixed(1).padStart(5)}  acdc ${(r.acdc * 100).toFixed(2)}%  sqi ${(r.sqi || 0).toFixed(2)}  acf ${(r.acf || 0).toFixed(2)}  sat ${((r.sat || 0) * 100).toFixed(0)}%  ${r.reason || r.error || ''}`);
+  const rows = results.map((r) => `${r.mode.padEnd(7)} ${(r.label || r.deviceId || '?').slice(0, 28).padEnd(28)} score ${r.score.toFixed(1).padStart(5)}  acdc ${(r.acdc * 100).toFixed(2)}%  sqi ${(r.sqi || 0).toFixed(2)}  acf ${(r.acf || 0).toFixed(2)}  sat ${((r.sat || 0) * 100).toFixed(0)}%  ${r.reason || r.error || ''}${r.fallback ? '  [' + r.fallback + ']' : ''}`);
   return [...rows, choice ? `-> ${choice.mode} ${choice.label || ''}${choice.usable ? '' : ' (nothing reached threshold)'}: ${choice.reason}` : ''].join('\n');
 }

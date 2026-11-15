@@ -1,6 +1,6 @@
 model,coverage,acc,bacc,sens,spec,auc,tm_acc,worst_person,acc_ci
 "v1 TINY (peak-interval HR), every window",1.0,0.8754,0.8733,0.8875,0.8592,0.9475,0.7962,0.812,"[0.844, 0.905]"
-"v2 TINY (robust HR + gate), every window forced to answer (no-lock windows scored with zero deltas)",1.0,0.8053,0.806,0.8012,0.8108,0.869,0.7714,0.4889,"[0.662, 0.899]"
+"v2 TINY (robust HR + gate), every window forced to answer (no-lock windows reuse the last valid features, forward-filled)",1.0,0.8053,0.806,0.8012,0.8108,0.869,0.7714,0.4889,"[0.662, 0.899]"
 "v2, no-lock windows abstain",0.8242,0.8697,0.8543,0.9416,0.767,0.9558,,0.7984,
 "v1, abstain band 0.10",0.8439,0.9391,0.9369,0.9516,0.9222,0.964,,0.8938,
 "v2, no-lock + abstain band 0.10",0.6797,0.9468,0.9375,0.9757,0.8992,0.9707,,0.8924,

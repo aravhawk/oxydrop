@@ -1,14 +1,14 @@
 # SpO2 optics path: ratio-of-ratios on real phone video (negative result, not shipped)
 
-**Outcome:** the optical red/green/blue ratio-of-ratios is **not** a model input in OxyDrop. It failed the decision rule below on Hoffman, and on MTHS it does not predict SpO2 better than predicting the training-set mean. The shipped chain (heart-rate change from your own 60 s baseline, TINY v2) is unchanged. The ratio is computed offline for the experiments only. No JavaScript optics function was added because the debug view does not need one.
+**Outcome:** a separate optical SpO₂ estimator built on the red/green/blue ratio-of-ratios is **not shipped** in OxyDrop. It failed the decision rule below on Hoffman, and on MTHS it does not predict SpO2 better than predicting the training-set mean. **This does not mean ratio features are absent from the model:** the shipped fusion regression takes 19 features, including four ratio-of-ratios features with nonzero coefficients (`ror_RG`, `ror_RB`, `ror_GB`, `ror30_RG`), slopes and DC absorption, so it is not a heart-rate-only classifier (an earlier version of this page said the ratio was not a model input; that was wrong). No JavaScript optics function was added beyond those features because the debug view does not need one.
 
-This page covers three things: the MTHS test (62 people), the Hoffman cross-check (6 people, already computed), and what could not be done (OpenOximetry).
+This page covers three things: the MTHS test (62 people), the Hoffman cross-check (6 people, already computed), and OpenOximetry (access now active; see the last section).
 
 ## Decision rule (fixed before the MTHS run)
 
 Ship the optical ratio as a model input **only if**, in nested person-level leave-one-person-out (LOPO) on Hoffman, a model that uses it beats the shipped TINY v2 on accuracy **and** on time-matched accuracy, with the person-bootstrap 95% confidence interval of each difference excluding zero (lower bound above 0).
 
-Result (`scripts/optics_decision.py`, `results/optics_experiment/decision_rule.csv`): 16 optics variants, all compared with TINY v2 on the same 4,594 windows (evaluated, optics gate passed, v2 pulse locked). **None passes.** Every point estimate for accuracy is below TINY v2 (0.873), and no accuracy lower bound is above zero. The best optics-bearing variants:
+Result (`scripts/optics_decision.py`, `results/optics_experiment/decision_rule.csv`; this is arithmetic on the CSV, not an independent raw-data rerun, because the experiment scripts depend on external `pivot/kit.py` and host paths): 16 optics variants, all compared with TINY v2 on the same 4,594 windows (evaluated, optics gate passed, v2 pulse locked). **None passes.** Every point estimate for accuracy is below TINY v2 (0.873), and no accuracy lower bound is above zero. The best optics-bearing variants:
 
 | Model (nested LOPO, Hoffman) | Accuracy | Time-matched acc | Difference in accuracy vs TINY v2 [95% CI] | Difference in TM acc [95% CI] |
 |---|---|---|---|---|
@@ -66,13 +66,13 @@ Task A, absolute SpO2 from uncalibrated features (MAE in SpO2 points, 95% person
 | Baseline: textbook 110 - 25 R (R = red/blue ratio-of-ratios, uncorrected, clipped to 70-100) | 3.49 [2.51, 4.63] | 0.43 / 0.53 / 0.81 |
 | Baseline: textbook, R = red/green | 6.19 [4.02, 9.00] | 0.36 / 0.42 / 0.53 |
 | HR only | 2.21 | 0.52 / 0.85 / 0.97 |
-| Time in recording only | 2.37 | 0.52 / 0.74 / 0.95 |
+| Time in recording only | 2.36 | 0.52 / 0.74 / 0.95 |
 | DC only | 2.34 | 0.44 / 0.79 / 0.98 |
 | Ratio-of-ratios only | 2.27 | 0.51 / 0.75 / 0.97 |
 | Ridge, optics (RoR + PI + DC + CV) | 2.29 | 0.48 / 0.85 / 0.97 |
 | Ridge, optics + HR | 2.22 | 0.52 / 0.85 / 0.97 |
 | Ridge, optics + HR + calibrated deltas | 2.21 | 0.52 / 0.85 / 0.97 |
-| GBM, optics + HR | 2.28 [1.44, 3.04] | 0.55 / 0.69 / 0.97 |
+| GBM, optics + HR | 2.27 [1.44, 3.04] | 0.55 / 0.69 / 0.97 |
 
 No learned model has a lower MAE than the training-mean baseline (no paired difference to the mean baseline is negative; several intervals are wide because the evaluation set has 20 people). Ridge shrinks to almost the mean (alpha 10^4 to 10^5 chosen in most folds), which is the model saying the features carry no usable signal. The textbook map is worse than predicting the mean by 1.3 points (difference 1.28 [0.40, 2.28]). Its AUROC of 0.79 comes from 3 people and has a wide interval, while its within-person correlation with SpO2 is negative (-0.40), so it is not tracking oxygen inside a person.
 
@@ -117,9 +117,11 @@ From `results/optics_experiment/main_table.csv` (`scripts/optics_experiment.py`)
 * Average of TINY and the optics model: 0.835, below TINY alone (difference in accuracy -0.041).
 * Time-only clock: 0.838 accuracy but 0.519 time-matched; optics models reach 0.51 to 0.79 time-matched versus TINY 0.80.
 
-## OpenOximetry: not available
+## OpenOximetry: now used (aggregates only)
 
-OpenOximetry (phone fingertip video during controlled desaturation, with skin-tone labels) is the dataset that would answer the remaining questions. Access is credentialed (PhysioNet, signed data-use agreement). Our access request was never activated, so **no OpenOximetry data was used anywhere in this project**. Synthetic stand-in files created while waiting were not used as evidence. With the real data we would (1) fit and test the ratio-of-ratios against reference SpO2 across 70% to 100%, which MTHS cannot do, (2) test whether the optical ratio tracks desaturation inside a person, and (3) measure error by skin tone (melanin) on the same protocol. Until then the optical path is not validated and not shipped.
+OpenOximetry (PhysioNet credentialed access, healthy volunteers, staircase hypoxia, arterial-blood-gas SaO2 reference) is a **contact-oximeter** dataset (red/infrared finger-clip PPG at 86 Hz and 2 Hz tables). It is **not phone-camera video**, so it cannot by itself validate the phone ratio-of-ratios. An earlier version of this page said access was never activated and that no OpenOximetry data was used. That is out of date: access is active and the data are used for (1) validation of the heart-rate-rise stage, (2) a large labelled time-matched baseline and a fairness check by skin tone, and (3) later model pretraining (see `python/oxydrop_ml/`). Data governance: only derived aggregates are committed, raw files and per-window arrays are never committed or redistributed (see `DATA_LICENSES.md`). The aggregate tables are on the `openox-results` branch (`results/openoximetry.md`) and are not merged into this page; read them there. The synthetic stand-in files created while waiting were never used as evidence.
+
+What it does not settle: whether a phone camera's optical ratio tracks desaturation inside a person, and error by skin tone for phone video. Until that is measured on phone video the optical estimator is not validated and not shipped.
 
 ## Reproduce
 

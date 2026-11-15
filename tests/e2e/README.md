@@ -6,7 +6,7 @@ python3 tests/e2e/make_fake_video.py bad  fake_bad.y4m      # grey noise, no fin
 npm i playwright-core                                       # or point PLAYWRIGHT_CORE at an existing playwright-core/index.mjs
 CHROME=/path/to/chromium node tests/e2e/fake_camera.mjs     # serves app/ itself on a random local port
 ```
-Set `LIVE_URL=https://aravhawk.github.io/oxydrop/index.html` to run the cases against the deployed site instead of the local copy (the `good` case passed against the live site after the v2 deploy).
+Set `LIVE_URL=https://aravhawk.github.io/oxydrop/index.html` to run the cases against the deployed site instead of the local copy (an earlier note here said the `good` case passed against the live site after the v2 deploy; the review could not reproduce that, the cause was the setup-screen generation-guard bug fixed in this branch, and the live site has to be redeployed from this branch before it is re-run there).
 
 Cases (`CASES=good,bad,replay`, default all):
 * **good**: lens select, ambient/flash toggle, placement reaches "Fingertip detected", Start enables after 3 locked windows, 60 s calibration passes, heart rate 72 +-3, state "Normal vs your baseline", debug CSV download and copy work, zero console errors.
