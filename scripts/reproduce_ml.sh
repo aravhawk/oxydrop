@@ -54,3 +54,7 @@ fi
 if [ "$STAGE" = "core-report" ]; then
   (cd python && "$PY" -m oxydrop_ml.core_report --runs "$RUNS" --out ../results/ml --baselines ../results/ml)
 fi
+if [ "$STAGE" = "core-hybrid" ]; then      # hybrid chain + CNN and BatchNorm adaptation on P1 (needs python/oxydrop for chain19.npy, see stack_run.py docstring)
+  (cd python && "$PY" -m oxydrop_ml.stack_run run --out "$RUNS/stack/s0" --init "$CK/stageB_full.pt" --recipe "$RUNS/recipe.json" --shard "${SHARD:-0/1}"
+   "$PY" -m oxydrop_ml.stack_run report --runs "$RUNS/stack/s0" --out ../results/ml)
+fi

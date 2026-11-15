@@ -241,3 +241,38 @@ def test_win20_concatenates_two_consecutive_windows(world):
     assert not (pool.ds[tr] == 'butppg').any() or True
     o = T.predict(fr.net, pool, rows, fr.norm, hp)
     assert np.isfinite(o['p_low']).all()
+
+
+def test_variants_keep_the_intended_init_and_switches():
+    assert T.variant_hp('no_ssl', init='B.pt').init == 'B.pt'               # regression: no_ssl once silently dropped the stage-B init
+    assert T.variant_hp('no_pretrain', init='B.pt').init is None
+    assert T.variant_hp('no_openox', init='noox.pt').init == 'noox.pt' and not T.variant_hp('no_openox').use_openox
+    assert T.variant_hp('no_aug').aug is False and T.variant_hp('hr_only').w_low == 0 and T.variant_hp('win20').win == 20
+    assert T.variant_hp('no_basecond').base_cond is False and set(T.variant_hp('no_physics').drop_ch) == {4, 5, 6}
+    assert LR.default_init('no_ssl', '/c').endswith('stageB_nossl.pt') and LR.default_init('no_openox', '/c').endswith('ssl_noox.pt') and LR.default_init('full', '/c').endswith('stageB_full.pt')
+
+
+def test_bn_adaptation_changes_only_batchnorm_statistics_and_alpha0_is_identity(world):
+    from oxydrop_ml import stack_run as SR
+    pool = T.Pool(root=world)
+    hp = tiny_hp()
+    net = T.make_net(hp).eval()
+    rows = np.nonzero(pool.ds == 'hoffman')[0][:12]
+    nm = T.Norm.fit(pool, rows, hp, np.random.default_rng(0))
+    assert SR.adapted_copy(net, pool, rows, nm, hp, 0.0) is net
+    ad = SR.adapted_copy(net, pool, rows, nm, hp, 1.0)
+    a, b = net.state_dict(), ad.state_dict()
+    changed = [k for k in a if not torch.equal(a[k], b[k])]
+    assert changed and all(k.endswith(('running_mean', 'running_var', 'num_batches_tracked')) for k in changed)
+    assert not ad.training
+
+
+def test_chain_logit_uses_only_given_rows():
+    from oxydrop_ml import stack_run as SR
+    r = np.random.default_rng(0)
+    X = r.standard_normal((200, 19)); y = (X[:, 0] + 0.5 * r.standard_normal(200) > 0).astype(int)
+    a = SR.chain_logit(X[:150], y[:150], X[150:])
+    X2 = X.copy(); X2[150:] += 5.0                      # changing the test rows does not change the fit, only the scores
+    b = SR.chain_logit(X[:150], y[:150], X2[150:])
+    assert a.shape == (50,) and not np.allclose(a, b)
+    assert np.allclose(SR.chain_logit(X[:150], y[:150], X[150:]), a)

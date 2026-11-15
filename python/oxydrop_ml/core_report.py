@@ -80,6 +80,10 @@ def ablation_row(root, variant, num, label, B=1000, kind='p23k'):
             r[f'{tag}_{suf}'] = agg(per, f'{key}_{suf}')[0]
     for k in ('p1_auroc', 'p2_doubling', 'p2_mae', 'p2_mths', 'p2_but'):
         r[k] = agg(per, k)[0]
+    if variant == 'hr_only':          # the SpO2 and low-oxygen heads are never trained in this variant: P1 and P3 are not defined
+        for k in list(r):
+            if k.startswith(('p1_', 'p3_')) and not k.endswith('protocol'):
+                r[k] = np.nan
     return r
 
 
@@ -108,8 +112,8 @@ def paired_vs_baselines(root, variant, bdir, cache_scores, B=1000):
     rows = []
     for sd in sdirs:
         seed = int(os.path.basename(sd)[1:])
-        p23 = os.path.join(sd, 'p23') if glob.glob(os.path.join(sd, 'p23', 'fold_*.json')) else os.path.join(sd, 'p23k')
-        df, _ = LR.load_run([d for d in (os.path.join(sd, 'p1'), p23) if os.path.isdir(d)])
+        p23 = os.path.join(sd, 'p23')                  # the headline P2/P3 comparison uses true LOSO runs only (grouped folds are never mixed in)
+        df, _ = LR.load_run([d for d in (os.path.join(sd, 'p1'), p23) if _has(d)])
         if df.empty:
             continue
         # ---- P1
@@ -266,6 +270,28 @@ def write_markdown(out, df, pv, runs, bdir):
         L += ['', 'Variant definitions: `no_ssl` = stage B from scratch; `no_physics` = ratio-of-ratios channels, beat_ok and their side features zeroed; `no_openox` = SSL without OpenOx, no stage B, no OpenOx in training; '
               '`no_aug` = no device augmentation; `no_basecond` = baseline-relative inputs and emb_base removed; `hr_only` = only the HR and quality heads are trained (P1 and P3 are then not defined; the untrained SpO2 and '
               'low-oxygen heads are not scored); `win20` = two consecutive 10 s feature windows (20 s of input), BUT clips are 10 s so P2 for this row is MTHS only; `adv` = exploratory gradient-reversal head on dataset id.', '']
+    hp_ = os.path.join(out, 'hybrid_p1.csv')
+    if os.path.exists(hp_):
+        h = pd.read_csv(hp_)
+        L += ['## Hybrid physics + CNN and test-time adaptation on P1 (exploratory, seed 0, `stack_run.py`)', '',
+              'Candidates are fit inside nested CV: for each outer Hoffman person the 5 other people give inner out-of-fold CNN and chain predictions (CNN refit without the outer and the inner person), a logistic meta-learner on [CNN logit, v1 chain logit] is fit on them, '
+              'and the candidate used for the outer person is the one with the best leave-one-inner-person-out time-matched balanced accuracy. `cnn_bnA`: BatchNorm statistics re-estimated on the person\'s own first-minute windows, blended by A %. '
+              '`chain` is the FEAT-005 v1 chain refit with the same folds (it reproduces 0.796). The last row is the inner-CV choice, the others are descriptive.', '',
+              '| candidate | TM bal. acc [95% CI] | TM AUROC | per-person mean ± SD | plain bal. acc | plain AUROC |', '|---|---|---|---|---|---|']
+        for _, r in h.iterrows():
+            L.append(f"| {r.candidate} | {fmt(r.tm_bacc)} [{fmt(r.lo)}, {fmt(r.hi)}] | {fmt(r.tm_auroc)} | {fmt(r.per_person_mean)} ± {fmt(r.per_person_sd)} | {fmt(r.bacc)} | {fmt(r.auroc)} |")
+        L.append('')
+    mp = os.path.join(out, 'ssl_manifest.json')
+    if os.path.exists(mp):
+        m = json.load(open(mp))
+        sf, pr = m.get('ssl_full', {}), m.get('linear_probe_hr', {})
+        L += ['## Self-supervised pretraining', '',
+              f"* SimCLR-style contrastive pretraining, {sf.get('steps')} steps, batch {sf.get('bs')}, {sf.get('rows'):,} windows from {sf.get('subjects')} people (sources {sf.get('sources')}); NT-Xent loss {sf.get('first_loss', float('nan')):.2f} -> {sf.get('last_loss', float('nan')):.2f}, top-1 positive retrieval {sf.get('last_top1', float('nan')):.2f}. "
+              f"Checkpoint SHA-256 `{sf.get('sha256')}`. No-OpenOx variant: loss {m.get('ssl_noox', {}).get('last_loss', float('nan')):.2f}. Loss curves: `ssl_loss_curve_full.csv`, `ssl_loss_curve_noox.csv`."]
+        if pr:
+            L.append(f"* Linear-probe sanity check (frozen 64-d embedding, ridge, fit on MTHS+BUT windows, tested on {pr.get('n_test')} Hoffman windows; nobody shared): HR MAE {pr['ssl']['mae']:.1f} bpm (within-5 {pr['ssl']['within5']:.2f}) "
+                     f"versus random-init encoder {pr['random_init']['mae']:.1f} ({pr['random_init']['within5']:.2f}) and train-mean {pr['train_mean']['mae']:.1f} ({pr['train_mean']['within5']:.2f}).")
+        L.append('')
     L.append(NOTES)
     ext = os.path.join(out, 'CORE_RESULTS_extra.md')
     if os.path.exists(ext):
