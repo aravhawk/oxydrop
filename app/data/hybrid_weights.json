@@ -29,7 +29,9 @@
   "p": "mean over p-members of lowox_logit",
   "d": "mean over d-members of lowox_logit",
   "corr": "mean over R-members of lowox_logit (the residual correction)",
-  "r": "c + corr"
+  "corrL": "mean over L-members (frozen backbone) of lowox_logit",
+  "r": "c + corr",
+  "rL": "c + corrL"
  },
  "chain": {
   "models": [
@@ -281,9 +283,11 @@
    "P": 0.7731653271125646,
    "D": 0.7490447089672498,
    "R": 0.8179160684472753,
+   "L": 0.753835007642445,
    "c+p": 0.7903106022094573,
    "c+d": 0.7837495196604022,
    "c+corr": 0.7836386382660797,
+   "c+corrL": 0.7991866911316727,
    "all": 0.7678127791755224
   },
   "cal_on_cv": 0.8100507922637997,

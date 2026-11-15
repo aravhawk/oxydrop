@@ -12,21 +12,25 @@ CNN seeds used: 0,1,2. Recipe, selection rule and candidate set are in Amendment
 * Best pre-registered baseline `chain_v1`: 0.796. Paired difference hybrid minus baseline -0.017 [-0.103, 0.069]: **tie**.
 * Same inner-fold selection restricted to the chain (a recalibrated chain, matched levers): 0.816 [0.674, 0.869]; the hybrid minus this control is -0.037 [-0.119, 0.028] (tie).
 * Hybrid minus the plain CNN (`P`, default levers, same seeds): -0.002 [-0.058, 0.060] (tie).
+* **Exploratory extension** (Amendment 4, frozen-backbone residual family `L` added to the candidates after the first results): `HYBRID_FINAL_EXT` 0.766 [0.638, 0.822], per-person mean 0.634 +- 0.100; minus `chain_v1`: -0.031 [-0.117, 0.066] (tie).
 
 ## P1 table: hybrid, controls and candidates (outer LOSO, selection on inner folds only)
 
 | model | TM bacc [95% CI] | per-person mean +- SD | min / max | TM AUROC | sens / spec (TM) |
 |---|---|---|---|---|---|
 | HYBRID_FINAL | 0.779 [0.638, 0.831] | 0.635 +- 0.102 | 0.517 / 0.766 | 0.859 | 0.746 / 0.812 |
+| HYBRID_FINAL_EXT | 0.766 [0.638, 0.822] | 0.634 +- 0.100 | 0.517 / 0.766 | 0.840 | 0.718 / 0.813 |
 | CHAIN_SAME_LEVERS | 0.816 [0.674, 0.869] | 0.685 +- 0.142 | 0.515 / 0.885 | 0.897 | 0.805 / 0.826 |
 | CHAIN_SHIPPED | 0.796 [0.636, 0.857] | 0.666 +- 0.153 | 0.458 / 0.889 | 0.887 | 0.813 / 0.780 |
 | default_chain_platt | 0.816 [0.674, 0.869] | 0.685 +- 0.142 | 0.515 / 0.885 | 0.897 | 0.805 / 0.826 |
 | default_P | 0.781 [0.632, 0.827] | 0.669 +- 0.081 | 0.594 / 0.774 | 0.835 | 0.776 / 0.785 |
 | default_D | 0.744 [0.601, 0.791] | 0.645 +- 0.090 | 0.526 / 0.765 | 0.817 | 0.770 / 0.717 |
 | default_R | 0.809 [0.644, 0.863] | 0.671 +- 0.088 | 0.517 / 0.766 | 0.882 | 0.809 / 0.810 |
+| default_L | 0.754 [0.589, 0.804] | 0.619 +- 0.097 | 0.526 / 0.794 | 0.850 | 0.827 / 0.681 |
 | default_c+p | 0.786 [0.623, 0.830] | 0.642 +- 0.108 | 0.497 / 0.772 | 0.883 | 0.749 / 0.822 |
 | default_c+d | 0.778 [0.616, 0.818] | 0.633 +- 0.114 | 0.461 / 0.756 | 0.881 | 0.754 / 0.803 |
 | default_c+corr | 0.787 [0.618, 0.831] | 0.637 +- 0.109 | 0.497 / 0.773 | 0.881 | 0.743 / 0.831 |
+| default_c+corrL | 0.796 [0.628, 0.848] | 0.661 +- 0.123 | 0.515 / 0.812 | 0.886 | 0.750 / 0.843 |
 | default_all | 0.766 [0.621, 0.798] | 0.657 +- 0.089 | 0.520 / 0.748 | 0.866 | 0.768 / 0.763 |
 
 `HYBRID_FINAL` is the pipeline chosen per outer person by the declared rule; `CHAIN_SAME_LEVERS` applies the same rule to the chain only; `CHAIN_SHIPPED` is the baseline as shipped (raw chain logit, threshold 0); `default_*` rows are the candidates at default levers (no calibration, k = 1), exploratory, never used for selection.
@@ -36,9 +40,12 @@ CNN seeds used: 0,1,2. Recipe, selection rule and candidate set are in Amendment
 | model | hof_100001 | hof_100002 | hof_100003 | hof_100004 | hof_100005 | hof_100006 |
 |---|---|---|---|---|---|---|
 | HYBRID_FINAL | 0.594 | 0.517 | 0.656 | 0.766 | 0.735 | 0.539 |
+| HYBRID_FINAL_EXT | 0.594 | 0.517 | 0.656 | 0.766 | 0.728 | 0.545 |
 | CHAIN_SAME_LEVERS | 0.885 | 0.515 | 0.661 | 0.774 | 0.735 | 0.539 |
 | CHAIN_SHIPPED | 0.889 | 0.458 | 0.660 | 0.711 | 0.737 | 0.539 |
 | default_P | 0.594 | 0.610 | 0.671 | 0.605 | 0.759 | 0.774 |
+| default_R | 0.636 | 0.517 | 0.671 | 0.766 | 0.737 | 0.697 |
+| default_L | 0.602 | 0.526 | 0.595 | 0.544 | 0.794 | 0.654 |
 
 ## Paired comparison with every baseline (P1)
 
@@ -61,6 +68,21 @@ Difference = model minus baseline, paired person-level bootstrap on the same win
 | HYBRID_FINAL | lgbm_fusion19_v1 | 0.779 | 0.743 | 0.036 [-0.090, 0.158] | tie |
 | HYBRID_FINAL | lgbm_fusion19_v2 | 0.779 | 0.738 | 0.041 [-0.054, 0.114] | tie |
 | HYBRID_FINAL | lgbm_hand26_cal | 0.779 | 0.647 | 0.132 [-0.028, 0.236] | tie |
+| HYBRID_FINAL_EXT | clock | 0.766 | 0.495 | 0.271 [0.130, 0.341] | better than a weaker baseline (not a pre-registered win) |
+| HYBRID_FINAL_EXT | ror_textbook_RB | 0.766 | 0.535 | 0.231 [0.107, 0.294] | better than a weaker baseline (not a pre-registered win) |
+| HYBRID_FINAL_EXT | ror_calibrated_RB | 0.766 | 0.503 | 0.263 [0.110, 0.417] | better than a weaker baseline (not a pre-registered win) |
+| HYBRID_FINAL_EXT | ror_textbook_RG | 0.766 | 0.498 | 0.268 [0.144, 0.319] | better than a weaker baseline (not a pre-registered win) |
+| HYBRID_FINAL_EXT | ror_calibrated_RG | 0.766 | 0.612 | 0.153 [0.073, 0.269] | better than a weaker baseline (not a pre-registered win) |
+| HYBRID_FINAL_EXT | chain_v1 (best) | 0.766 | 0.796 | -0.031 [-0.117, 0.066] | tie |
+| HYBRID_FINAL_EXT | chain_v1_nestedC | 0.766 | 0.786 | -0.021 [-0.101, 0.069] | tie |
+| HYBRID_FINAL_EXT | chain_v2 | 0.766 | 0.772 | -0.006 [-0.069, 0.087] | tie |
+| HYBRID_FINAL_EXT | chain_v2_nestedC | 0.766 | 0.759 | 0.007 [-0.053, 0.087] | tie |
+| HYBRID_FINAL_EXT | xgb_fusion19_v1 | 0.766 | 0.736 | 0.029 [-0.104, 0.167] | tie |
+| HYBRID_FINAL_EXT | xgb_fusion19_v2 | 0.766 | 0.763 | 0.003 [-0.092, 0.081] | tie |
+| HYBRID_FINAL_EXT | xgb_hand26_cal | 0.766 | 0.655 | 0.110 [-0.040, 0.234] | tie |
+| HYBRID_FINAL_EXT | lgbm_fusion19_v1 | 0.766 | 0.743 | 0.022 [-0.106, 0.154] | tie |
+| HYBRID_FINAL_EXT | lgbm_fusion19_v2 | 0.766 | 0.738 | 0.028 [-0.067, 0.102] | tie |
+| HYBRID_FINAL_EXT | lgbm_hand26_cal | 0.766 | 0.647 | 0.118 [-0.033, 0.221] | tie |
 | CHAIN_SAME_LEVERS | clock | 0.816 | 0.495 | 0.321 [0.163, 0.376] | better than a weaker baseline (not a pre-registered win) |
 | CHAIN_SAME_LEVERS | ror_textbook_RB | 0.816 | 0.535 | 0.281 [0.139, 0.369] | better than a weaker baseline (not a pre-registered win) |
 | CHAIN_SAME_LEVERS | ror_calibrated_RB | 0.816 | 0.503 | 0.313 [0.126, 0.444] | better than a weaker baseline (not a pre-registered win) |
@@ -78,8 +100,12 @@ Difference = model minus baseline, paired person-level bootstrap on the same win
 | CHAIN_SAME_LEVERS | lgbm_hand26_cal | 0.816 | 0.647 | 0.168 [0.040, 0.269] | better than a weaker baseline (not a pre-registered win) |
 | HYBRID_FINAL | CHAIN_SAME_LEVERS | 0.779 | 0.816 | -0.037 [-0.119, 0.028] | tie |
 | HYBRID_FINAL | P_alone_default | 0.779 | 0.781 | -0.002 [-0.058, 0.060] | tie |
+| HYBRID_FINAL_EXT | CHAIN_SAME_LEVERS | 0.766 | 0.816 | -0.050 [-0.129, 0.024] | tie |
+| HYBRID_FINAL_EXT | HYBRID_FINAL | 0.766 | 0.779 | -0.014 [-0.020, 0.000] | tie |
 
 ### Inner-fold selection, per outer person
+
+`HYBRID_FINAL`
 
 | held-out person | source | per-user calibration | k windows | inner CV TM bacc |
 |---|---|---|---|---|
@@ -92,6 +118,19 @@ Difference = model minus baseline, paired person-level bootstrap on the same win
 
 Sources chosen: R x3, c+p x2, P x1. Calibration on: 1 of 6 folds. k windows: 1 x5, 6 x1.
 
+`HYBRID_FINAL_EXT`
+
+| held-out person | source | per-user calibration | k windows | inner CV TM bacc |
+|---|---|---|---|---|
+| hof_100001 | P | False | 1 | 0.769 |
+| hof_100002 | R | False | 1 | 0.789 |
+| hof_100003 | R | True | 6 | 0.865 |
+| hof_100004 | R | False | 1 | 0.785 |
+| hof_100005 | c+corrL | False | 1 | 0.745 |
+| hof_100006 | c+corrL | False | 1 | 0.766 |
+
+Sources chosen: R x3, c+corrL x2, P x1. Calibration on: 1 of 6 folds. k windows: 1 x5, 6 x1.
+
 ### Train-vs-test gap (P1)
 
 Like with like (Amendment 1, item 5). *Per person*: mean over the 5 training people of their own time-matched balanced accuracy (fold pipeline, outer CNN fit, in-sample logits) minus the held-out person's, mean +- SD over the 6 folds (bootstrap CI over folds). *Pooled*: training people pooled vs the pooled held-out windows. *Selection optimism*: inner-CV score used by the selection minus the pooled held-out score. Positive = optimistic.
@@ -99,6 +138,7 @@ Like with like (Amendment 1, item 5). *Per person*: mean over the 5 training peo
 | model | train, per person | held-out, per person | gap, per person | train, pooled | held-out, pooled | gap, pooled | inner CV (mean +- SD) | selection optimism |
 |---|---|---|---|---|---|---|---|---|
 | HYBRID_FINAL | 0.727 | 0.635 | 0.093 +- 0.121 [0.009, 0.180] | 0.855 | 0.779 | 0.076 | 0.779 +- 0.049 | -0.000 |
+| HYBRID_FINAL_EXT | 0.717 | 0.634 | 0.083 +- 0.118 [0.004, 0.163] | 0.846 | 0.766 | 0.080 | 0.787 +- 0.041 | 0.021 |
 | CHAIN_SAME_LEVERS | 0.689 | 0.685 | 0.004 +- 0.172 [-0.117, 0.124] | 0.834 | 0.816 | 0.019 | 0.777 +- 0.033 | -0.038 |
 
 ### Single seeds, seed ensemble and fold ensemble (exploratory, default levers)
@@ -108,27 +148,34 @@ Like with like (Amendment 1, item 5). *Per person*: mean over the 5 training peo
 | P | 0 | 0.752 | 0.694 +- 0.071 |
 | D | 0 | 0.748 | 0.685 +- 0.097 |
 | R | 0 | 0.797 | 0.693 +- 0.085 |
+| L | 0 | 0.752 | 0.623 +- 0.099 |
 | c+p | 0 | 0.796 | 0.653 +- 0.102 |
 | c+d | 0 | 0.795 | 0.653 +- 0.109 |
 | c+corr | 0 | 0.803 | 0.647 +- 0.119 |
+| c+corrL | 0 | 0.801 | 0.670 +- 0.120 |
 | all | 0 | 0.789 | 0.651 +- 0.108 |
 | P | 1 | 0.773 | 0.583 +- 0.118 |
 | D | 1 | 0.743 | 0.566 +- 0.134 |
 | R | 1 | 0.818 | 0.650 +- 0.100 |
+| L | 1 | 0.753 | 0.607 +- 0.104 |
 | c+p | 1 | 0.766 | 0.621 +- 0.104 |
 | c+d | 1 | 0.763 | 0.627 +- 0.100 |
 | c+corr | 1 | 0.763 | 0.622 +- 0.109 |
+| c+corrL | 1 | 0.791 | 0.659 +- 0.115 |
 | all | 1 | 0.724 | 0.618 +- 0.096 |
 | P | 2 | 0.766 | 0.652 +- 0.070 |
 | D | 2 | 0.745 | 0.655 +- 0.073 |
 | R | 2 | 0.794 | 0.667 +- 0.094 |
+| L | 2 | 0.754 | 0.619 +- 0.098 |
 | c+p | 2 | 0.794 | 0.643 +- 0.113 |
 | c+d | 2 | 0.784 | 0.642 +- 0.107 |
 | c+corr | 2 | 0.787 | 0.646 +- 0.105 |
+| c+corrL | 2 | 0.804 | 0.675 +- 0.142 |
 | all | 2 | 0.770 | 0.641 +- 0.101 |
 | P | ensemble | 0.781 | 0.669 +- 0.081 |
 | D | ensemble | 0.744 | 0.645 +- 0.090 |
 | R | ensemble | 0.809 | 0.671 +- 0.088 |
+| L | ensemble | 0.754 | 0.619 +- 0.097 |
 | c+p | ensemble | 0.786 | 0.642 +- 0.108 |
 | P+fold_ensemble | ensemble | 0.769 | 0.669 +- 0.077 |
 
@@ -170,6 +217,14 @@ Every candidate x per-user calibration x k. `inner CV` is the mean over folds of
 | R | on | 6 | 0.804 | 0.656 +- 0.092 | 0.770 |
 | R | on | 11 | 0.800 | 0.642 +- 0.080 | 0.769 |
 | R | on | 21 | 0.760 | 0.565 +- 0.040 | 0.746 |
+| L | off | 1 | 0.754 | 0.619 +- 0.097 | 0.739 |
+| L | off | 6 | 0.750 | 0.626 +- 0.123 | 0.735 |
+| L | off | 11 | 0.750 | 0.628 +- 0.131 | 0.734 |
+| L | off | 21 | 0.725 | 0.590 +- 0.107 | 0.717 |
+| L | on | 1 | 0.754 | 0.616 +- 0.107 | 0.736 |
+| L | on | 6 | 0.753 | 0.617 +- 0.123 | 0.733 |
+| L | on | 11 | 0.747 | 0.623 +- 0.126 | 0.729 |
+| L | on | 21 | 0.722 | 0.580 +- 0.096 | 0.717 |
 | c+p | off | 1 | 0.786 | 0.642 +- 0.108 | 0.760 |
 | c+p | off | 6 | 0.780 | 0.629 +- 0.108 | 0.757 |
 | c+p | off | 11 | 0.778 | 0.631 +- 0.111 | 0.755 |
@@ -194,6 +249,14 @@ Every candidate x per-user calibration x k. `inner CV` is the mean over folds of
 | c+corr | on | 6 | 0.779 | 0.617 +- 0.121 | 0.748 |
 | c+corr | on | 11 | 0.774 | 0.616 +- 0.100 | 0.746 |
 | c+corr | on | 21 | 0.751 | 0.571 +- 0.064 | 0.726 |
+| c+corrL | off | 1 | 0.796 | 0.661 +- 0.123 | 0.756 |
+| c+corrL | off | 6 | 0.792 | 0.647 +- 0.114 | 0.750 |
+| c+corrL | off | 11 | 0.786 | 0.624 +- 0.125 | 0.745 |
+| c+corrL | off | 21 | 0.749 | 0.561 +- 0.082 | 0.722 |
+| c+corrL | on | 1 | 0.785 | 0.631 +- 0.114 | 0.752 |
+| c+corrL | on | 6 | 0.780 | 0.617 +- 0.126 | 0.746 |
+| c+corrL | on | 11 | 0.774 | 0.606 +- 0.117 | 0.738 |
+| c+corrL | on | 21 | 0.742 | 0.559 +- 0.076 | 0.712 |
 | all | off | 1 | 0.766 | 0.657 +- 0.089 | 0.749 |
 | all | off | 6 | 0.764 | 0.648 +- 0.117 | 0.744 |
 | all | off | 11 | 0.759 | 0.642 +- 0.118 | 0.739 |
@@ -267,7 +330,13 @@ Final HR rule chosen on Hoffman inner out-of-fold windows only (the P2 people ne
 * P1: the hybrid is a **tie** with the best baseline (`chain_v1`) by the pre-registered rule: 0.779 vs 0.796, difference -0.017 [-0.103, 0.069].
 * P1 control: re-fitting the chain's threshold on inner folds (`CHAIN_SAME_LEVERS`) reaches 0.816; the hybrid minus that control is -0.037 [-0.119, 0.028] (tie). The CNN is kept in the inference path by design (Amendment 2), not because it wins.
 * P2: rule `agree` reaches 0.480 against 0.419 for the best baseline `v2_spectral_acf__forced`: difference 0.061 [0.013, 0.107] (win). The Hoffman people alone would choose `spec` (see the rule table), the CNN-containing rule is the declared headline (Amendment 3, forking path disclosed).
+* Why `default_P` differs from the FEAT-006 raw seed ensemble in `CORE_RESULTS.md`: here every CNN logit passes through the logistic meta-learner fit on the inner out-of-fold windows (a per-fold recalibration of the threshold and scale); FEAT-006 used the raw probability at 0.5. Both are leave-one-person-out.
 * No hybrid result here is validated on a phone that is not in the Hoffman, MTHS or BUT PPG data; every interval is wide because P1 has six people.
+
+## Deployed pipeline
+
+Choosing by the same inner-fold rule on the six out-of-fold tables gives source `R` (features r), per-user calibration off, k = 1 window(s), inner-CV TM balanced accuracy 0.818; ensemble members: R seed 0, R seed 1, R seed 2 (2.7 MB of weights).
+The nested estimate of this deployed *procedure* is the `HYBRID_FINAL` row above (0.779). The row `default_R` (0.809) is the same pipeline looked at after the fact on the outer folds: it is not an unbiased estimate, because the pipeline was chosen with all six people in view.
 
 #
 #

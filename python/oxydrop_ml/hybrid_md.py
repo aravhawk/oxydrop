@@ -196,7 +196,16 @@ def main(argv=None):
     L += [f'* P1: the hybrid is a **{bp.verdict}** with the best baseline (`{bp.baseline}`) by the pre-registered rule: {f3(fin.tm_bacc)} vs {f3(bp.baseline_tm_bacc)}, difference {f3(bp["diff"])} {ci(bp.lo, bp.hi)}.',
           f'* P1 control: re-fitting the chain\'s threshold on inner folds (`CHAIN_SAME_LEVERS`) reaches {f3(cl.tm_bacc)}; the hybrid minus that control is {f3(pc["diff"])} {ci(pc.lo, pc.hi)} ({pc.verdict}). The CNN is kept in the inference path by design (Amendment 2), not because it wins.',
           f'* P2: rule `{rule}` reaches {f3(ab.model_within5)} against {f3(ab.baseline_within5)} for the best baseline `{ab.baseline}`: difference {f3(ab["diff"])} {ci(ab.lo, ab.hi)} ({ab.verdict}). The Hoffman people alone would choose `spec` (see the rule table), the CNN-containing rule is the declared headline (Amendment 3, forking path disclosed).',
+          '* Why `default_P` differs from the FEAT-006 raw seed ensemble in `CORE_RESULTS.md`: here every CNN logit passes through the logistic meta-learner fit on the inner out-of-fold windows (a per-fold recalibration of the threshold and scale); FEAT-006 used the raw probability at 0.5. Both are leave-one-person-out.',
           '* No hybrid result here is validated on a phone that is not in the Hoffman, MTHS or BUT PPG data; every interval is wide because P1 has six people.', '']
+    wp = os.path.join(R, '..', '..', 'app', 'data', 'hybrid_weights.json')
+    if os.path.exists(wp):
+        dj = json.load(open(wp))
+        pl = dj['pipeline']
+        dflt = p1[p1.model == f'default_{pl["source"]}']
+        L += ['## Deployed pipeline', '',
+              f'Choosing by the same inner-fold rule on the six out-of-fold tables gives source `{pl["source"]}` (features {", ".join(pl["features"])}), per-user calibration {"on" if pl["calibration"] else "off"}, k = {pl["aggregate_windows"]} window(s), inner-CV TM balanced accuracy {f3(pl["inner_cv_tm_bacc"])}; ensemble members: {", ".join(f"{m["family"]} seed {m["seed"]}" for m in dj["members"])} ({sum(m.get("bytes", 0) for m in dj["members"]) / 1e6:.1f} MB of weights).',
+              (f'The nested estimate of this deployed *procedure* is the `HYBRID_FINAL` row above ({f3(fin.tm_bacc)}). The row `default_{pl["source"]}` ({f3(dflt.tm_bacc.iloc[0])}) is the same pipeline looked at after the fact on the outer folds: it is not an unbiased estimate, because the pipeline was chosen with all six people in view.' if len(dflt) else ''), '']
     L += STATIC
     open(os.path.join(R, f'HYBRID{t}.md'), 'w').write('\n'.join(L) + '\n')
     print('wrote', os.path.join(R, f'HYBRID{t}.md'))
