@@ -44,6 +44,18 @@ None of the components is new. The contribution is the evaluation: every selecti
 * Data and protocol: Hoffman et al., Smartphone camera oximetry in an induced hypoxemia study, npj Digital Medicine 5:146, 2022 (UW Hoffman data, MIT licence).
 * Not claimed: a device-agnostic-augmentation novelty (FEAT-006 found it within noise), phone SpO2 accuracy, or any result on a phone outside the training and evaluation data. Android phones and iPhone models that are not in the data are an untested limitation. The three team iPhones are a held-out sanity check after the fact, never a tuning set.
 
+## Files
+
+| file | content |
+|---|---|
+| `hybrid_p1_final.csv` | P1 summary per model: pooled TM balanced accuracy, person-bootstrap CI, per-person mean/SD/min/max, one column per held-out person |
+| `hybrid_p1_final_paired.csv` | paired person-bootstrap differences to every baseline, to the same-lever chain control and to the plain CNN |
+| `hybrid_p1_final_choices.csv` | per outer person: the pipeline chosen from inner folds and every inner-CV score of the selection steps |
+| `hybrid_p1_final_grid.csv`, `hybrid_p1_final_seeds.csv`, `hybrid_p1_final_gap.csv` | exploratory grid of candidates x calibration x k, single seeds / ensembles, train-vs-test gaps |
+| `hybrid_p2.csv`, `hybrid_p2_paired.csv`, `hybrid_p2_rules.csv` | P2 HR tables, paired differences, Hoffman rule-selection table |
+| `scores/hybrid_final_hoffman.csv` | per-window out-of-fold scores of the final hybrid on the 5,644 Hoffman windows (for conformal calibration): `logit` (> 0 = possible low oxygen), `prob` = sigmoid(logit) (class balanced, not prevalence calibrated), the components `chain_logit`, `cnn_logit`, `distilled_logit`, `residual_corr`, the chosen `source`, `cal`, `k` |
+| `scores/hybrid_final_butppg.csv` | per-window final HR of the 3,840 BUT PPG windows: `hr_ref`, `hr_cnn`, `hr_spec`, `spec_gate_ok`, `hr_final`, `cnn_sqi`, `rule`. MTHS rows are written to the cache only (licence) |
+
 ## Export for the app: `app/data/hybrid_weights.json`
 
 Written by `python -m oxydrop_ml.export_hybrid` (format `oxydrop-hybrid-v1`):

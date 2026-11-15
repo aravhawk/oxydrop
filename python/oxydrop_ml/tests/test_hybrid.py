@@ -229,3 +229,20 @@ def test_deploy_pipeline_is_chosen_by_the_same_rule_on_the_stacked_outer_tables(
     ch, cols, f, oof = EH.deploy_pipeline(w, order=['P', 'c+p'])
     assert ch['source'] in ('P', 'c+p') and cols == H.CANDS[ch['source']]
     assert len(f.params['coef']) == len(cols) and set(oof.inner) == set(w.subject)
+
+
+def test_load_runs_counts_a_job_once_and_wide_averages_seeds(tmp_path):
+    def job(seed, shift):
+        return pd.DataFrame(dict(outer='o', inner='q', target='inner', family='P', seed=seed, subject='q', rec='qL', local=[1, 2], t_start=[60., 62.], low=[0., 1.],
+                                 eval=True, in_base=False, hr_ref=60., logit=np.array([1., -1.]) + shift, hr=[60., 61.], hr_argmax=[60., 61.], p_sqi=[.5, .5], best_step=100))
+    for d in ('a', 'b'):                                                     # the same job finished in two run directories
+        for s in (0, 1):
+            p = tmp_path / d / f'P_s{s}'
+            p.mkdir(parents=True)
+            job(s, 0.0 if s == 0 else 2.0).to_csv(p / 'inner_o_q.csv', index=False)
+    runs, counts = H.load_runs([str(tmp_path / 'a'), str(tmp_path / 'b')], families=('P',), seeds=(0, 1), require_complete=False)
+    assert counts == {('P', 0): 1, ('P', 1): 1} and len(runs) == 4
+    w = H.wide(runs)
+    assert len(w) == 2 and np.allclose(w.p.values, [2.0, 0.0])               # mean of the two seeds: (1 + 3) / 2 and (-1 + 1) / 2
+    with pytest.raises(RuntimeError):
+        H.load_runs([str(tmp_path / 'a')], families=('P',), seeds=(0,))        # 36 job files are required by default
