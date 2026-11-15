@@ -1,4 +1,4 @@
-const V = 'oxydrop-v3.5-ui';
+const V = 'oxydrop-v3.5.1-ui';
 // everything the hybrid needs offline: the page, the engines, the CNN worker, the three CNN seed files, the physics-chain/meta/conformal parameters and the replay demo
 const ASSETS = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon.svg',
   'js/app.js', 'js/ui.js', 'js/decision.js', 'js/camera.js', 'js/resample.js', 'js/engine.js', 'js/engine_v1.js', 'js/hr.js', 'js/lensprobe.js',

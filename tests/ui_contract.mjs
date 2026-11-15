@@ -99,6 +99,8 @@ for (const id of ['debug-setup', 'debug-measure']) {
 }
 check(html.includes('data-dl') && html.includes('data-copy'), 'the raw-trace download and debug-copy buttons must stay');
 check(css.includes('.capture-debug') && css.includes('.capture-debug-toggle'), 'the ?debug=1 capture overlay must still be styled');
+// the floating toggle must not be dimmed with opacity: that fades its label below 4.5:1 as well
+check(!/\.capture-debug-toggle\{[^}]*opacity:/.test(css), 'the capture-debug toggle must not use opacity to look quiet');
 ok('both debug views are present, collapsed by default, and the ?debug=1 overlay is styled');
 
 // ----------------------------------------------------------------- 5. accessibility invariants of the new UI
