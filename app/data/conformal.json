@@ -1,0 +1,151 @@
+{
+ "format": "oxydrop-conformal-v1",
+ "not_a_medical_device": true,
+ "description": "Class-conditional (Mondrian) split-conformal thresholds on the decision logit z of the hybrid pipeline in hybrid_weights.json. Parameters only.",
+ "score": "z = decision logit of the pipeline (z > 0 = possible low oxygen); app/js computes it from hybrid_weights.json",
+ "method": "mondrian split conformal, nonconformity 1 - p_y, finite-sample quantile ceil((n + 1)(1 - alpha)) / n per class, in the logit domain",
+ "states": {
+  "NORMAL": "Normal vs your baseline",
+  "LOW": "Possible low oxygen: re-check with a pulse oximeter",
+  "UNSURE": "Unsure, re-measure"
+ },
+ "rule": {
+  "contains_normal": "z <= t0",
+  "contains_low": "z >= t1",
+  "normal": "contains_normal and not contains_low",
+  "possible_low_oxygen": "contains_low and not contains_normal",
+  "unsure": "otherwise (both or neither), re-measure",
+  "shortcut": "normal if z < normal_below, possible low oxygen if z > low_above, unsure in between (equality has probability zero); past_crossing = true means alpha is so large that the middle band holds empty sets, not used"
+ },
+ "default_alpha": 0.1,
+ "alphas": {
+  "0.02": {
+   "t0": 3.9495784510991534,
+   "t1": -2.2585667059187102,
+   "normal_below": -2.2585667059187102,
+   "low_above": 3.9495784510991534,
+   "past_crossing": false
+  },
+  "0.05": {
+   "t0": 1.5299421985003447,
+   "t1": -1.5554372510739054,
+   "normal_below": -1.5554372510739054,
+   "low_above": 1.5299421985003447,
+   "past_crossing": false
+  },
+  "0.10": {
+   "t0": 0.389431721484113,
+   "t1": -0.9653109532046704,
+   "normal_below": -0.9653109532046704,
+   "low_above": 0.389431721484113,
+   "past_crossing": false
+  },
+  "0.15": {
+   "t0": -0.28124476813429045,
+   "t1": -0.5127209922119331,
+   "normal_below": -0.5127209922119331,
+   "low_above": -0.28124476813429045,
+   "past_crossing": false
+  },
+  "0.20": {
+   "t0": -0.5806057813335175,
+   "t1": -0.14177627623927802,
+   "normal_below": -0.5806057813335175,
+   "low_above": -0.14177627623927802,
+   "past_crossing": true
+  }
+ },
+ "calibration": {
+  "source": "out-of-fold logits of the deployed pipeline on all six Hoffman people (scores/conformal_deployed_oof_hoffman.csv), leave-one-person-out meta-learner",
+  "n_people": 6,
+  "n_windows": 5644,
+  "n_normal": 2400,
+  "n_hypoxic": 3244,
+  "min_t_start_s": 60.0
+ },
+ "pipeline": {
+  "source": "R",
+  "features": [
+   "r"
+  ],
+  "calibration": false,
+  "aggregate_windows": 1,
+  "meta_intercept": 0.9401707021349072,
+  "meta_coef": [
+   3.235827469397979
+  ]
+ },
+ "examples": [
+  {
+   "z": -6.0,
+   "state": {
+    "0.02": "NORMAL",
+    "0.05": "NORMAL",
+    "0.10": "NORMAL",
+    "0.15": "NORMAL",
+    "0.20": "NORMAL"
+   }
+  },
+  {
+   "z": -2.0,
+   "state": {
+    "0.02": "UNSURE",
+    "0.05": "NORMAL",
+    "0.10": "NORMAL",
+    "0.15": "NORMAL",
+    "0.20": "NORMAL"
+   }
+  },
+  {
+   "z": -0.5,
+   "state": {
+    "0.02": "UNSURE",
+    "0.05": "UNSURE",
+    "0.10": "UNSURE",
+    "0.15": "UNSURE",
+    "0.20": "UNSURE"
+   }
+  },
+  {
+   "z": 0.0,
+   "state": {
+    "0.02": "UNSURE",
+    "0.05": "UNSURE",
+    "0.10": "UNSURE",
+    "0.15": "LOW",
+    "0.20": "LOW"
+   }
+  },
+  {
+   "z": 0.5,
+   "state": {
+    "0.02": "UNSURE",
+    "0.05": "UNSURE",
+    "0.10": "LOW",
+    "0.15": "LOW",
+    "0.20": "LOW"
+   }
+  },
+  {
+   "z": 2.0,
+   "state": {
+    "0.02": "UNSURE",
+    "0.05": "LOW",
+    "0.10": "LOW",
+    "0.15": "LOW",
+    "0.20": "LOW"
+   }
+  },
+  {
+   "z": 6.0,
+   "state": {
+    "0.02": "LOW",
+    "0.05": "LOW",
+    "0.10": "LOW",
+    "0.15": "LOW",
+    "0.20": "LOW"
+   }
+  }
+ ],
+ "limits": "Fit on six people with the Hoffman phones; windows overlap and people differ, so the coverage guarantee is approximate (see results/ml/CONFORMAL.md for the nested evaluation). Other phones are untested."
+}

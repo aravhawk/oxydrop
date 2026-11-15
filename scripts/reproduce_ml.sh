@@ -81,3 +81,28 @@ fi
 if [ "$STAGE" = "hybrid-export" ]; then
   (cd python && "$PY" -m oxydrop_ml.export_hybrid --runs "$HYB" --seeds 0 1 2 --final-dir "$HYBF" --out-dir ../app/data --fixture ../tests/fixtures/hybrid_ref.json)
 fi
+
+# ===================================================================================================== FEAT-007: conformal 3-state output, OpenOx SaO2 test, HR voting
+# Pre-registration: python/oxydrop_ml/amendments/AMENDMENT_5_conformal_openox.md. Stages (STAGE=...):
+#   conformal-test    unit tests of the conformal method, the nested protocol and the committed results (CSV only, seconds)
+#   conformal-calib   scores/conformal_inputs_hoffman.csv + scores/conformal_deployed_oof_hoffman.csv from the FEAT-008 run tables (HYB dirs; host, seconds)
+#   conformal         the nested evaluation (conformal_*.csv), app/data/conformal.json and CONFORMAL.md from the score CSVs (about 5 minutes, B = 2000)
+#   openox-up         Daytona sandbox with the OpenOx shard (credentialed data: Daytona only, never Kaggle, never git), checkpoints and code
+#   openox-run        infer + analyze on the sandbox (background jobs; pull results/ml/openox_spo2_*.csv with scripts/ml_daytona.py pull --path runs/aggregates)
+#   openox-report     OPENOX_SPO2.md from the committed aggregates
+#   hr-vote           HR voting on BUT PPG and MTHS (hr_vote_*.csv, HR_VOTE.md; MTHS rows stay in the cache, licence)
+HYB=${HYB:-$OXY_CACHE_DIR/runs/hyb_A,$OXY_CACHE_DIR/runs/hyb_B}
+if [ "$STAGE" = "conformal-test" ]; then (cd python && "$PY" -m pytest oxydrop_ml/tests/test_conformal.py oxydrop_ml/tests/test_openox_spo2.py oxydrop_ml/tests/test_hr_vote.py -q); fi
+if [ "$STAGE" = "conformal-calib" ]; then
+  (cd python && "$PY" -m oxydrop_ml.conformal calib --runs "$OXY_CACHE_DIR/runs/hyb_A" --seeds 0 1 2 --res ../results/ml && "$PY" -m oxydrop_ml.export_conformal oof --runs "$HYB" --seeds 0 1 2 --res ../results/ml)
+fi
+if [ "$STAGE" = "conformal" ]; then
+  (cd python && "$PY" -m oxydrop_ml.conformal run --res ../results/ml && "$PY" -m oxydrop_ml.export_conformal build --res ../results/ml --out ../app/data/conformal.json && "$PY" -m oxydrop_ml.conformal report --res ../results/ml)
+fi
+if [ "$STAGE" = "openox-up" ]; then "$PY" scripts/openox_daytona.py up --tag "${TAG:-oxs}" --disk 4; fi
+if [ "$STAGE" = "openox-run" ]; then
+  "$PY" scripts/ml_daytona.py bg --tag "${TAG:-oxs}" --name infer -- python -m oxydrop_ml.openox_spo2 infer --ckpt-dir ../ckpt --out ../runs/openox_spo2
+  echo "when 'tail --name infer' shows EXIT 0 run:  python scripts/ml_daytona.py bg --tag ${TAG:-oxs} --name analyze -- python -m oxydrop_ml.openox_spo2 analyze --out ../runs/openox_spo2 --res ../runs/aggregates"
+fi
+if [ "$STAGE" = "openox-report" ]; then (cd python && "$PY" -m oxydrop_ml.openox_spo2 report --res ../results/ml); fi
+if [ "$STAGE" = "hr-vote" ]; then (cd python && "$PY" -m oxydrop_ml.hr_vote run --res ../results/ml && "$PY" -m oxydrop_ml.hr_vote report --res ../results/ml); fi
