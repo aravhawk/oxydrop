@@ -1,6 +1,6 @@
-"""FEAT-008 fits: the CNN families P (plain), R (residual on the chain logit) and D (chain distillation) for the nested P1 protocol, and the report.
+"""FEAT-008 fits: the CNN families P (plain), R (residual on the chain logit), D (chain distillation) and L (frozen-backbone residual, Amendment 4) for the nested P1 protocol, and the report.
 
-    python -m oxydrop_ml.hybrid_run run --families P R D --seeds 0 1 2 --out RUNS/hyb --init ckpt/stageB_full.pt --recipe recipe.json [--shard i/n] [--threads 1]
+    python -m oxydrop_ml.hybrid_run run --families P R D L --seeds 0 1 2 --out RUNS/hyb --init ckpt/stageB_full.pt --recipe recipe.json [--shard i/n] [--threads 1]
     python -m oxydrop_ml.hybrid_run final --families P R --seeds 0 1 2 --out RUNS/hyb_final --init ckpt/stageB_full.pt --recipe recipe.json     # all-people fits for the app
     python -m oxydrop_ml.hybrid_run report --runs RUNS/hyb --out results/ml           (see hybrid.py; heavy part is the bootstrap)
 
@@ -142,7 +142,7 @@ def main(argv=None):
     f.add_argument('--data', default=None)
     p = sp.add_parser('report')
     p.add_argument('--runs', required=True); p.add_argument('--out', required=True); p.add_argument('--B', type=int, default=2000)
-    p.add_argument('--seeds', nargs='+', type=int, default=None); p.add_argument('--tag', default=''); p.add_argument('--families', nargs='+', default=['P', 'R', 'D'])
+    p.add_argument('--seeds', nargs='+', type=int, default=None); p.add_argument('--tag', default=''); p.add_argument('--families', nargs='+', default=['P', 'R', 'D', 'L'])
     a = ap.parse_args(argv)
     if a.cmd == 'run':
         if a.threads:
