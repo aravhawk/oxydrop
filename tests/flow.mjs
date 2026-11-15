@@ -19,12 +19,14 @@ const els = new Map(); let lightValue = 'flash';
 class El {
   constructor(id = '') {
     this.id = id; this.textContent = ''; this.hidden = false; this.disabled = false; this.value = ''; this.width = 600; this.height = 120; this.children = []; this.style = {};
-    this.handlers = {}; this.classList = { toggle() {}, add() {}, remove() {} }; this.className = ''; this.selectedOptions = []; this._html = '';
+    this.isConnected = false; this.parentNode = null; this.handlers = {}; this.classList = { toggle() {}, add() {}, remove() {} }; this.className = ''; this.selectedOptions = []; this._html = '';
   }
   addEventListener(type, fn) { (this.handlers[type] ||= []).push(fn); }
   removeEventListener() {}
-  appendChild(c) { this.children.push(c); return c; }
-  remove() {}
+  appendChild(c) { this.children.push(c); c.isConnected = true; c.parentNode = this; return c; }
+  remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this); this.isConnected = false; this.parentNode = null; }
+  setAttribute(name, value) { this[name] = value; }
+  removeAttribute(name) { delete this[name]; }
   getContext() { return ctx; }
   set innerHTML(v) { this._html = v; if (v === '') this.children = []; }
   get innerHTML() { return this._html; }
@@ -45,10 +47,11 @@ function frame() {
 }
 pulseAt = (t) => { const x = 2 * Math.PI * 1.2 * t, w = Math.sin(x) + 0.5 * Math.sin(2 * x + 1); if (fingerOff) return [128, 128, 128]; return [200 * (1 + 0.006 * w), 80 * (1 + 0.010 * w), 60 * (1 + 0.008 * w)]; };
 
-class FakeVideo {
-  constructor() { this.videoWidth = 640; this.videoHeight = 480; this.srcObject = null; this.n = 0; }
+class FakeVideo extends El {
+  constructor() { super('video'); this.videoWidth = 640; this.videoHeight = 480; this.readyState = 4; this.currentTime = 0; this.srcObject = null; this.n = 0; }
   async play() {}
-  requestVideoFrameCallback(cb) { return setTimeout(() => { const t = performance.now(); cb(t, { captureTime: t, presentedFrames: ++this.n }); }, 33); }
+  cancelVideoFrameCallback(id) { clearTimeout(id); }
+  requestVideoFrameCallback(cb) { return setTimeout(() => { const t = performance.now(); this.currentTime += 1 / 30; cb(t, { captureTime: t, mediaTime: this.currentTime, presentedFrames: ++this.n }); }, 33); }
 }
 const document = {
   hidden: false, body: new El('body'),
@@ -90,6 +93,8 @@ const mediaDevices = {
 Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices, userAgent: 'node-flow-test' }, configurable: true });
 globalThis.window = { scrollTo: noop, addEventListener: noop, removeEventListener: noop };
 globalThis.document = document;
+globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 const LOGISTIC_REQ = process.env.FLOW_ENGINE === 'logistic';
 globalThis.location = { search: LOGISTIC_REQ ? '?engine=logistic&debug=1' : '?debug=1' };
 const HYBRID_FAIL = process.env.FLOW_HYBRID_FAIL === '1';

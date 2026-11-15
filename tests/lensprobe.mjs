@@ -108,7 +108,7 @@ await t('probe picks the strongest-pulse lens, not the default wide lens; each s
   assert.equal(res.find((r) => r.deviceId === 't').usable, false, 'noise-only lens rejected');
   assert.equal(res.find((r) => r.deviceId === 'm').reason, 'saturated');
   assert.ok(res.find((r) => r.deviceId === 'm').score < res.find((r) => r.deviceId === 'w').score, 'saturated lens ranks below the clean one');
-  assert.ok(res.every((r) => r.samples === Math.round((PROBE_SEC + SETTLE_SEC) * FS)), 'each probe collects 0.5 s settle + 1.5 s acquisition');
+  assert.ok(res.every((r) => r.samples === Math.round((PROBE_SEC + SETTLE_SEC) * FS)), 'each probe collects the complete settled acquisition budget');
   assert.equal(st.maxOpen, 1, 'never two streams open at once'); assert.equal(st.open, 0, 'everything released'); assert.deepEqual(st.opened, ['w', 'u', 't', 'm']);
   assert.ok(st.torchApplied.every(([, on]) => on), 'torch requested for torch probes');
   const c = chooseMode(res); assert.equal(c.mode, 'torch'); assert.equal(c.deviceId, 'u'); assert.ok(c.usable); assert.equal(c.scores.length, 4);
@@ -219,7 +219,7 @@ await t('cancelling mid-probe stops the ladder, releases the stream and never sh
   assert.ok(out.results.length < 4 + 1); assert.ok(!calls.includes('before'), 'white overlay never shown after cancel');
 });
 await t('an abort set before the overlay hook runs still pairs afterFront', async () => {
-  const dev = DEVICES.map((d) => (/front/i.test(d.label) ? d : { ...d, p: { torch: { level: 130, amp: 0.0, noise: 1.5 }, ambient: d.p.ambient } })), calls = []; let abort = false;
+  const dev = DEVICES.map((d) => (/front/i.test(d.label) ? d : { ...d, p: { torch: { level: 130, amp: 0.0, noise: 0 }, ambient: d.p.ambient } })), calls = []; let abort = false;
   mockNavigator({ devices: dev, torchMode: 'ok' });
   const out = await runProbeLadder(fakeCamFactory(), { back: backTargets(dev), front: true }, { ...FAST, shouldAbort: () => abort, beforeFront: async () => { calls.push('before'); abort = true; }, afterFront: async () => { calls.push('after'); } });
   assert.ok(out.cancelled); assert.deepEqual(calls, ['before', 'after']);
