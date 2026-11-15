@@ -134,7 +134,7 @@ def main(argv=None):
     f.add_argument('--data', default=None)
     p = sp.add_parser('report')
     p.add_argument('--runs', required=True); p.add_argument('--out', required=True); p.add_argument('--B', type=int, default=2000)
-    p.add_argument('--seeds', nargs='+', type=int, default=None); p.add_argument('--tag', default='')
+    p.add_argument('--seeds', nargs='+', type=int, default=None); p.add_argument('--tag', default=''); p.add_argument('--families', nargs='+', default=['P', 'R', 'D'])
     a = ap.parse_args(argv)
     if a.cmd == 'run':
         if a.threads:

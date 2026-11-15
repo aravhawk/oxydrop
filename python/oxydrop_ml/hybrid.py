@@ -380,7 +380,7 @@ def report_cli(a):
     seeds = a.seeds or [0]
     out = a.out
     os.makedirs(os.path.join(out, 'scores'), exist_ok=True)
-    runs, counts = load_runs(runs_dirs, seeds=seeds)
+    runs, counts = load_runs(runs_dirs, families=tuple(a.families), seeds=seeds)
     print('job files per (family, seed):', counts, flush=True)
     base = pd.read_csv(os.path.join(out, 'scores', 'baseline_P1_hoffman.csv'))
     bname, bvals = best_baseline(base)
@@ -413,13 +413,14 @@ def report_cli(a):
     srows = []
     meta, X19 = hoffman_meta()
     for s in seeds:
-        r1, _ = load_runs(runs_dirs, seeds=[s])
-        F1 = folds(add_chain(wide(r1), meta, X19, None))
-        for nm in ('P', 'D', 'R', 'c+p', 'c+d', 'c+corr', 'all'):
+        r1, _ = load_runs(runs_dirs, families=tuple(a.families), seeds=[s])
+        w1 = add_chain(wide(r1), meta, X19, None)
+        F1 = folds(w1)
+        for nm in [n for n in ('P', 'D', 'R', 'c+p', 'c+d', 'c+corr', 'all') if has_cols(w1, n)]:
             fr, _, _ = run_pipeline_over_folds(F1, [nm], fixed=(nm, False, 1))
             srows.append(dict(seed=s, **summarize(fr, B=0, name=nm)))
     Fall = folds(res['w'])
-    for nm in ('P', 'D', 'R', 'c+p'):
+    for nm in [n for n in ('P', 'D', 'R', 'c+p') if has_cols(res['w'], n)]:
         fr, _, _ = run_pipeline_over_folds(Fall, [nm], fixed=(nm, False, 1))
         srows.append(dict(seed=-1, **summarize(fr, B=0, name=nm)))
     fe = fold_ensemble_scores(Fall, 'P')
@@ -427,3 +428,29 @@ def report_cli(a):
     pd.DataFrame(srows).to_csv(os.path.join(out, f'hybrid_p1_seeds{tag}.csv'), index=False)
     print(final[['model', 'tm_bacc', 'ci_lo', 'ci_hi', 'fold_mean', 'fold_sd', 'tm_auroc']].round(3).to_string())
     print(res['final_choices'][['outer', 'source', 'cal', 'k', 'inner_cv']].to_string())
+    p2_report(a, runs, out, tag)
+
+
+def p2_report(a, runs, out, tag):
+    """P2 part of the report (hybrid_hr.py): Hoffman rule table, BUT PPG + MTHS tables with CIs, paired tables, final per-window HR scores."""
+    from . import hybrid_hr as HH
+    from .baselines import hr_est as HE
+    cache = os.environ.get('OXY_CACHE', os.path.dirname(DATA_DIR))
+    cache_scores = os.path.join(cache, 'scores')
+    z = np.load(os.path.join(cache, 'baselines', 'hr_raw_hoffman_6004.npz'))
+    spec, valid = HE.select({k: z[k] for k in z.files}, *HE.SHIPPED_GATE)
+    rules = HH.hoffman_rule_table(runs, spec, valid)
+    rules.to_csv(os.path.join(out, f'hybrid_p2_rules{tag}.csv'), index=False)
+    rule = rules.rule[rules.selected].iloc[0]
+    fr = HH.load_p2_inputs(out, cache_scores)
+    tab, pairs, best = HH.p2_tables(fr, rule, B=a.B)
+    tab.to_csv(os.path.join(out, f'hybrid_p2{tag}.csv'), index=False)
+    pairs.to_csv(os.path.join(out, f'hybrid_p2_paired{tag}.csv'), index=False)
+    fr['hr_final'] = HH.apply_rule(rule, fr.cnn.values, fr.spec.values, fr.valid.values)
+    cols = ['subject', 'rec', 't_start', 'hr_ref', 'cnn', 'spec', 'valid', 'hr_final', 'p_sqi']
+    f2 = fr[cols].rename(columns={'cnn': 'hr_cnn', 'spec': 'hr_spec', 'valid': 'spec_gate_ok', 'p_sqi': 'cnn_sqi'}).assign(rule=rule)
+    f2[fr.ds.values == 'butppg'].to_csv(os.path.join(out, 'scores', f'hybrid_final{tag}_butppg.csv'), index=False)
+    os.makedirs(cache_scores, exist_ok=True)
+    f2[fr.ds.values == 'mths'].to_csv(os.path.join(cache_scores, f'hybrid_final{tag}_mths.csv'), index=False)     # licence: MTHS rows stay in the cache
+    print('P2 rule', rule, 'best baseline', best)
+    print(tab[tab.model.isin([f'HYBRID_{rule}', 'cnn_alone', best])].round(3).to_string())

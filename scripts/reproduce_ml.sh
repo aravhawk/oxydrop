@@ -58,3 +58,26 @@ if [ "$STAGE" = "core-hybrid" ]; then      # hybrid chain + CNN and BatchNorm ad
   (cd python && "$PY" -m oxydrop_ml.stack_run run --out "$RUNS/stack/s0" --init "$CK/stageB_full.pt" --recipe "$RUNS/recipe.json" --shard "${SHARD:-0/1}"
    "$PY" -m oxydrop_ml.stack_run report --runs "$RUNS/stack/s0" --out ../results/ml)
 fi
+
+# ===================================================================================================== FEAT-008: physics-informed hybrid (chain + CNN)
+# Pre-registration: python/oxydrop_ml/amendments/AMENDMENT_2_hybrid.md (+ AMENDMENT_3_hybrid_hr.md). Families P (plain), R (residual on the chain logit), D (chain distillation),
+# 3 seeds, 36 fits each (6 outer + 30 inner), about one minute per fit on one Daytona vCPU. HYB=<runs dir(s), comma separated> (outside git), HYBF=<final checkpoints dir>.
+#   hybrid-test     unit tests of the hybrid (no leakage, selection uses the inner table only)
+#   hybrid-fit      the nested fits (shardable: SHARD=i/n; run several workers on one runs dir, finished jobs are skipped)
+#   hybrid-final    the all-people fits of the families for the app (needs no outer fold)
+#   hybrid-report   results/ml/hybrid_*.csv, scores/hybrid_final_{hoffman,butppg}.csv, HYBRID.md
+#   hybrid-export   app/data/hybrid_weights.json + member weight files + tests/fixtures/hybrid_ref.json
+HYB=${HYB:-$OXY_CACHE_DIR/runs/hyb}; HYBF=${HYBF:-$OXY_CACHE_DIR/runs/hyb_final}
+if [ "$STAGE" = "hybrid-test" ]; then (cd python && "$PY" -m pytest oxydrop_ml/tests/test_hybrid.py -q); fi
+if [ "$STAGE" = "hybrid-fit" ]; then
+  (cd python && "$PY" -m oxydrop_ml.hybrid_run run --families P R D --seeds 0 1 2 --out "$HYB" --init "$CK/stageB_full.pt" --recipe "$RUNS/recipe.json" --shard "${SHARD:-0/1}" --threads 1)
+fi
+if [ "$STAGE" = "hybrid-final" ]; then
+  (cd python && "$PY" -m oxydrop_ml.hybrid_run final --families P R D --seeds 0 1 2 --out "$HYBF" --init "$CK/stageB_full.pt" --recipe "$RUNS/recipe.json" --threads 1)
+fi
+if [ "$STAGE" = "hybrid-report" ]; then
+  (cd python && "$PY" -m oxydrop_ml.hybrid_run report --runs "$HYB" --out ../results/ml --seeds 0 1 2 --B 2000 && "$PY" -m oxydrop_ml.hybrid_md --res ../results/ml)
+fi
+if [ "$STAGE" = "hybrid-export" ]; then
+  (cd python && "$PY" -m oxydrop_ml.export_hybrid --runs "$HYB" --seeds 0 1 2 --final-dir "$HYBF" --out-dir ../app/data --fixture ../tests/fixtures/hybrid_ref.json)
+fi
