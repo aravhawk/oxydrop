@@ -1,7 +1,7 @@
-const V = 'oxydrop-v3.4-ios-frames';
+const V = 'oxydrop-v3.5-ui';
 // everything the hybrid needs offline: the page, the engines, the CNN worker, the three CNN seed files, the physics-chain/meta/conformal parameters and the replay demo
 const ASSETS = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon.svg',
-  'js/app.js', 'js/decision.js', 'js/camera.js', 'js/resample.js', 'js/engine.js', 'js/engine_v1.js', 'js/hr.js', 'js/lensprobe.js',
+  'js/app.js', 'js/ui.js', 'js/decision.js', 'js/camera.js', 'js/resample.js', 'js/engine.js', 'js/engine_v1.js', 'js/hr.js', 'js/lensprobe.js',
   'js/hybrid_engine.js', 'js/hybrid_async.js', 'js/hybrid_worker.js', 'js/cnn.js', 'js/cnn_features.js',
   'data/weights.json', 'data/hybrid_weights.json', 'data/conformal.json', 'data/hybrid_R_s0.json', 'data/hybrid_R_s1.json', 'data/hybrid_R_s2.json',
   'data/replay/100001L.json', 'data/replay/100001L.bin', 'data/replay/100004R.json', 'data/replay/100004R.bin'];
