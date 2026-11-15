@@ -50,7 +50,11 @@ def load_runs(dirs, families=('P', 'R', 'D'), seeds=(0,), require_complete=True)
     frames, counts = [], {}
     for fam in families:
         for s in seeds:
-            files = sorted(f for d in dirs for f in glob.glob(os.path.join(d, f'{fam}_s{s}', '*.csv')))
+            byname = {}
+            for d in dirs:                               # a job finished in several run directories counts once (the first directory wins)
+                for f in sorted(glob.glob(os.path.join(d, f'{fam}_s{s}', '*.csv'))):
+                    byname.setdefault(os.path.basename(f), f)
+            files = [byname[k] for k in sorted(byname)]
             counts[(fam, s)] = len(files)
             if files:
                 frames.append(pd.concat([pd.read_csv(f) for f in files], ignore_index=True))
