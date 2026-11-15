@@ -19,7 +19,7 @@ People with COVID-19, COPD, asthma or at altitude who own a phone but no pulse o
 
 ## 3. Architecture and parameters
 
-`python/oxydrop_ml/model.py` (specification: `python/oxydrop_ml/MODEL_SPEC.md`). **Parameters: {{v:params}}** shipped (budget 300,000, asserted in a test); about 11.6 million multiply-adds per window; one member's JSON is {{v:member_kb}} (three seed members {{v:members_mb}}) and the ONNX interoperability file is {{v:onnx_kb}}. A single forward pass takes about 17 to 18 ms per 10 s window in Node on a development laptop (feature construction 0.2 to 1 ms); the hybrid runs three members, so about three times that. Phone-class latency: **PENDING**, measured in `results/ml/DEPLOY.md` by the app-integration branch.
+`python/oxydrop_ml/model.py` (specification: `python/oxydrop_ml/MODEL_SPEC.md`). **Parameters: {{v:params}}** shipped (budget 300,000, asserted in a test); about 11.6 million multiply-adds per window; one member's JSON is {{v:member_kb}} (three seed members {{v:members_mb}}) and the ONNX interoperability file is {{v:onnx_kb}}. A single forward pass takes {{v:deploy_fwd_ms}} ms per 10 s window in Node on a development laptop (feature construction 0.2 to 1 ms) and a full hybrid window (v2 quality chain, v1 chain, features, three forward passes, combiner) {{v:deploy_win_ms}} (`results/ml/DEPLOY.md`, laptop numbers). Phones are slower by an unmeasured factor; the app prints the real latency per window in its debug view, so every phone test gives one. The three seed files are {{v:deploy_mb}} together.
 
 | Stage | Detail |
 |---|---|
@@ -91,7 +91,7 @@ Inner-fold selection of the deployed pipeline per held-out person (Amendment 2; 
 
 {{@selection}}
 
-### 8.2 Accuracy versus coverage and abstention
+### 8.2 Accuracy versus coverage and abstention (descriptive, confidence ranking)
 
 {{@matched_coverage}}
 
@@ -101,7 +101,13 @@ The v1 shipped band answers {{v:v1_cov}} of windows at {{v:v1_acc_band}} accurac
 
 ### 8.3 Calibration and conformal 3-state output
 
-{{@conformal}}
+The nested conformal result below supersedes the descriptive ranking above where the two differ: it fixes the cutoffs from other people only.
+
+{{@conformal_full}}
+
+![Conformal output](docs/figures/ml_conformal.png)
+
+**Reading.** The hybrid does not beat v1 at matched coverage ({{cm:final/v1/conformal_mondrian|d}} points at v1's coverage, {{cm:final/v2/conformal_mondrian|d}} at v2's; both intervals contain zero). The same conformal step on the v1 chain reads {{cm:chain_v1/v1/conformal_mondrian:acc|pct}} at v1's coverage and {{cm:chain_v1/v2/conformal_mondrian:acc|pct}} at v2's: the loss comes from the hybrid score, not from the conformal step. At alpha = 0.10 the hybrid alerts {{cf:final/0.1:alert_share_all|pct}} of all hypoxic windows and calls {{cf:final/0.1:confident_miss|pct}} of them Normal (target 10%). Set coverage holds approximately pooled and fails per person: person 1 has {{cpp:final/0.1/hof_100001:confident_miss|pct}} of its hypoxic windows called Normal. The thresholds shipped in the app (`app/data/conformal.json`) are fit on all six people and are therefore in-sample on the replay demo.
 
 ### 8.4 P2: heart rate
 
@@ -111,7 +117,7 @@ The v1 shipped band answers {{v:v1_cov}} of windows at {{v:v1_acc_band}} accurac
 
 Rule selection on the Hoffman inner folds (6 people disjoint from every P2 test person): `spec` {{hr:spec:within5_full}}, `agree` {{hr:agree:within5_full}}, `guard` {{hr:guard:within5_full}}, `gate` {{hr:gate:within5_full}}, `cnn` {{hr:cnn:within5_full}}. The pre-registered "win" ({{hpd:all/v2_spectral_acf__forced|d}}) rests on a rule chosen after the pooled table had been seen (Amendment 3); on Hoffman alone the spectral estimator is best.
 
-{{@hrvote}}
+{{@hrvote_full}}
 
 ### 8.5 P3: absolute SpO2 (not headlined)
 
@@ -119,7 +125,11 @@ Rule selection on the Hoffman inner folds (6 people disjoint from every P2 test 
 
 MTHS is normoxic, so nothing beats the train-mean predictor, including the CNN ({{cp:P3/-1/train_mean|d}}). The OpenOximetry arterial-blood-gas analysis is the SpO2 test that matters:
 
-{{@openox}}
+{{@openox_full}}
+
+![OpenOximetry skin tone](docs/figures/ml_openox_skin.png)
+
+The CNN ties the textbook ratio-of-ratios on the contact sensor ({{oxp:lag_star/R/ror_textbook|d}} MAE points) and beats the training mean ({{oxp:lag_star/R/train_mean|d}}); the dark-minus-light MAE gap by ITA tertile is {{oxg:ita/R/mae|d}} ({{oxg:ita/R/mae|n}} people), a tie, and not estimable by Monk group with 2 dark-skinned held-out people. No claim about phone SpO2 follows, and no SpO2 number is shown to users.
 
 ### 8.6 Ablations and levers
 
@@ -139,7 +149,7 @@ Lever ledger (kept and dropped, with the evidence):
 
 ![Gap](docs/figures/ml_gap.png)
 
-## 9. Deployed pipeline
+## 9. Deployed pipeline and the app
 
 Source R: logit = {{v:deploy_intercept}} + {{v:deploy_coef}} x (r - {{v:deploy_mean}}) / {{v:deploy_scale}}, r = v1 chain logit plus the mean residual of three CNN seeds; decision logit > 0 is *possible low oxygen*, otherwise *normal*, with the quality gates and the conformal rule deciding *Unsure*. Inner-CV score of the deployed choice {{v:deploy_inner_cv}}, which was selected with all six people in view; the unbiased estimate of the *procedure* is the nested {{hy:HYBRID_FINAL:tm_bacc|full}}. Format and reference combiner: `results/ml/HYBRID.md`, `app/data/hybrid_weights.json`.
 

@@ -5,6 +5,8 @@
 
 **Live app:** https://aravhawk.github.io/oxydrop/ (open on a phone; "Watch a recorded demo" works with no camera) · **Paper-style write-up:** [WHITEPAPER.md](WHITEPAPER.md) ([PDF](WHITEPAPER.pdf)) · **Model card:** [MODEL.md](MODEL.md)
 
+> **Headline, stated plainly: the pre-registered primary metric (P1, detecting SpO2 below 90 on six held-out people) was not beaten.** The hybrid scores 0.779 against 0.796 for the best baseline, the shipped logistic chain (a tie), and the CNN alone ties it too. What held: heart rate (P2, within 5 bpm 0.480 against 0.419, a design choice made after seeing the pooled table), the CNN beating the weaker baselines (clock, ratio-of-ratios), a calibrated three-state hybrid that runs on the device, and an open pre-registered leave-one-person-out audit.
+
 > **This project is a prototype and is not medical advice.** It does not measure SpO2, is not a medical device, and the key low-oxygen result rests on only six people. Never use it instead of a pulse oximeter or a clinician. Built for the Veritas AI International High School Hackathon 2026, Health track.
 
 ## Who it is for, and input to output
@@ -56,9 +58,19 @@ The evaluation protocol was **pre-registered** (commit `3e708fe`, [PREREGISTRATI
 
 What the experiments say about the network: **the OpenOximetry warm-up is the main source of its skill** (P1 0.739 with it, 0.577 without); a device-agnostic-augmentation benefit is **not supported**; physics channels change nothing measurable; test-time BatchNorm adaptation hurts. Every lever, kept or dropped, is in the ledger in [MODEL.md](MODEL.md) and [WHITEPAPER.md](WHITEPAPER.md).
 
-**PENDING (generated blocks, filled automatically when the files exist):** conformal 3-state output and matched-coverage comparison; OpenOximetry SpO2 by skin tone; heart-rate voting. **PENDING:** the app in this tree still runs the logistic chain v2 (the hybrid export is ready, wiring is the app-integration branch).
+**Conformal three-state output (secondary).** At the declared level the hybrid answers 79.1% of windows with 87.0% accuracy and alerts 70.1% of all hypoxic windows; 11.4% of hypoxic windows are called Normal (target 10%). At the coverage of the v1 band (84.4%) it scores 85.9% against 93.9% (-8.0 [-20.8, +1.2] points, a tie by interval, not a win); at v2's coverage 89.5% against 94.7%. The same conformal step on the v1 chain gives 92.0% and 95.0%. The coverage guarantee holds roughly pooled and fails per person (person 1: 58.4% of hypoxic windows called Normal).
+
+**SpO2 on a contact oximeter, by skin tone (secondary, not a phone test).** On 34 held-out OpenOximetry people (24 with blood-gas SaO2 labels) the CNN has MAE 2.94 [2.45, 3.50] against 3.07 [2.60, 3.54] for the textbook ratio-of-ratios (tie, difference -0.13 [-0.47, +0.26]) and 7.38 for the training mean; the learned label lag is 19 s [15, 27]. The dark-minus-light MAE gap by ITA tertile is +0.41 [-0.75, +1.63] (7 versus 6 people); the Monk 7+ group has too few held-out people to estimate. The contact oximeter itself reads higher in darker skin: dark minus light +1.77 [+0.64, +2.61] points by Monk group and +1.10 [+0.65, +1.55] by ITA tertile. No SpO2 number is shown to users.
+
+**Heart-rate voting (negative result).** A voting rule over autocorrelation, spectral and CNN estimates gives a clean-clip MAE of 10.94 bpm on BUT PPG and 5.22 on MTHS (target under 3 bpm not met), is worse than the CNN alone on BUT PPG, and does not replace the P2 rule. For a resting pulse near 48 bpm the 51 bpm spectral floor gives MAE 14.3 bpm and a 40 bpm floor 1.9; the CNN does not track that person.
+
+**What the app runs.** The hybrid is the on-device default path: the v1 physiological chain logit plus the residual of three CNN seeds, then the logistic meta-learner and the conformal three-state rule (`app/js/hybrid_engine.js`, `docs/APP_INTEGRATION.md`). The CNN runs in a Web Worker so a forward pass never delays camera frames, with an in-page fallback when module workers are unavailable; the v2 logistic chain stays behind `?engine=logistic`. A generic low-amplitude guard (AC/DC below the 0.1th percentile of the Hoffman training windows, 0.24%) answers *Unsure*. Latency measured on a development laptop (`results/ml/DEPLOY.md`): 16.4 ms for one forward pass, 50 to 58 ms per 2 s window including all three seeds; phones are slower and unmeasured. The three seed files are 2.69 MB together. The replay demo is in-sample for the hybrid (the weights saw those two people) and is labelled demo only in the app.
 
 ![Ablation](docs/figures/ml_ablation.png)
+
+![Conformal output and OpenOximetry skin-tone test](docs/figures/ml_conformal.png)
+
+![OpenOximetry SaO2 by skin tone](docs/figures/ml_openox_skin.png)
 
 ## Where it fails
 
@@ -67,7 +79,7 @@ What the experiments say about the network: **the OpenOximetry warm-up is the ma
 * **Motion, cold fingers, saturated red channel, far-flash phones:** the app answers *Unsure* rather than guess ([figure](docs/figures/ml_failure_modes.png)).
 * **Dark skin:** pulse-oximeter references are biased in darker skin at low saturation (Bickler 2005, Sjoding 2020). Phone-camera fairness cannot be assessed (one dark-skinned participant); the contact-oximeter analysis is in the whitepaper.
 * **Already low at the start**, exercise, arrhythmia and a resting pulse under 51 bpm break the signal.
-* **Every phone:** the app is built to work on every phone and is **not tuned to any specific phone**. The iPhone 13, 17 and 18 Pro the team owns are only a held-out sanity check, never a tuning set. **Untested Android phones and other phones are a limitation.**
+* **Every phone:** the app is built to work on every phone and is **not tuned to any specific phone**. The iPhone 13, 17 and 18 Pro the team owns are only a held-out sanity check, never a tuning set. **Untested Android phones and other phones are a limitation.** The per-phone test checklist for the pull request is [docs/PHONE_CHECKLIST.md](docs/PHONE_CHECKLIST.md).
 
 ![Failure modes](docs/figures/ml_failure_modes.png)
 
@@ -86,11 +98,11 @@ python scripts/check_claims.py   # every number in README, MODEL.md and WHITEPAP
 ## Repository map
 
 ```
-app/        static PWA, no build step: engine.js (chain v2), engine_v1.js (v1 chain), cnn.js + cnn_features.js (CNN), data/ (weights, hybrid members), sw.js
+app/        static PWA, no build step: hybrid_engine.js + hybrid_worker.js (default path), engine.js (v2 quality chain), engine_v1.js (v1 chain), cnn.js + cnn_features.js (CNN), data/ (hybrid members, conformal.json, weights), sw.js
 python/     oxydrop/ (chain, HR, evaluation kit) and oxydrop_ml/ (data, CNN, SSL, training, baselines, hybrid, tests, PREREGISTRATION.md and amendments)
 results/    ml/ (all CSVs behind every number, scores/, CORE_RESULTS.md, BASELINES.md, HYBRID.md), older chain tables
 scripts/    reproduce_ml.sh (stages), ml_numbers.py, render_docs.py, make_ml_figs.py, check_claims.py, build_whitepaper_pdf.sh
-docs/       figures/, templates/ (sources of the generated docs), ENGINEERED_CHAIN.md (the v1/v2 chain, camera flow, older audit), WRITEUP.md, HR_VALIDATION.md, SPO2_OPTICS.md, PHONE_RETEST.md, REVIEW_RESPONSE.md
+docs/       figures/, templates/ (sources of the generated docs), APP_INTEGRATION.md, PHONE_CHECKLIST.md, ENGINEERED_CHAIN.md (the v1/v2 chain, camera flow, older audit), WRITEUP.md, HR_VALIDATION.md, SPO2_OPTICS.md, PHONE_RETEST.md, REVIEW_RESPONSE.md
 tests/      JS parity, flow and e2e tests; docs_claims.mjs guards wording
 ```
 
@@ -100,7 +112,7 @@ tests/      JS parity, flow and e2e tests; docs_claims.mjs guards wording
 
 ## Data and licences
 
-Hoffman (MIT), BUT PPG (CC BY 4.0), MTHS (CC BY-NC-ND 4.0, non-commercial research; weights trained on it are flagged), OpenOximetry (PhysioNet credentialed, derived aggregates only, never redistributed), plus pretraining sources. See [DATA_LICENSES.md](DATA_LICENSES.md). No data from users is stored. Code is MIT. AI tools (Claude) assisted with code, analysis and writing; the team reviewed and can explain every component.
+Hoffman (MIT), BUT PPG (CC BY 4.0), MTHS (CC BY-NC-ND 4.0, non-commercial research), OpenOximetry (PhysioNet credentialed, **aggregates only**, never redistributed), plus pretraining sources. **The shipped CNN weights (`app/data/hybrid_R_s*.json`, `oxynet.onnx`) are derived models trained on MTHS and OpenOximetry data: the NoDerivatives and data-use-agreement caveat is flagged for the owner to confirm before release** (see [DATA_LICENSES.md](DATA_LICENSES.md)). No data from users is stored. Code is MIT. AI tools (Claude) assisted with code, analysis and writing; the team reviewed and can explain every component.
 
 ## Older documentation
 

@@ -3,8 +3,7 @@
     python scripts/make_ml_figs.py            # all figures -> docs/figures/ml_*.png
     python scripts/make_ml_figs.py ablation   # a subset by name
 
-Figures that depend on FEAT-007 outputs (conformal reliability, OpenOximetry skin tone) draw a clearly marked PENDING panel until
-their CSV files exist in results/ml/ and the real plot once they do. Schematic panels (failure-mode signal shapes) are labelled
+The conformal and OpenOximetry skin-tone figures are drawn from results/ml/conformal_*.csv and openox_spo2_*.csv. Schematic panels (failure-mode signal shapes) are labelled
 "schematic, synthetic" in the figure itself: they show a mechanism, they are not data.
 """
 from __future__ import annotations
@@ -217,52 +216,69 @@ def _find_cols(df, *subs):
 
 
 def fig_conformal():
-    fs = N._found('conformal')
-    if not fs:
-        _pending_fig('ml_conformal.png', 'Conformal 3-state output: coverage, accuracy and reliability',
-                     ['Produced by a separate analysis not merged yet (results/ml/conformal*.csv).', 'This panel redraws itself when `python scripts/make_ml_figs.py conformal` runs on a tree that contains them.'])
-        return
-    for p in fs:
-        df = pd.read_csv(p)
-        cov, acc = _find_cols(df, 'cov'), _find_cols(df, 'acc')
-        if cov and acc:
-            fig, ax = plt.subplots(figsize=(6, 4))
-            grp = next((c for c in df.columns if c.lower() in ('model', 'method', 'variant', 'pipeline')), None)
-            for k, d in (df.groupby(grp) if grp else [('all', df)]):
-                d = d.sort_values(cov)
-                ax.plot(d[cov], d[acc], marker='o', ms=3, label=str(k))
-            ax.set_xlabel(cov)
-            ax.set_ylabel(acc)
-            ax.set_title('Conformal: accuracy versus coverage\n(' + os.path.basename(p) + ')')
-            ax.legend(fontsize=8)
-            save(fig, 'ml_conformal.png')
-            return
-    _pending_fig('ml_conformal.png', 'Conformal results exist but no coverage/accuracy columns were recognised', ['Plot the files in results/ml/conformal*.csv by hand or extend `fig_conformal` in scripts/make_ml_figs.py.'])
+    """Left: accuracy versus coverage along alpha (nested Mondrian conformal, held-out people) for the hybrid, the deployed pipeline R and the v1 chain, with the v1 and v2
+    shipped bands as reference points. Right: share of hypoxic windows called Normal per held-out person at alpha = 0.10, against the 10% target."""
+    cur = N.rd('conformal_curve.csv')
+    ref = N.rd('conformal_reference_bands.csv').set_index('system')
+    fig, ax = plt.subplots(1, 2, figsize=(10.5, 4.1), gridspec_kw=dict(width_ratios=[1.25, 1]))
+    for system, col, lab in (('final', VERM, 'Hybrid (nested pipeline)'), ('deployed_R', BLUE, 'Deployed pipeline R (fixed)'), ('chain_v1', GREEN, 'v1 chain alone (control)')):
+        d = cur[(cur.system == system) & (cur.method == 'mondrian')].sort_values('param')
+        d = d[d.param <= 0.15]                                   # past this alpha the class thresholds cross (see CONFORMAL.md)
+        ax[0].plot(d.coverage, d.acc, color=col, lw=1.8, label=lab)
+        ax[0].fill_between(d.coverage, d.acc_lo, d.acc_hi, color=col, alpha=0.10, lw=0)
+        r = N._cf_row(system, 0.1)
+        ax[0].plot([r.coverage], [r.acc], 'o', color=col, ms=7, mec='k')
+    for key, mk, lab in (('v1_shipped_band', '*', 'v1 shipped band'), ('v2_shipped_band', 'P', 'v2 gated band')):
+        r = ref.loc[key]
+        ax[0].errorbar([r.coverage], [r.acc], yerr=[[r.acc - r.acc_lo], [r.acc_hi - r.acc]], fmt=mk, color='k', ms=12 if mk == '*' else 8, capsize=2, label=lab)
+    ax[0].set_xlabel('coverage (share of windows answered Normal or Possible low)')
+    ax[0].set_ylabel('accuracy on answered windows')
+    ax[0].set_title('Held-out accuracy versus coverage; dots = alpha 0.10', fontsize=10)
+    ax[0].legend(fontsize=8, loc='lower left')
+    pp = N.rd('conformal_per_person.csv')
+    pp = pp[(pp.system == 'final') & (pp.method == 'mondrian') & np.isclose(pp.alpha.astype(float), 0.1)]
+    x = np.arange(len(pp))
+    ax[1].bar(x, 100 * pp.confident_miss, color=[VERM if v > 0.2 else SKY for v in pp.confident_miss])
+    ax[1].axhline(10, color='k', ls='--', lw=1)
+    ax[1].text(len(pp) - 0.5, 11, 'target 10%', ha='right', fontsize=8)
+    ax[1].set_xticks(x)
+    ax[1].set_xticklabels([p.replace('hof_10000', 'P') for p in pp.person])
+    ax[1].set_ylabel('hypoxic windows called Normal (%)')
+    ax[1].set_title('Per held-out person, hybrid at alpha 0.10', fontsize=10)
+    fig.suptitle('Conformal three-state output, Hoffman, thresholds from the other five people only', fontsize=10, y=1.0)
+    fig.tight_layout()
+    save(fig, 'ml_conformal.png')
 
 
 def fig_openox_skin():
-    fs = N._found('openox_spo2')
-    if not fs:
-        _pending_fig('ml_openox_skin.png', 'OpenOximetry SpO2 error by skin-tone group (ABG-anchored)',
-                     ['Produced by a separate analysis not merged yet (results/ml/openox_spo2*.csv, Daytona only, aggregates only).', 'This panel redraws itself when `python scripts/make_ml_figs.py openox_skin` runs on a tree that contains them.'])
-        return
-    for p in fs:
-        df = pd.read_csv(p)
-        grp = next((c for c in df.columns if any(s in c.lower() for s in ('skin', 'monk', 'group', 'tone'))), None)
-        mae = _find_cols(df, 'mae')
-        if grp and mae:
-            fig, ax = plt.subplots(figsize=(6.5, 4))
-            mod = next((c for c in df.columns if c.lower() in ('model', 'method', 'estimator', 'variant')), None)
-            if mod:
-                piv = df.pivot_table(index=grp, columns=mod, values=mae, aggfunc='first')
-                piv.plot(kind='bar', ax=ax)
-            else:
-                df.plot(x=grp, y=mae, kind='bar', ax=ax)
-            ax.set_ylabel(mae)
-            ax.set_title('OpenOximetry SpO2 error by skin-tone group\n(' + os.path.basename(p) + ')')
-            save(fig, 'ml_openox_skin.png')
-            return
-    _pending_fig('ml_openox_skin.png', 'OpenOximetry results exist but no skin-tone / MAE columns were recognised', ['Plot results/ml/openox_spo2*.csv by hand or extend `fig_openox_skin` in scripts/make_ml_figs.py.'])
+    """Left: SaO2 MAE by skin-tone group, CNN versus textbook ratio-of-ratios (OpenOximetry contact sensor, 24 held-out people, lag-corrected).
+    Right: contact-oximeter display minus blood-gas SaO2 by group (reference bias)."""
+    sk = N.rd('openox_spo2_skin.csv')
+    sk = sk[sk.label == 'lag_star']
+    cb = N.rd('openox_spo2_contact_bias.csv')
+    cb = cb.iloc[[0, 1, 2, 5, 4, 3]].reset_index(drop=True) if list(cb.scheme) == ['monk'] * 3 + ['ita'] * 3 else cb
+    groups = [('monk', '1-3', 'Monk 1-3'), ('monk', '4-6', 'Monk 4-6'), ('monk', '7+', 'Monk 7+'), ('ita', 'lightest tertile', 'ITA light'), ('ita', 'mid tertile', 'ITA mid'), ('ita', 'darkest tertile', 'ITA dark')]
+    fig, ax = plt.subplots(1, 2, figsize=(10.5, 4.0), gridspec_kw=dict(width_ratios=[1.35, 1]))
+    x = np.arange(len(groups))
+    for k, (m, lab, col) in enumerate((('R', 'CNN (hybrid R members)', BLUE), ('ror_textbook', 'Textbook ratio-of-ratios', ORANGE))):
+        rr = [N._row(sk, scheme=s, group=g, model=m) for s, g, _ in groups]
+        ax[0].bar(x + (k - 0.5) * 0.38, [r.mae for r in rr], 0.38, color=col, label=lab, yerr=np.array([[r.mae - r.mae_lo, r.mae_hi - r.mae] for r in rr]).T, capsize=2)
+    ax[0].set_xticks(x)
+    ax[0].set_xticklabels([f'{lab}\n(n={int(N._row(sk, scheme=s, group=g, model="R").n_people)})' for s, g, lab in groups], fontsize=8)
+    ax[0].set_ylabel('SaO2 MAE, SpO2 points')
+    ax[0].set_title('Error by skin tone, 24 held-out people (n = people)\nMonk 7+ has 2 people: not estimable', fontsize=9.5)
+    ax[0].legend(fontsize=8, loc='upper left')
+    ax[0].set_ylim(0, 6)
+    xb = np.arange(len(cb))
+    ax[1].bar(xb, cb.bias, color=[SKY, SKY, SKY, GREY, GREY, GREY][:len(cb)], yerr=np.array([cb.bias - cb.lo, cb.hi - cb.bias]), capsize=2)
+    ax[1].set_xticks(xb)
+    ax[1].set_xticklabels([f'{"Monk" if s == "monk" else "ITA"} {g.replace(" tertile", "")}\n(n={int(n)})' for s, g, n in zip(cb.scheme, cb.group, cb.n_people)], fontsize=8)
+    ax[1].axhline(0, color='k', lw=1)
+    ax[1].set_ylabel('device display minus blood-gas SaO2')
+    ax[1].set_title('The reference over-reads more in darker skin\n(all people with draws)', fontsize=9.5)
+    fig.suptitle('OpenOximetry contact red/infrared sensor with arterial blood gas: not a phone test', fontsize=10, y=1.0)
+    fig.tight_layout()
+    save(fig, 'ml_openox_skin.png')
 
 
 # ----------------------------------------------------------------------------------------------------------------------- 7. HR

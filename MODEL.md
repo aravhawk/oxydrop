@@ -19,7 +19,7 @@ People with COVID-19, COPD, asthma or at altitude who own a phone but no pulse o
 
 ## 3. Architecture and parameters
 
-`python/oxydrop_ml/model.py` (specification: `python/oxydrop_ml/MODEL_SPEC.md`). **Parameters: 167,588** shipped (budget 300,000, asserted in a test); about 11.6 million multiply-adds per window; one member's JSON is 0.90 MB (three seed members 2.7 MB) and the ONNX interoperability file is 728 KB. A single forward pass takes about 17 to 18 ms per 10 s window in Node on a development laptop (feature construction 0.2 to 1 ms); the hybrid runs three members, so about three times that. Phone-class latency: **PENDING**, measured in `results/ml/DEPLOY.md` by the app-integration branch.
+`python/oxydrop_ml/model.py` (specification: `python/oxydrop_ml/MODEL_SPEC.md`). **Parameters: 167,588** shipped (budget 300,000, asserted in a test); about 11.6 million multiply-adds per window; one member's JSON is 0.90 MB (three seed members 2.7 MB) and the ONNX interoperability file is 728 KB. A single forward pass takes 16.4 ms per 10 s window in Node on a development laptop (feature construction 0.2 to 1 ms) and a full hybrid window (v2 quality chain, v1 chain, features, three forward passes, combiner) 50 to 58 ms (`results/ml/DEPLOY.md`, laptop numbers). Phones are slower by an unmeasured factor; the app prints the real latency per window in its debug view, so every phone test gives one. The three seed files are 2.69 MB together.
 
 | Stage | Detail |
 |---|---|
@@ -132,7 +132,7 @@ Inner-fold selection of the deployed pipeline per held-out person (Amendment 2; 
 | person 5 | c+p | off | 1 | 0.722 |
 | person 6 | c+p | off | 1 | 0.744 |
 
-### 8.2 Accuracy versus coverage and abstention
+### 8.2 Accuracy versus coverage and abstention (descriptive, confidence ranking)
 
 | Model (Hoffman, 5,644 windows) | Coverage | Accuracy on answered windows | Share of ALL hypoxic windows alerted | Accuracy at full coverage |
 | :--- | ---: | ---: | ---: | ---: |
@@ -147,7 +147,59 @@ The v1 shipped band answers 84.4% of windows at 93.9% accuracy and alerts 80.5% 
 
 ### 8.3 Calibration and conformal 3-state output
 
-> **PENDING: conformal 3-state output.** Split-conformal abstention on the final hybrid scores, with the coverage-versus-accuracy curve and the comparison with the v1 chain at matched coverage (v1 shipped band: coverage 84.4%, accuracy 93.9%). The numbers for this section come from a separate analysis that is not merged into this tree yet (`results/ml/CONFORMAL.md, results/ml/conformal*.csv`). This block is generated: run `bash scripts/reproduce_ml.sh docs` after the files exist and it renders in full. No number from this section is quoted anywhere else in this document.
+The nested conformal result below supersedes the descriptive ranking above where the two differ: it fixes the cutoffs from other people only.
+
+**Held-out conformal output at the declared level alpha = 0.10** (Mondrian, thresholds from the five other people only, 5,644 Hoffman windows after the first minute, 95% person-bootstrap CIs):
+
+| Pipeline | Coverage (answered) | Accuracy on answered | All hypoxic windows alerted | Hypoxic called Normal | Normal / Possible low / Unsure |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Hybrid (nested pipeline) | 79.1% [63.5%, 89.9%] | 87.0% [76.1%, 95.5%] | 70.1% [43.6%, 90.0%] | 11.4% | 35% / 44% / 21% |
+| Deployed pipeline R (fixed, exploratory) | 74.5% [60.1%, 84.0%] | 89.5% [79.4%, 98.1%] | 70.0% [46.5%, 88.5%] | 8.7% | 31% / 43% / 26% |
+| v1 chain alone (control) | 92.5% [86.9%, 98.2%] | 90.3% [86.1%, 94.4%] | 84.3% [78.9%, 88.2%] | 10.0% | 41% / 52% / 8% |
+
+**At matched coverage** (each system is read at the coverage of the reference, by interpolation along alpha; the reference accuracy is the hand-set band of the shipped v1 or v2 chain):
+
+| Reference at its own coverage | Pipeline (nested Mondrian conformal) | Matched coverage | Accuracy on answered | Reference accuracy | Difference, points | Verdict |
+| :--- | :--- | ---: | ---: | ---: | ---: | :--- |
+| v1 shipped band | Hybrid (nested pipeline) | 84.4% | 85.9% [75.6%, 94.9%] | 93.9% | -8.0 [-20.8, +1.2] | tie |
+| v1 shipped band | Deployed pipeline R (fixed, exploratory) | 84.4% | 88.0% [78.5%, 96.2%] | 93.9% | -5.9 [-17.1, +2.3] | tie |
+| v1 shipped band | v1 chain alone (control) | 84.4% | 92.0% [88.2%, 95.9%] | 93.9% | -1.9 [-3.7, +0.3] | tie |
+| v2 gated band | Hybrid (nested pipeline) | 68.0% | 89.5% [78.9%, 98.2%] | 94.7% | -5.2 [-18.5, +3.3] | tie |
+| v2 gated band | Deployed pipeline R (fixed, exploratory) | 68.0% | 90.8% [82.2%, 98.7%] | 94.7% | -3.9 [-13.9, +3.8] | tie |
+| v2 gated band | v1 chain alone (control) | 68.0% | 95.0% [91.0%, 98.2%] | 94.7% | +0.3 [-3.5, +3.1] | tie |
+
+**Empirical set coverage next to the target** (the guarantee is per class and assumes exchangeability; windows of one person overlap by 80% and people differ):
+
+| alpha | Target | Pipeline | Coverage, hypoxic windows | Coverage, normal windows |
+| ---: | ---: | :--- | ---: | ---: |
+| 0.05 | 95% | Hybrid (nested pipeline) | 93.7% [81.8%, 100.0%] | 95.8% [89.6%, 99.3%] |
+| 0.05 | 95% | Deployed pipeline R (fixed, exploratory) | 97.1% [91.4%, 100.0%] | 96.3% [90.4%, 99.8%] |
+| 0.05 | 95% | v1 chain alone (control) | 95.0% [90.5%, 98.4%] | 95.1% [91.0%, 98.1%] |
+| 0.10 | 90% | Hybrid (nested pipeline) | 88.6% [69.6%, 99.2%] | 91.2% [80.6%, 97.8%] |
+| 0.10 | 90% | Deployed pipeline R (fixed, exploratory) | 91.3% [74.1%, 99.9%] | 93.2% [84.8%, 99.0%] |
+| 0.10 | 90% | v1 chain alone (control) | 89.6% [82.1%, 95.4%] | 91.7% [87.6%, 95.7%] |
+| 0.15 | 85% | Hybrid (nested pipeline) | 84.2% [60.9%, 97.2%] | 87.8% [76.4%, 95.9%] |
+| 0.15 | 85% | Deployed pipeline R (fixed, exploratory) | 89.0% [69.0%, 99.2%] | 88.8% [77.7%, 96.7%] |
+| 0.15 | 85% | v1 chain alone (control) | 85.7% [76.3%, 92.2%] | 88.5% [85.0%, 91.7%] |
+
+**Per person** (hybrid, alpha = 0.10): the pooled guarantee does not hold person by person.
+
+| Held-out person | Windows | Coverage | Accuracy on answered | Hypoxic alerted | Hypoxic called Normal | Set coverage, hypoxic | Unsure |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| person 1 | 1,022 | 83.3% | 63.1% | 13.0% | 58.4% | 41.6% | 16.7% |
+| person 2 | 1,053 | 85.4% | 96.0% | 87.2% | 0.4% | 99.6% | 14.6% |
+| person 3 | 998 | 80.2% | 83.4% | 94.0% | 0.0% | 100.0% | 19.8% |
+| person 4 | 947 | 41.8% | 97.7% | 44.2% | 0.0% | 100.0% | 58.2% |
+| person 5 | 859 | 94.9% | 94.5% | 90.1% | 5.1% | 94.9% | 5.1% |
+| person 6 | 765 | 91.9% | 93.7% | 86.6% | 4.6% | 95.4% | 8.1% |
+
+AUROC over all windows: hybrid 0.891, deployed R 0.918, v1 chain 0.947. Expected calibration error of sigmoid(z): hybrid 0.076, deployed R 0.054, v1 chain 0.107 (the chain ranks well but is not calibrated).
+
+Source: `results/ml/conformal_curve.csv`, `conformal_matched.csv`, `conformal_per_person.csv`, `conformal_calibration.csv`; protocol and reading in `results/ml/CONFORMAL.md`.
+
+![Conformal output](docs/figures/ml_conformal.png)
+
+**Reading.** The hybrid does not beat v1 at matched coverage (-8.0 [-20.8, +1.2] points at v1's coverage, -5.2 [-18.5, +3.3] at v2's; both intervals contain zero). The same conformal step on the v1 chain reads 92.0% at v1's coverage and 95.0% at v2's: the loss comes from the hybrid score, not from the conformal step. At alpha = 0.10 the hybrid alerts 70.1% of all hypoxic windows and calls 11.4% of them Normal (target 10%). Set coverage holds approximately pooled and fails per person: person 1 has 58.4% of its hypoxic windows called Normal. The thresholds shipped in the app (`app/data/conformal.json`) are fit on all six people and are therefore in-sample on the replay demo.
 
 ### 8.4 P2: heart rate
 
@@ -164,7 +216,29 @@ The v1 shipped band answers 84.4% of windows at 93.9% accuracy and alerts 80.5% 
 
 Rule selection on the Hoffman inner folds (6 people disjoint from every P2 test person): `spec` 0.883, `agree` 0.826, `guard` 0.811, `gate` 0.814, `cnn` 0.803. The pre-registered "win" (+0.061 [0.013, 0.107]) rests on a rule chosen after the pooled table had been seen (Amendment 3); on Hoffman alone the spectral estimator is best.
 
-> **PENDING: heart-rate voting.** Voting between autocorrelation, the spectral harmonic sum and the CNN head with harmonic correction and a causal median, on BUT PPG and MTHS. The numbers for this section come from a separate analysis that is not merged into this tree yet (`results/ml/HR_VOTE.md, results/ml/hr_vote*.csv`). This block is generated: run `bash scripts/reproduce_ml.sh docs` after the files exist and it renders in full. No number from this section is quoted anywhere else in this document.
+**Voting rule on clean clips** (pass the shipped v2 quality gate; MAE in bpm; target stated before any result: MAE under 3 bpm and doubling under 1%). Voting of autocorrelation, spectral harmonic sum and the CNN, with octave check and a causal median of 5:
+
+| Dataset | Clean windows | Voting MAE [95% CI] | Within 5 bpm | Doubling | CNN alone MAE | Spectral alone MAE | Target met |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| BUT PPG (38 people) | 1,379 (36%) | 10.94 [8.63, 13.44] | 49.2% [38.8%, 59.4%] | 0.00% | 8.05 | 11.85 | no |
+| MTHS (62 people) | 1,701 (82%) | 5.22 [3.51, 7.34] | 77.4% [69.0%, 84.8%] | 0.00% | 6.30 | 6.42 | no |
+| BUT PPG + MTHS (100 people) | 3,080 (52%) | 7.78 [6.29, 9.45] | 64.7% [57.8%, 71.4%] | 0.00% | 7.08 | 8.85 | no |
+| Hoffman (6 people, extra) | 4,671 (83%) | 0.98 [0.78, 1.21] | 98.2% [95.7%, 99.7%] | 0.00% | 2.11 | 1.77 | yes |
+
+**Slow pulse (Hoffman person 4, mean reference 48 bpm).** With the shipped spectral floor of 51 bpm the spectral estimate has MAE 14.3 bpm; widening the band to 40 bpm gives 1.9; the CNN does not track this person (21.0 bpm).
+
+Paired MAE difference, voting minus baseline in bpm (positive = voting better):
+
+| Scope | Baseline | Difference [95% CI] | Verdict |
+| :--- | :--- | ---: | :--- |
+| BUT PPG, clean clips | CNN alone | -2.89 [-4.50, -1.43] | worse |
+| BUT PPG, clean clips | P2 rule `agree` | -3.03 [-4.59, -1.60] | worse |
+| MTHS, clean clips | CNN alone | +1.08 [+0.09, +2.18] | better |
+| MTHS, clean clips | P2 rule `agree` | +0.96 [-0.02, +2.06] | tie |
+| BUT PPG + MTHS, all clips | CNN alone | -1.09 [-1.76, -0.36] | worse |
+| BUT PPG + MTHS, all clips | P2 rule `agree` | -1.17 [-1.84, -0.45] | worse |
+
+On BUT PPG the voting rule (10.94 bpm against 8.05) is worse than the CNN alone, and the target is not met on either phone dataset, so **it does not replace the P2 rule** and the app keeps `agree`. Source: `results/ml/hr_vote_summary.csv`, `hr_vote_paired.csv`, `hr_vote_slow_band.csv`; protocol in `results/ml/HR_VOTE.md`.
 
 ### 8.5 P3: absolute SpO2 (not headlined)
 
@@ -181,7 +255,47 @@ Rule selection on the Hoffman inner folds (6 people disjoint from every P2 test 
 
 MTHS is normoxic, so nothing beats the train-mean predictor, including the CNN (-0.017 [-0.181, 0.148]). The OpenOximetry arterial-blood-gas analysis is the SpO2 test that matters:
 
-> **PENDING: OpenOximetry SpO2 by skin tone.** ABG-anchored SaO2 (lag-corrected, learned on training people only) on OpenOximetry people held out of every training stage (Daytona only), MAE and ARMS against the ratio-of-ratios and the train-mean predictor, split by Monk skin-tone group, with dark-minus-light gaps and person-bootstrap intervals. The numbers for this section come from a separate analysis that is not merged into this tree yet (`results/ml/OPENOX_SPO2.md, results/ml/openox_spo2*.csv`). This block is generated: run `bash scripts/reproduce_ml.sh docs` after the files exist and it renders in full. No number from this section is quoted anywhere else in this document.
+**Contact-sensor test, not a phone test.** OpenOximetry is a red/infrared finger clip with arterial-blood-gas SaO2. 34 people are held out of every training stage (24 with SaO2 labels, 25 scored); the label lag (19 s, bootstrap [15, 27]) was learned on 63 training people only. Windows: 33,001. Error in SpO2 points, 95% person-bootstrap CI:
+
+| Predictor | MAE | Bias (prediction minus SaO2) | ARMS, SaO2 70 to 100 |
+| :--- | ---: | ---: | ---: |
+| CNN, hybrid R members (3 seeds, shipped family) | 2.94 [2.45, 3.50] | 1.22 [0.45, 2.02] | 4.19 [3.65, 4.69] |
+| CNN, plain family P (3 seeds) | 3.14 [2.63, 3.70] | 1.43 [0.62, 2.27] | 4.37 [3.83, 4.87] |
+| CNN, stage-B warm-up checkpoint | 2.82 [2.37, 3.33] | 0.95 [0.26, 1.71] | 4.10 [3.64, 4.51] |
+| Textbook ratio-of-ratios (110 - 25 R) | 3.07 [2.60, 3.54] | -0.18 [-0.90, 0.63] | 4.21 [3.77, 4.61] |
+| Ratio-of-ratios, linear fit on training people | 4.75 [4.35, 5.17] | 0.41 [-0.11, 1.00] | 5.53 [5.19, 5.87] |
+| Training-mean predictor | 7.38 [6.95, 7.82] | -0.01 [-0.56, 0.62] | 8.19 [7.83, 8.52] |
+
+**Paired difference of the shipped CNN (R) minus each baseline** (MAE points, negative = CNN better):
+
+| Baseline | Difference [95% CI] | Verdict |
+| :--- | ---: | :--- |
+| Textbook ratio-of-ratios (110 - 25 R) | -0.13 [-0.47, +0.26] | tie |
+| Ratio-of-ratios, linear fit on training people | -1.81 [-2.24, -1.41] | model better |
+| Training-mean predictor | -4.44 [-4.94, -3.97] | model better |
+| CNN, plain family P (3 seeds) | -0.20 [-0.29, -0.11] | model better |
+| CNN, stage-B warm-up checkpoint | +0.12 [-0.12, +0.32] | tie |
+
+**By skin tone** (Monk scale from the dataset; ITA from the image-derived tertiles; MAE in SpO2 points):
+
+| Group | People | CNN MAE | Textbook ratio-of-ratios MAE | Training-mean MAE |
+| :--- | ---: | ---: | ---: | ---: |
+| Monk 1-3 | 8 | 3.25 [2.03, 4.04] | 3.44 [2.15, 4.16] | 7.11 [5.95, 7.85] |
+| Monk 4-6 | 14 | 2.66 [2.14, 3.40] | 2.88 [2.54, 3.29] | 7.60 [7.17, 8.16] |
+| Monk 7+ | 2 | 3.42 [3.01, 4.57] | 2.90 [2.12, 5.09] | 7.13 [6.38, 9.22] |
+| ITA lightest tertile | 6 | 2.71 [1.89, 3.64] | 3.49 [2.54, 4.47] | 7.70 [6.99, 8.77] |
+| ITA mid tertile | 7 | 2.97 [1.94, 3.96] | 3.11 [1.95, 3.93] | 7.27 [6.05, 7.91] |
+| ITA darkest tertile | 7 | 3.12 [2.50, 4.09] | 2.87 [2.35, 3.66] | 7.26 [6.57, 8.40] |
+
+CNN MAE dark minus light, ITA tertiles (7 versus 6 people): +0.41 [-0.75, +1.63], and the interval contains 0. Monk 7 and above has only 2 held-out people, so the gap by Monk group is **not estimable**.
+
+**The reference itself is biased.** Contact-oximeter display minus blood-gas SaO2 (all 137 people with draws), dark minus light: Monk 7+ versus 1-3 +1.77 [+0.64, +2.61] points (7 versus 55 people), ITA darkest versus lightest tertile +1.10 [+0.65, +1.55] points. The device over-reads more in darker skin, so any label from a pulse oximeter inherits this; the analysis above is anchored to blood gas.
+
+Source: `results/ml/openox_spo2_overall.csv`, `openox_spo2_skin.csv`, `openox_spo2_gaps.csv`, `openox_spo2_paired.csv`, `openox_spo2_contact_bias_gaps.csv`; protocol in `results/ml/OPENOX_SPO2.md` (Daytona only, aggregates only).
+
+![OpenOximetry skin tone](docs/figures/ml_openox_skin.png)
+
+The CNN ties the textbook ratio-of-ratios on the contact sensor (-0.13 [-0.47, +0.26] MAE points) and beats the training mean (-4.44 [-4.94, -3.97]); the dark-minus-light MAE gap by ITA tertile is +0.41 [-0.75, +1.63] (7 versus 6 people), a tie, and not estimable by Monk group with 2 dark-skinned held-out people. No claim about phone SpO2 follows, and no SpO2 number is shown to users.
 
 ### 8.6 Ablations and levers
 
@@ -227,9 +341,9 @@ Lever ledger (kept and dropped, with the evidence):
 | Stacking: meta-learner on [chain logit, CNN logit] | TM 0.786 | KEEP (selected in 2 of 6 folds) | Ties the chain |
 | HR: average CNN and v2 spectral when they agree within 5 bpm | within 5 bpm 0.480 vs CNN alone 0.468 | KEEP | Declared design choice made after seeing the pooled table (Amendment 3) |
 | HealthRing PPG pretraining (Kaggle kernel, different CNN; predictions only) | SpO2 MAE 4.25 pretrained vs 4.33 scratch (6 Hoffman people) | DROP | Tie with training from scratch; no weights, cannot initialise OxyNet |
-| Conformal 3-state abstention | PENDING (results/ml files not yet produced) | PENDING |  |
-| OpenOximetry lag-corrected SaO2 head | PENDING (results/ml files not yet produced) | PENDING |  |
-| HR voting and harmonic correction | PENDING (results/ml files not yet produced) | PENDING |  |
+| Conformal 3-state abstention (Mondrian, alpha 0.10) | hybrid 85.9% at v1 coverage 84.4% against 93.9% for the hand-set v1 band (-8.0 points [-20.8, +1.2]); the same step on the chain: 92.0% | KEEP (output rule, not a win) | Calibrated rule instead of a hand-set band; the loss against v1 comes from the hybrid score, not from the conformal step; the per-person guarantee fails |
+| OpenOximetry lag-corrected SaO2 head (contact sensor) | MAE 2.94 [2.45, 3.50] against 3.07 for the textbook ratio-of-ratios (tie) | DROP as a claim (never shown) | Ties the textbook rule on a contact sensor; says nothing about phone SpO2 |
+| HR voting with harmonic and octave correction | clean BUT PPG MAE 10.94 bpm against 8.05 for the CNN alone; target under 3 bpm not met | DROP | Does not replace the P2 rule `agree` |
 
 ### 8.7 Per-fold spread and the train-versus-test gap
 
@@ -246,11 +360,11 @@ Lever ledger (kept and dropped, with the evidence):
 
 ![Gap](docs/figures/ml_gap.png)
 
-## 9. Deployed pipeline
+## 9. Deployed pipeline and the app
 
 Source R: logit = 0.940 + 3.236 x (r - 1.486) / 4.275, r = v1 chain logit plus the mean residual of three CNN seeds; decision logit > 0 is *possible low oxygen*, otherwise *normal*, with the quality gates and the conformal rule deciding *Unsure*. Inner-CV score of the deployed choice 0.818, which was selected with all six people in view; the unbiased estimate of the *procedure* is the nested 0.779 [0.638, 0.831]. Format and reference combiner: `results/ml/HYBRID.md`, `app/data/hybrid_weights.json`.
 
-**PENDING (app integration):** in this tree the app still runs the logistic chain v2. The hybrid weights are exported (`app/data/hybrid_weights.json`, three seed members) and checked for numerical parity, and wiring them into the app is the job of the app-integration branch (`docs/APP_INTEGRATION.md`). Until that is merged, nothing in this document claims that the live site runs the CNN.
+**What the app runs.** The hybrid is the on-device default path: the v1 physiological chain logit plus the residual of three CNN seeds, then the logistic meta-learner and the conformal three-state rule (`app/js/hybrid_engine.js`, `docs/APP_INTEGRATION.md`). The CNN runs in a Web Worker so a forward pass never delays camera frames, with an in-page fallback when module workers are unavailable; the v2 logistic chain stays behind `?engine=logistic`. A generic low-amplitude guard (AC/DC below the 0.1th percentile of the Hoffman training windows, 0.24%) answers *Unsure*. Latency measured on a development laptop (`results/ml/DEPLOY.md`): 16.4 ms for one forward pass, 50 to 58 ms per 2 s window including all three seeds; phones are slower and unmeasured. The three seed files are 2.69 MB together. The replay demo is in-sample for the hybrid (the weights saw those two people) and is labelled demo only in the app.
 
 ## 10. Comparison with prior work
 

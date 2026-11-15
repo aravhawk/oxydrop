@@ -483,6 +483,9 @@ CUSTOM = {
     'member_kb': lambda: f"{os.path.getsize(os.path.join(ROOT, 'app/data/hybrid_R_s0.json')) / 1e6:.2f} MB",
     'members_mb': lambda: f"{sum(os.path.getsize(os.path.join(ROOT, f'app/data/hybrid_R_s{i}.json')) for i in range(3)) / 1e6:.1f} MB",
     'onnx_kb': lambda: f"{os.path.getsize(os.path.join(ROOT, 'app/data/oxynet.onnx')) / 1e3:.0f} KB",
+    'deploy_fwd_ms': lambda: _deploy_value(r'one OxyNet forward pass[^|]*\|\s*([\d.]+) ms'),
+    'deploy_win_ms': lambda: _deploy_value(r'full hybrid window[^|]*\|\s*([\d]+ to [\d]+ ms)'),
+    'deploy_mb': lambda: f"{sum(os.path.getsize(os.path.join(ROOT, f'app/data/hybrid_R_s{i}.json')) for i in range(3)) / 1e6:.2f} MB",
     'app_state': lambda: 'wired' if _app_state()['wired'] else 'not-wired',
     'v1_cov': lambda: pct(b1('chain_v1', 'coverage', 'band_shipped').pooled, 1),
     'v1_acc_band': lambda: pct(b1('chain_v1', 'acc', 'band_shipped').pooled, 1),
@@ -709,7 +712,7 @@ def _lever_delta_p1(var: str) -> tuple[float, float]:
     return float(r.p1_tm_bacc), float(r.p1_tm_bacc - ab('full', 'p23').p1_tm_bacc)
 
 
-def block_levers() -> str:
+def block_levers(short: bool = False) -> str:
     """The lever ledger: every lever, its measured effect on held-out people, and the keep/drop decision with the evidence."""
     full = ab('full', 'p23')
     full0 = _row(rd('ablation_core.csv'), variant='full (seed 0)', p23_kind='p23k')
@@ -765,8 +768,18 @@ def block_levers() -> str:
     rows.append(['HR: average CNN and v2 spectral when they agree within 5 bpm', f'within 5 bpm {f(hr.within5_full)} vs CNN alone {f(hc.within5_full)}', 'KEEP', 'Declared design choice made after seeing the pooled table (Amendment 3)'])
     hp = healthring_row()
     rows.append(['HealthRing PPG pretraining (Kaggle kernel, different CNN; predictions only)', hp, 'DROP', 'Tie with training from scratch; no weights, cannot initialise OxyNet'])
-    for kind, name in (('conformal', 'Conformal 3-state abstention'), ('openox_spo2', 'OpenOximetry lag-corrected SaO2 head'), ('hr_vote', 'HR voting and harmonic correction')):
-        rows.append([name, 'PENDING (results/ml files not yet produced)' if _pending(kind) else 'see the dedicated section', 'PENDING' if _pending(kind) else 'see section', ''])
+    cmv = _row(rd('conformal_matched.csv'), system='final', reference='v1', variant='conformal_mondrian')
+    cmc = _row(rd('conformal_matched.csv'), system='chain_v1', reference='v1', variant='conformal_mondrian')
+    rows.append(['Conformal 3-state abstention (Mondrian, alpha 0.10)', f'hybrid {pct(cmv.acc)} at v1 coverage {pct(cmv.coverage)} against {pct(cmv.reference_acc)} for the hand-set v1 band ({100 * cmv.diff_acc:+.1f} points [{100 * cmv.diff_lo:+.1f}, {100 * cmv.diff_hi:+.1f}]); the same step on the chain: {pct(cmc.acc)}',
+                 'KEEP (output rule, not a win)', 'Calibrated rule instead of a hand-set band; the loss against v1 comes from the hybrid score, not from the conformal step; the per-person guarantee fails'])
+    ox = _row(rd('openox_spo2_paired.csv'), label='lag_star', model='R', baseline='ror_textbook')
+    rows.append(['OpenOximetry lag-corrected SaO2 head (contact sensor)', f'MAE {_ox_cell(_row(rd("openox_spo2_overall.csv"), label="lag_star", model="R").mae, _row(rd("openox_spo2_overall.csv"), label="lag_star", model="R").mae_lo, _row(rd("openox_spo2_overall.csv"), label="lag_star", model="R").mae_hi, "full")} against {f(ox.baseline_mae, 2)} for the textbook ratio-of-ratios (tie)',
+                 'DROP as a claim (never shown)', 'Ties the textbook rule on a contact sensor; says nothing about phone SpO2'])
+    hv = _row(rd('hr_vote_summary.csv'), dataset='butppg', variant='vote+harmonic+octave+median5', scope='clean')
+    hc2 = _row(rd('hr_vote_summary.csv'), dataset='butppg', variant='cnn', scope='clean')
+    rows.append(['HR voting with harmonic and octave correction', f'clean BUT PPG MAE {f(hv.mae, 2)} bpm against {f(hc2.mae, 2)} for the CNN alone; target under 3 bpm not met', 'DROP', 'Does not replace the P2 rule `agree`'])
+    if short:
+        return md_table(['Lever', 'Measured effect on held-out people', 'Decision'], [r[:3] for r in rows], ['l', 'l', 'l'])
     hdr = ['Lever', 'Measured effect on held-out people (descriptive)', 'Decision', 'Evidence and caveat']
     return md_table(hdr, rows, ['l', 'l', 'l', 'l'])
 
@@ -824,65 +837,303 @@ def block_ssl() -> str:
                      ['SSL, no OpenOximetry', f'{int(n.step.iloc[-1]):,}', f(n.loss.iloc[0], 2), f(n.loss.iloc[-1], 2), f(n.top1.iloc[-1], 2)]], ['l', 'r', 'r', 'r', 'r'])
 
 
-# ------------------------------------------------------------------------------------------------------------ FEAT-007 sections (PENDING until the files exist)
-def _generic_csv_md(path: str, max_rows=16, max_cols=9) -> str:
-    df = pd.read_csv(path)
-    cols = list(df.columns)[:max_cols]
-    df = df[cols].head(max_rows)
+# ------------------------------------------------------------------------------------------------------------ FEAT-007 sections (typed tables from conformal_*, openox_spo2_*, hr_vote_*)
+SYS_LABEL = {'final': 'Hybrid (nested pipeline)', 'deployed_R': 'Deployed pipeline R (fixed, exploratory)', 'chain_v1': 'v1 chain alone (control)'}
+
+
+def _cf_row(system: str, alpha: float, method: str = 'mondrian') -> pd.Series:
+    d = rd('conformal_curve.csv')
+    m = (d.system == system) & (d.method == method) & np.isclose(d.param.astype(float), float(alpha))
+    sub = d[m]
+    if len(sub) != 1:
+        raise KeyError(f'conformal_curve row {system} {method} {alpha}: {len(sub)} rows')
+    return sub.iloc[0]
+
+
+def _cf_cell(r: pd.Series, col: str, mod: str | None) -> str:
+    if mod == 'pcti':
+        return f'{pct(r[col])} [{pct(r[col + "_lo"])}, {pct(r[col + "_hi"])}]'
+    if mod == 'pct':
+        return pct(r[col])
+    if mod == 'ci':
+        return f'[{pct(r[col + "_lo"])}, {pct(r[col + "_hi"])}]'
+    return f(r[col])
+
+
+def _ns_cf(args, mod):
+    """cf:<system>/<alpha>:<col>  from conformal_curve.csv (Mondrian rows); mods pct, pcti (with person-bootstrap CI), ci"""
+    system, alpha = args[0].split('/')
+    return _cf_cell(_cf_row(system, float(alpha)), args[1], mod)
+
+
+def _ns_cp_person(args, mod):
+    """cpp:<system>/<alpha>/<person>:<col>  from conformal_per_person.csv (Mondrian)"""
+    system, alpha, person = args[0].split('/')
+    d = rd('conformal_per_person.csv')
+    r = _row(d[np.isclose(d.alpha.astype(float), float(alpha)) & (d.method == 'mondrian')], system=system, person=person)
+    return pct(r[args[1]]) if mod == 'pct' else f(r[args[1]])
+
+
+def _ns_cm(args, mod):
+    """cm:<system>/<reference>/<variant>:<col>  from conformal_matched.csv; mod d = difference in points with CI, pct, v = verdict"""
+    system, ref, variant = args[0].split('/')
+    r = _row(rd('conformal_matched.csv'), system=system, reference=ref, variant=variant)
+    if mod == 'd':
+        return f'{100 * r.diff_acc:+.1f} [{100 * r.diff_lo:+.1f}, {100 * r.diff_hi:+.1f}]'
+    if mod == 'v':
+        return verdict_from_ci(r.diff_lo, r.diff_hi)
+    if mod == 'pcti':
+        return f'{pct(r.acc)} [{pct(r.acc_lo)}, {pct(r.acc_hi)}]'
+    if mod == 'pct':
+        return pct(r[args[1]])
+    return f(r[args[1]])
+
+
+def _ns_cc(args, mod):
+    """cc:<system>:<col>  from conformal_calibration.csv"""
+    r = _row(rd('conformal_calibration.csv'), system=args[0])
+    return f(r[args[1]])
+
+
+def _ox_cell(v, lo, hi, mod, d=2):
+    if mod == 'full':
+        return f'{f(v, d)} [{f(lo, d)}, {f(hi, d)}]'
+    if mod == 'ci':
+        return f'[{f(lo, d)}, {f(hi, d)}]'
+    if mod == 'd':
+        return f'{sgn(v, d)} [{sgn(lo, d)}, {sgn(hi, d)}]'
+    return f(v, d)
+
+
+def _ns_ox(args, mod):
+    """ox:<label>/<model>:<col>  from openox_spo2_overall.csv (label lag_star = the primary lag-corrected analysis)"""
+    label, model = args[0].split('/')
+    r = _row(rd('openox_spo2_overall.csv'), label=label, model=model)
+    col = args[1]
+    lo, hi = (r.get(col + '_lo', np.nan), r.get(col + '_hi', np.nan))
+    return _ox_cell(r[col], lo, hi, mod, 3 if col == 'auroc_lt90' else 2)
+
+
+def _ns_oxp(args, mod):
+    """oxp:<label>/<model>/<baseline>  from openox_spo2_paired.csv (MAE difference model minus baseline; negative = model better)"""
+    label, model, base = args[0].split('/')
+    r = _row(rd('openox_spo2_paired.csv'), label=label, model=model, baseline=base)
+    if mod == 'v':
+        return str(r.verdict)
+    return _ox_cell(r.diff_model_minus_baseline, r.lo, r.hi, 'd')
+
+
+def _ns_oxg(args, mod):
+    """oxg:<scheme>/<model>/<metric>  from openox_spo2_gaps.csv (primary lag), dark minus light"""
+    scheme, model, metric = args[0].split('/')
+    d = rd('openox_spo2_gaps.csv')
+    r = _row(d, label='lag_star', scheme=scheme, model=model, metric=metric)
+    if mod == 'n':
+        return f'{int(r.n_dark)} versus {int(r.n_light)}'
+    if mod == 'nd':
+        return str(int(r.n_dark))
+    if mod == 'nl':
+        return str(int(r.n_light))
+    return _ox_cell(r.gap, r.lo, r.hi, 'd')
+
+
+def _ns_oxb(args, mod):
+    """oxb:<scheme>  from openox_spo2_contact_bias_gaps.csv: contact-oximeter reading minus blood-gas SaO2, dark minus light"""
+    r = _row(rd('openox_spo2_contact_bias_gaps.csv'), scheme=args[0])
+    if mod == 'n':
+        return f'{int(r.n_dark)} versus {int(r.n_light)}'
+    return _ox_cell(r.gap, r.lo, r.hi, 'd')
+
+
+def _ns_oxl(args, mod):
+    """oxl:<method>  from openox_spo2_lag.csv (kind estimate); mod ci"""
+    d = rd('openox_spo2_lag.csv')
+    r = _row(d[d.kind == 'estimate'], method=args[0])
+    if mod == 'ci':
+        return f'[{int(r.ci_lo)}, {int(r.ci_hi)}]'
+    return f'{int(r.lag)}'
+
+
+def _ns_oxc(args, mod):
+    """oxc:<col>  from openox_spo2_counts.csv (first row)"""
+    v = rd('openox_spo2_counts.csv').iloc[0][args[0]]
+    return f'{int(v):,}' if float(v).is_integer() else f(v, 2)
+
+
+def _ns_hv(args, mod):
+    """hv:<dataset>/<variant>/<scope>:<col>  from hr_vote_summary.csv; mods full (value [CI]), pct, pcti"""
+    ds, var, scope = args[0].split('/')
+    r = _row(rd('hr_vote_summary.csv'), dataset=ds, variant=var, scope=scope)
+    col = args[1]
+    if col == 'mae':
+        return _ox_cell(r.mae, r.mae_lo, r.mae_hi, mod)
+    if col == 'within5_full':
+        if mod == 'pcti':
+            return f'{pct(r.within5_full)} [{pct(r.within5_lo)}, {pct(r.within5_hi)}]'
+        return pct(r.within5_full)
+    if col == 'doubling':
+        return pct(r.doubling, 2)
+    if col == 'n_windows':
+        return f'{int(r.n_windows):,}'
+    if col == 'share_of_windows':
+        return pct(r.share_of_windows, 0)
+    return f(r[col])
+
+
+def _ns_hvp(args, mod):
+    """hvp:<dataset>/<scope>/<baseline>/<metric>  from hr_vote_paired.csv (rule minus baseline, better = positive)"""
+    ds, scope, base, metric = args[0].split('/')
+    d = rd('hr_vote_paired.csv')
+    r = _row(d[d.rule == 'vote+harmonic+octave+median5'], dataset=ds, scope=scope, baseline=base, metric=metric)
+    if mod == 'v':
+        return str(r.verdict)
+    return _ox_cell(r.better_is_positive_diff, r.lo, r.hi, 'd')
+
+
+def _ns_hvs(args, mod):
+    """hvs:<person>/<estimator>:<col>  from hr_vote_slow_band.csv (MAE and means to 1 decimal, shares as percent with mod pct)"""
+    person, est = args[0].split('/')
+    r = _row(rd('hr_vote_slow_band.csv'), person=person, estimator=est)
+    return pct(r[args[1]]) if mod == 'pct' else f(r[args[1]], 1)
+
+
+def _line_rows(df, cols):
+    return [[str(c) for c in r] for r in df[cols].itertuples(index=False)]
+
+
+def block_conformal(full: bool = False) -> str:
+    """Headline table at the declared alpha 0.10, the matched-coverage comparison with v1 and v2, and (full) coverage targets and per person."""
+    head = ['Pipeline', 'Coverage (answered)', 'Accuracy on answered', 'All hypoxic windows alerted', 'Hypoxic called Normal', 'Normal / Possible low / Unsure']
     rows = []
-    for _, r in df.iterrows():
-        rows.append([f(v) if isinstance(v, (float, np.floating)) else str(v) for v in r.tolist()])
-    return md_table(cols, rows, ['l'] + ['r'] * (len(cols) - 1))
+    for s in (('final', 'deployed_R', 'chain_v1') if full else ('final', 'chain_v1')):
+        r = _cf_row(s, 0.1)
+        rows.append([SYS_LABEL[s], _cf_cell(r, 'coverage', 'pcti'), _cf_cell(r, 'acc', 'pcti'), _cf_cell(r, 'alert_share_all', 'pcti'), pct(r.confident_miss),
+                     f'{pct(r.share_normal, 0)} / {pct(r.share_low, 0)} / {pct(r.share_unsure, 0)}'])
+    out = [f'**Held-out conformal output at the declared level alpha = 0.10** (Mondrian, thresholds from the five other people only, {int(_cf_row("final", 0.1).n):,} Hoffman windows after the first minute, 95% person-bootstrap CIs):', '',
+           md_table(head, rows, ['l', 'r', 'r', 'r', 'r', 'r']), '']
+    hdr = ['Reference at its own coverage', 'Pipeline (nested Mondrian conformal)', 'Matched coverage', 'Accuracy on answered', 'Reference accuracy', 'Difference, points', 'Verdict']
+    mr = []
+    systems = ('final', 'deployed_R', 'chain_v1') if full else ('final', 'chain_v1')
+    for ref, rl in (('v1', 'v1 shipped band'), ('v2', 'v2 gated band')):
+        for s in systems:
+            r = _row(rd('conformal_matched.csv'), system=s, reference=ref, variant='conformal_mondrian')
+            mr.append([rl, SYS_LABEL[s], pct(r.coverage), f'{pct(r.acc)} [{pct(r.acc_lo)}, {pct(r.acc_hi)}]', pct(r.reference_acc), f'{100 * r.diff_acc:+.1f} [{100 * r.diff_lo:+.1f}, {100 * r.diff_hi:+.1f}]',
+                       verdict_from_ci(r.diff_lo, r.diff_hi)])
+    out += ['**At matched coverage** (each system is read at the coverage of the reference, by interpolation along alpha; the reference accuracy is the hand-set band of the shipped v1 or v2 chain):', '',
+            md_table(hdr, mr, ['l', 'l', 'r', 'r', 'r', 'r', 'l']), '']
+    if full:
+        tg = []
+        for a in (0.05, 0.1, 0.15):
+            for s in ('final', 'deployed_R', 'chain_v1'):
+                r = _cf_row(s, a)
+                tg.append([f'{a:.2f}', pct(1 - a, 0), SYS_LABEL[s], _cf_cell(r, 'set_cov_hypoxic', 'pcti'), _cf_cell(r, 'set_cov_normal', 'pcti')])
+        out += ['**Empirical set coverage next to the target** (the guarantee is per class and assumes exchangeability; windows of one person overlap by 80% and people differ):', '',
+                md_table(['alpha', 'Target', 'Pipeline', 'Coverage, hypoxic windows', 'Coverage, normal windows'], tg, ['r', 'r', 'l', 'r', 'r']), '']
+        pp = rd('conformal_per_person.csv')
+        pp = pp[(pp.system == 'final') & (pp.method == 'mondrian') & np.isclose(pp.alpha.astype(float), 0.1)]
+        prow = [[p.person.replace('hof_10000', 'person '), f'{int(p.n):,}', pct(p.coverage), pct(p.acc), pct(p.alert_share_all), pct(p.confident_miss), pct(p.set_cov_hypoxic), pct(p.share_unsure)] for p in pp.itertuples()]
+        out += ['**Per person** (hybrid, alpha = 0.10): the pooled guarantee does not hold person by person.', '',
+                md_table(['Held-out person', 'Windows', 'Coverage', 'Accuracy on answered', 'Hypoxic alerted', 'Hypoxic called Normal', 'Set coverage, hypoxic', 'Unsure'], prow, ['l', 'r', 'r', 'r', 'r', 'r', 'r', 'r']), '']
+        cr = lambda s: _row(rd('conformal_calibration.csv'), system=s)
+        cal = ['AUROC over all windows: hybrid ' + f(cr('final').auroc_all) + ', deployed R ' + f(cr('deployed_R').auroc_all) + ', v1 chain ' + f(cr('chain_v1').auroc_all) +
+               '. Expected calibration error of sigmoid(z): hybrid ' + f(cr('final').ece_all_windows) + ', deployed R ' + f(cr('deployed_R').ece_all_windows) + ', v1 chain ' + f(cr('chain_v1').ece_all_windows) + ' (the chain ranks well but is not calibrated).']
+        out += cal + ['']
+    out += ['Source: `results/ml/conformal_curve.csv`, `conformal_matched.csv`, `conformal_per_person.csv`, `conformal_calibration.csv`; protocol and reading in `results/ml/CONFORMAL.md`.']
+    return '\n'.join(out)
 
 
-def _pending_block(title: str, what: str, files: str) -> str:
-    return (f'> **PENDING: {title}.** {what} The numbers for this section come from a separate analysis that is not merged into this tree yet (`{files}`). '
-            f'This block is generated: run `bash scripts/reproduce_ml.sh docs` after the files exist and it renders in full. '
-            f'No number from this section is quoted anywhere else in this document.')
+OX_LABEL = {'R': 'CNN, hybrid R members (3 seeds, shipped family)', 'P': 'CNN, plain family P (3 seeds)', 'stageB': 'CNN, stage-B warm-up checkpoint',
+            'ror_textbook': 'Textbook ratio-of-ratios (110 - 25 R)', 'ror_calibrated': 'Ratio-of-ratios, linear fit on training people', 'train_mean': 'Training-mean predictor'}
 
 
-def block_conformal() -> str:
-    fs = _found('conformal')
-    if not fs:
-        return _pending_block('conformal 3-state output', 'Split-conformal abstention on the final hybrid scores, with the coverage-versus-accuracy curve and the comparison with the v1 chain at matched coverage '
-                              '(v1 shipped band: coverage ' + CUSTOM['v1_cov']() + ', accuracy ' + CUSTOM['v1_acc_band']() + ').', 'results/ml/CONFORMAL.md, results/ml/conformal*.csv')
-    parts = []
-    for p in fs:
-        parts.append(f'`results/ml/{os.path.basename(p)}`:\n\n' + _generic_csv_md(p))
-    return '\n\n'.join(parts) + '\n\nSee `results/ml/CONFORMAL.md` for the protocol and the reading.'
+def block_openox(full: bool = False) -> str:
+    c = rd('openox_spo2_counts.csv').iloc[0]
+    models = ('R', 'P', 'stageB', 'ror_textbook', 'ror_calibrated', 'train_mean') if full else ('R', 'ror_textbook', 'train_mean')
+    rows = []
+    for m in models:
+        r = _row(rd('openox_spo2_overall.csv'), label='lag_star', model=m)
+        rows.append([OX_LABEL[m], f'{f(r.mae, 2)} [{f(r.mae_lo, 2)}, {f(r.mae_hi, 2)}]', f'{f(r.bias, 2)} [{f(r.bias_lo, 2)}, {f(r.bias_hi, 2)}]', f'{f(r.arms_70_100, 2)} [{f(r.arms_70_100_lo, 2)}, {f(r.arms_70_100_hi, 2)}]'])
+    out = [f'**Contact-sensor test, not a phone test.** OpenOximetry is a red/infrared finger clip with arterial-blood-gas SaO2. {int(c.heldout_people)} people are held out of every training stage ({int(c.heldout_people_with_sao2)} with SaO2 labels, {int(c.heldout_people_scored)} scored); '
+           f'the label lag ({oxl("ppg")} s, bootstrap {oxl("ppg", "ci")}) was learned on {int(c.train_people)} training people only. Windows: {int(c.windows_sao2):,}. Error in SpO2 points, 95% person-bootstrap CI:', '',
+           md_table(['Predictor', 'MAE', 'Bias (prediction minus SaO2)', 'ARMS, SaO2 70 to 100'], rows, ['l', 'r', 'r', 'r']), '']
+    if full:
+        pr = []
+        for base in ('ror_textbook', 'ror_calibrated', 'train_mean', 'P', 'stageB'):
+            r = _row(rd('openox_spo2_paired.csv'), label='lag_star', model='R', baseline=base)
+            pr.append([OX_LABEL[base], _ox_cell(r.diff_model_minus_baseline, r.lo, r.hi, 'd'), str(r.verdict)])
+        out += ['**Paired difference of the shipped CNN (R) minus each baseline** (MAE points, negative = CNN better):', '', md_table(['Baseline', 'Difference [95% CI]', 'Verdict'], pr, ['l', 'r', 'l']), '']
+    sk = rd('openox_spo2_skin.csv')
+    sk = sk[sk.label == 'lag_star']
+    srows = []
+    for scheme, groups, sl in (('monk', ('1-3', '4-6', '7+'), 'Monk'), ('ita', ('lightest tertile', 'mid tertile', 'darkest tertile'), 'ITA')):
+        for g in groups:
+            cells = []
+            for m in ('R', 'ror_textbook', 'train_mean'):
+                r = _row(sk, scheme=scheme, group=g, model=m)
+                cells.append(f'{f(r.mae, 2)} [{f(r.mae_lo, 2)}, {f(r.mae_hi, 2)}]')
+            n = int(_row(sk, scheme=scheme, group=g, model='R').n_people)
+            srows.append([f'{sl} {g}', str(n)] + cells)
+    out += ['**By skin tone** (Monk scale from the dataset; ITA from the image-derived tertiles; MAE in SpO2 points):', '',
+            md_table(['Group', 'People', 'CNN MAE', 'Textbook ratio-of-ratios MAE', 'Training-mean MAE'], srows, ['l', 'r', 'r', 'r', 'r']), '']
+    g = _row(rd('openox_spo2_gaps.csv'), label='lag_star', scheme='ita', model='R', metric='mae')
+    g7 = _row(rd('openox_spo2_gaps.csv'), label='lag_star', scheme='monk', model='R', metric='mae')
+    out += [f'CNN MAE dark minus light, ITA tertiles ({int(g.n_dark)} versus {int(g.n_light)} people): {_ox_cell(g.gap, g.lo, g.hi, "d")}, and the interval {"contains 0" if g.lo < 0 < g.hi else "excludes 0"}. Monk 7 and above has only {int(g7.n_dark)} held-out people, so the gap by Monk group is **not estimable**.', '']
+    cb = rd('openox_spo2_contact_bias_gaps.csv')
+    bm, bi = _row(cb, scheme='monk'), _row(cb, scheme='ita')
+    out += [f'**The reference itself is biased.** Contact-oximeter display minus blood-gas SaO2 (all {int(rd("openox_spo2_contact_bias.csv").query("scheme == 'monk'").n_people.sum())} people with draws), dark minus light: Monk 7+ versus 1-3 {_ox_cell(bm.gap, bm.lo, bm.hi, "d")} points ({int(bm.n_dark)} versus {int(bm.n_light)} people), '
+            f'ITA darkest versus lightest tertile {_ox_cell(bi.gap, bi.lo, bi.hi, "d")} points. The device over-reads more in darker skin, so any label from a pulse oximeter inherits this; the analysis above is anchored to blood gas.', '',
+            'Source: `results/ml/openox_spo2_overall.csv`, `openox_spo2_skin.csv`, `openox_spo2_gaps.csv`, `openox_spo2_paired.csv`, `openox_spo2_contact_bias_gaps.csv`; protocol in `results/ml/OPENOX_SPO2.md` (Daytona only, aggregates only).']
+    return '\n'.join(out)
 
 
-def block_openox() -> str:
-    fs = _found('openox_spo2')
-    if not fs:
-        return _pending_block('OpenOximetry SpO2 by skin tone', 'ABG-anchored SaO2 (lag-corrected, learned on training people only) on OpenOximetry people held out of every training stage (Daytona only), '
-                              'MAE and ARMS against the ratio-of-ratios and the train-mean predictor, split by Monk skin-tone group, with dark-minus-light gaps and person-bootstrap intervals.',
-                              'results/ml/OPENOX_SPO2.md, results/ml/openox_spo2*.csv')
-    parts = []
-    for p in fs:
-        parts.append(f'`results/ml/{os.path.basename(p)}`:\n\n' + _generic_csv_md(p))
-    return '\n\n'.join(parts) + '\n\nSee `results/ml/OPENOX_SPO2.md` for the protocol and the reading.'
+def oxl(method: str, mod: str | None = None) -> str:
+    return _ns_oxl([method], mod)
 
 
-def block_hrvote() -> str:
-    fs = _found('hr_vote')
-    if not fs:
-        return _pending_block('heart-rate voting', 'Voting between autocorrelation, the spectral harmonic sum and the CNN head with harmonic correction and a causal median, on BUT PPG and MTHS.',
-                              'results/ml/HR_VOTE.md, results/ml/hr_vote*.csv')
-    parts = []
-    for p in fs:
-        parts.append(f'`results/ml/{os.path.basename(p)}`:\n\n' + _generic_csv_md(p))
-    return '\n\n'.join(parts) + '\n\nSee `results/ml/HR_VOTE.md` for the protocol and the reading.'
+def block_hrvote(full: bool = False) -> str:
+    rule = 'vote+harmonic+octave+median5'
+    rows = []
+    for ds, lab in (('butppg', 'BUT PPG (38 people)'), ('mths', 'MTHS (62 people)'), ('butppg+mths', 'BUT PPG + MTHS (100 people)'), ('hoffman', 'Hoffman (6 people, extra)')):
+        r = _row(rd('hr_vote_summary.csv'), dataset=ds, variant=rule, scope='clean')
+        c = _row(rd('hr_vote_summary.csv'), dataset=ds, variant='cnn', scope='clean')
+        s = _row(rd('hr_vote_summary.csv'), dataset=ds, variant='spec', scope='clean')
+        rows.append([lab, f'{int(r.n_windows):,} ({pct(r.share_of_windows, 0)})', f'{f(r.mae, 2)} [{f(r.mae_lo, 2)}, {f(r.mae_hi, 2)}]', f'{pct(r.within5_full)} [{pct(r.within5_lo)}, {pct(r.within5_hi)}]', pct(r.doubling, 2),
+                     f(c.mae, 2), f(s.mae, 2), 'yes' if bool(r.meets_target) else 'no'])
+    out = ['**Voting rule on clean clips** (pass the shipped v2 quality gate; MAE in bpm; target stated before any result: MAE under 3 bpm and doubling under 1%). Voting of autocorrelation, spectral harmonic sum and the CNN, with octave check and a causal median of 5:', '',
+           md_table(['Dataset', 'Clean windows', 'Voting MAE [95% CI]', 'Within 5 bpm', 'Doubling', 'CNN alone MAE', 'Spectral alone MAE', 'Target met'], rows, ['l', 'r', 'r', 'r', 'r', 'r', 'r', 'l']), '']
+    sl = rd('hr_vote_slow_band.csv')
+    p = 'hof_100004'
+    out += [f'**Slow pulse (Hoffman person 4, mean reference {f(_row(sl, person=p, estimator="spec_band51").mean_ref, 0)} bpm).** With the shipped spectral floor of 51 bpm the spectral estimate has MAE {f(_row(sl, person=p, estimator="spec_band51").mae, 1)} bpm; widening the band to 40 bpm gives {f(_row(sl, person=p, estimator="spec_band40").mae, 1)}; '
+            f'the CNN does not track this person ({f(_row(sl, person=p, estimator="cnn").mae, 1)} bpm).', '']
+    if full:
+        pr = []
+        for ds, scope in (('butppg', 'clean'), ('mths', 'clean'), ('butppg+mths', 'all')):
+            for base in ('cnn', 'p2_final_rule') if ds != 'hoffman' else ('cnn',):
+                r = _row(rd('hr_vote_paired.csv'), dataset=ds, scope=scope, baseline=base, metric='mae', rule=rule)
+                pr.append([{'butppg': 'BUT PPG', 'mths': 'MTHS', 'butppg+mths': 'BUT PPG + MTHS'}[ds] + (', clean clips' if scope == 'clean' else ', all clips'), {'cnn': 'CNN alone', 'p2_final_rule': 'P2 rule `agree`'}[base], _ox_cell(r.better_is_positive_diff, r.lo, r.hi, 'd'), str(r.verdict)])
+        out += ['Paired MAE difference, voting minus baseline in bpm (positive = voting better):', '', md_table(['Scope', 'Baseline', 'Difference [95% CI]', 'Verdict'], pr, ['l', 'l', 'r', 'l']), '']
+    out += [f'On BUT PPG the voting rule ({f(_row(rd("hr_vote_summary.csv"), dataset="butppg", variant=rule, scope="clean").mae, 2)} bpm against {f(_row(rd("hr_vote_summary.csv"), dataset="butppg", variant="cnn", scope="clean").mae, 2)}) is worse than the CNN alone, and the target is not met on either phone dataset, so **it does not replace the P2 rule** and the app keeps `agree`. Source: `results/ml/hr_vote_summary.csv`, `hr_vote_paired.csv`, `hr_vote_slow_band.csv`; protocol in `results/ml/HR_VOTE.md`.']
+    return '\n'.join(out)
+
+
+def _deploy_value(label_regex: str) -> str:
+    txt = open(os.path.join(RES, 'DEPLOY.md')).read()
+    m = re.search(label_regex, txt)
+    return m.group(1) if m else 'n/a'
 
 
 def block_app_state() -> str:
     st = _app_state()
     if st['wired']:
-        return ('The default engine of the app in this tree is the hybrid: the v1 logistic chain logit plus the residual of the 3-seed CNN ensemble (`app/js/`, see `docs/APP_INTEGRATION.md`). '
-                'The logistic chain stays as the fallback and as `?engine=logistic`.')
-    return ('**PENDING (app integration):** in this tree the app still runs the logistic chain v2. The hybrid weights are exported (`app/data/hybrid_weights.json`, three seed members) and '
-            'checked for numerical parity, and wiring them into the app is the job of the app-integration branch (`docs/APP_INTEGRATION.md`). Until that is merged, nothing in this document '
-            'claims that the live site runs the CNN.')
+        fwd = _deploy_value(r'one OxyNet forward pass[^|]*\|\s*([\d.]+) ms')
+        win = _deploy_value(r'full hybrid window[^|]*\|\s*([\d]+ to [\d]+ ms)')
+        mb = sum(os.path.getsize(os.path.join(ROOT, f'app/data/hybrid_R_s{i}.json')) for i in range(3)) / 1e6
+        return ('**What the app runs.** The hybrid is the on-device default path: the v1 physiological chain logit plus the residual of three CNN seeds, then the logistic meta-learner and the conformal three-state rule (`app/js/hybrid_engine.js`, `docs/APP_INTEGRATION.md`). '
+                'The CNN runs in a Web Worker so a forward pass never delays camera frames, with an in-page fallback when module workers are unavailable; the v2 logistic chain stays behind `?engine=logistic`. '
+                'A generic low-amplitude guard (AC/DC below the 0.1th percentile of the Hoffman training windows, ' + pct(_row(rd('ood_ac_range.csv'), dataset='hoffman', percentile=0.1).ac_ratio_percent / 100, 2) + ') answers *Unsure*. '
+                f'Latency measured on a development laptop (`results/ml/DEPLOY.md`): {fwd} ms for one forward pass, {win} per 2 s window including all three seeds; phones are slower and unmeasured. '
+                f'The three seed files are {mb:.2f} MB together. The replay demo is in-sample for the hybrid (the weights saw those two people) and is labelled demo only in the app.')
+    return ('**PENDING (app integration):** in this tree the app still runs the logistic chain v2 (`app/js/hybrid_engine.js` is not wired into `app/js/app.js`).')
 
 
 def block_pending_summary() -> str:
@@ -892,9 +1143,12 @@ def block_pending_summary() -> str:
     if pend:
         out.append('**PENDING (generated blocks, filled automatically when the files exist):** ' + '; '.join(names[k] for k in pend) + '.')
     if not _app_state()['wired']:
-        out.append('**PENDING:** the app in this tree still runs the logistic chain v2 (the hybrid export is ready, wiring is the app-integration branch).')
-    return ' '.join(out) if out else 'No section is pending: every block below is generated from files in `results/ml/`.'
+        out.append('**PENDING:** the app in this tree still runs the logistic chain v2.')
+    return ' '.join(out) if out else 'Nothing is pending: every table in this document is generated from files in `results/ml/`.'
 
+
+NS.update({'cf': _ns_cf, 'cpp': _ns_cp_person, 'cm': _ns_cm, 'cc': _ns_cc, 'ox': _ns_ox, 'oxp': _ns_oxp, 'oxg': _ns_oxg, 'oxb': _ns_oxb, 'oxl': _ns_oxl, 'oxc': _ns_oxc,
+           'hv': _ns_hv, 'hvp': _ns_hvp, 'hvs': _ns_hvs})
 
 BLOCKS = {
     'pending_summary': block_pending_summary,
@@ -906,14 +1160,18 @@ BLOCKS = {
     'p3_main': block_p3_main,
     'ablation': block_ablation,
     'levers': block_levers,
+    'levers_short': lambda: block_levers(True),
     'gap': block_gap,
     'selection': block_selection,
     'matched_coverage': block_matched_coverage,
     'skin_hoffman': block_skin_hoffman,
     'ssl': block_ssl,
-    'conformal': block_conformal,
-    'openox': block_openox,
-    'hrvote': block_hrvote,
+    'conformal': lambda: block_conformal(False),
+    'conformal_full': lambda: block_conformal(True),
+    'openox': lambda: block_openox(False),
+    'openox_full': lambda: block_openox(True),
+    'hrvote': lambda: block_hrvote(False),
+    'hrvote_full': lambda: block_hrvote(True),
     'app_state': block_app_state,
 }
 

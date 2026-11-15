@@ -121,6 +121,52 @@ def independent_claims() -> list[tuple[str, str, list[str]]]:
     acc = sh[sh.metric == 'acc'].iloc[0].pooled
     claims.append(('v1 shipped band coverage', f'{100 * cov:.1f}%', ['MODEL.md', 'WHITEPAPER.md']))
     claims.append(('v1 shipped band accuracy', f'{100 * acc:.1f}%', ['MODEL.md', 'WHITEPAPER.md']))
+    # ---- conformal, OpenOximetry and HR voting (independent code, straight from the CSVs)
+    cc = csv('conformal_curve.csv')
+    r = cc[(cc.system == 'final') & (cc.method == 'mondrian') & ((cc.param - 0.10).abs() < 1e-9)].iloc[0]
+    claims.append(('conformal alpha 0.10 coverage', f'{100 * r.coverage:.1f}% [{100 * r.coverage_lo:.1f}%, {100 * r.coverage_hi:.1f}%]', ['MODEL.md', 'WHITEPAPER.md']))
+    claims.append(('conformal alpha 0.10 coverage (README)', f'{100 * r.coverage:.1f}%', ['README.md']))
+    claims.append(('conformal alpha 0.10 accuracy on answered', f'{100 * r.acc:.1f}% [{100 * r.acc_lo:.1f}%, {100 * r.acc_hi:.1f}%]', ['MODEL.md', 'WHITEPAPER.md']))
+    claims.append(('conformal alpha 0.10 hypoxic alerted', f'{100 * r.alert_share_all:.1f}%', allthree))
+    claims.append(('conformal alpha 0.10 hypoxic called Normal', f'{100 * r.confident_miss:.1f}%', allthree))
+    cm = csv('conformal_matched.csv')
+    for ref in ('v1', 'v2'):
+        r = cm[(cm.system == 'final') & (cm.reference == ref) & (cm.variant == 'conformal_mondrian')].iloc[0]
+        claims.append((f'matched coverage {ref} hybrid accuracy', f'{100 * r.acc:.1f}%', allthree if ref == 'v1' else ['MODEL.md', 'WHITEPAPER.md']))
+        claims.append((f'matched coverage {ref} hybrid difference', f'{100 * r.diff_acc:+.1f} [{100 * r.diff_lo:+.1f}, {100 * r.diff_hi:+.1f}]', ['MODEL.md', 'WHITEPAPER.md'] + (['README.md'] if ref == 'v1' else [])))
+        r = cm[(cm.system == 'chain_v1') & (cm.reference == ref) & (cm.variant == 'conformal_mondrian')].iloc[0]
+        claims.append((f'matched coverage {ref} chain accuracy', f'{100 * r.acc:.1f}%', allthree))
+    pp = csv('conformal_per_person.csv')
+    r = pp[(pp.system == 'final') & (pp.method == 'mondrian') & ((pp.alpha - 0.1).abs() < 1e-9) & (pp.person == 'hof_100001')].iloc[0]
+    claims.append(('person 1 hypoxic called Normal', f'{100 * r.confident_miss:.1f}%', allthree))
+    ov = csv('openox_spo2_overall.csv')
+    for mdl in ('R', 'ror_textbook'):
+        r = ov[(ov.label == 'lag_star') & (ov.model == mdl)].iloc[0]
+        claims.append((f'OpenOx SaO2 MAE {mdl}', f'{r.mae:.2f} [{r.mae_lo:.2f}, {r.mae_hi:.2f}]', allthree))
+    r = ov[(ov.label == 'lag_star') & (ov.model == 'train_mean')].iloc[0]
+    claims.append(('OpenOx SaO2 MAE train mean', f'{r.mae:.2f}', ['README.md', 'MODEL.md', 'WHITEPAPER.md']))
+    pr = csv('openox_spo2_paired.csv')
+    r = pr[(pr.label == 'lag_star') & (pr.model == 'R') & (pr.baseline == 'ror_textbook')].iloc[0]
+    claims.append(('OpenOx CNN minus textbook', f'{r.diff_model_minus_baseline:+.2f} [{r.lo:+.2f}, {r.hi:+.2f}]', ['README.md', 'MODEL.md']))
+    gp = csv('openox_spo2_gaps.csv')
+    r = gp[(gp.label == 'lag_star') & (gp.scheme == 'ita') & (gp.model == 'R') & (gp.metric == 'mae')].iloc[0]
+    claims.append(('OpenOx ITA MAE gap', f'{r.gap:+.2f} [{r.lo:+.2f}, {r.hi:+.2f}]', allthree))
+    cb = csv('openox_spo2_contact_bias_gaps.csv').set_index('scheme')
+    claims.append(('contact bias gap Monk', f'{cb.loc["monk"].gap:+.2f} [{cb.loc["monk"].lo:+.2f}, {cb.loc["monk"].hi:+.2f}]', allthree))
+    claims.append(('contact bias gap ITA', f'{cb.loc["ita"].gap:+.2f} [{cb.loc["ita"].lo:+.2f}, {cb.loc["ita"].hi:+.2f}]', allthree))
+    lg = csv('openox_spo2_lag.csv')
+    r = lg[(lg.kind == 'estimate') & (lg.method == 'ppg')].iloc[0]
+    claims.append(('OpenOx lag', f'[{int(r.ci_lo)}, {int(r.ci_hi)}]', ['README.md', 'MODEL.md', 'WHITEPAPER.md']))
+    hv = csv('hr_vote_summary.csv')
+    rule = 'vote+harmonic+octave+median5'
+    for ds in ('butppg', 'mths'):
+        r = hv[(hv.dataset == ds) & (hv.variant == rule) & (hv.scope == 'clean')].iloc[0]
+        claims.append((f'HR vote clean MAE {ds}', f'{r.mae:.2f}', allthree))
+    sb = csv('hr_vote_slow_band.csv').set_index('estimator')
+    claims.append(('slow pulse MAE floor 51', f'{sb.loc["spec_band51"].mae:.1f}', allthree))
+    claims.append(('slow pulse MAE floor 40', f'{sb.loc["spec_band40"].mae:.1f}', allthree))
+    dep = open(os.path.join(RES, 'DEPLOY.md')).read()
+    claims.append(('forward pass latency from DEPLOY.md', re.search(r'one OxyNet forward pass[^|]*\|\s*([\d.]+) ms', dep).group(1) + ' ms', ['MODEL.md', 'WHITEPAPER.md']))
     ssl = json.load(open(os.path.join(RES, 'ssl_manifest.json')))
     claims.append(('SSL rows', f"{ssl['ssl_full']['rows']:,}", ['MODEL.md', 'WHITEPAPER.md']))
     try:
@@ -146,6 +192,7 @@ ALLOW_DECIMALS = {
     '0.5', '0.7',    # design constants: fixed decision threshold, band-pass lower edge
     '0.2', '1.1', '1.0', '2.0', '1.5', '0.9', '0.8', '1.4',  # version strings, feature timing constants, band names
     '4.0',           # CC BY 4.0 / CC BY-NC-ND 4.0 licence versions
+    '0.10',          # declared conformal miscoverage level alpha (Amendment 5, before any result)
     '11.6',          # million multiply-adds per window (python/oxydrop_ml/MODEL_SPEC.md, measured by model.py)
 }
 TOKEN = re.compile(r'\{\{[^{}]+\}\}')
@@ -164,7 +211,7 @@ def check_templates():
                 line = txt[:m.start()].count('\n') + 1
                 fail(f'{os.path.basename(tpl)} line ~{line}: hand-typed decimal {m.group(1)!r} (use a {{{{token}}}} or add it to ALLOW_DECIMALS with a reason)')
         for m in re.finditer(r'\b(\d{1,3}(?:\.\d+)?)\s?%', txt):
-            if m.group(1) not in ('81', '79', '100', '95', '90'):   # literature rates, 95% intervals, SpO2 < 90% definition
+            if m.group(1) not in ('81', '79', '100', '95', '90', '10'):   # literature rates, 95% intervals, SpO2 < 90% definition, 10% = 1 - (1 - alpha) target
                 line = txt[:m.start()].count('\n') + 1
                 fail(f'{os.path.basename(tpl)} line ~{line}: hand-typed percentage {m.group(0)!r}')
 

@@ -29,9 +29,9 @@ A web app (works in a phone browser, nothing to install, video never leaves the 
 * **Heart rate (P2, 100 people): a win with a caveat.** {{hp:all/HYBRID_agree:within5_full|full}} within 5 bpm against {{hp:all/v2_spectral_acf__forced:within5_full|full}} for the best baseline ({{hpd:all/v2_spectral_acf__forced|d}}); the rule was chosen after the pooled table had been seen.
 * **Absolute SpO2 (P3, MTHS):** no model beats the training mean ({{ab:full/p23:p3_mae}} CNN against {{b3:train_mean:mae}}); MTHS is normoxic, so SpO2 is not shown to users.
 * **What drives the CNN:** the OpenOximetry warm-up (P1 {{ab:no_openox/p23k:p1_tm_bacc}} without it against {{ab:full/p23:p1_tm_bacc}} with it). A device-agnostic-augmentation benefit is not supported.
-* **Where it fails:** only six hypoxic phone-camera people exist in open data, so intervals are wide; motion, cold fingers, saturated red channel and far-flash phones produce *Unsure*; skin-tone fairness cannot be shown on phones; low oxygen already present during the first minute is invisible; person 4's 43 bpm resting pulse is below the heart-rate floor of the v2 estimator. The app is built to work on every phone and is not tuned to any specific phone; untested Android and other phones are a limitation.
+* **Where it fails:** only six hypoxic phone-camera people exist in open data, so intervals are wide; motion, cold fingers, saturated red channel and far-flash phones produce *Unsure*; skin-tone fairness cannot be shown on phones; low oxygen already present during the first minute is invisible; person 4's resting pulse of about 48 bpm is below the 51 bpm spectral floor of the v2 estimator. The app is built to work on every phone and is not tuned to any specific phone; untested Android and other phones are a limitation.
 
-{{@pending_summary}}
+{{@app_state}}
 
 The v1/v2 chain tables, the heart-rate validation on BUT PPG and the earlier audit are in [ENGINEERED_CHAIN.md](ENGINEERED_CHAIN.md).
 
