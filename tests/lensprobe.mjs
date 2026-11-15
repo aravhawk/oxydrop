@@ -196,4 +196,32 @@ await t('adaptive exposure: steps down when saturated, bounded, and a no-op with
   const none = new CameraSource(() => {}); none.caps = {}; none.stat = { luma: 30, satFrac: 0 };
   assert.equal((await none.tryAdaptExposure({ sleep: async () => {} })).result, 'unsupported_left_on_auto');
 });
+
+// ---------- review fixes: settle-frame saturation and cancellation
+await t('saturation during the settle frames does not zero a lens score', async () => {
+  mockNavigator({ devices: DEVICES, torchMode: 'ok' });
+  const settleN = Math.round(0.5 * FS);
+  const wrap = (satOf) => (onSample) => { let k = 0; const cam = fakeCamFactory()((r, g, b) => { k++; cam.satFrac = satOf(k); onSample(r, g, b); }); return cam; };
+  const target = { id: 'u', label: 'Back Ultra Wide Camera', mode: 'torch' };
+  const early = await probeLens(wrap((k) => (k <= settleN ? 0.9 : 0)), target, FAST);
+  const clean = await probeLens(wrap(() => 0), target, FAST);
+  const late = await probeLens(wrap((k) => (k <= settleN ? 0 : 0.9)), target, FAST);
+  console.log(`      settle-sat ${early.score.toFixed(1)}  no-sat ${clean.score.toFixed(1)}  body-sat ${late.score.toFixed(1)}`);
+  assert.ok(clean.score >= SCORE_MIN); assert.ok(Math.abs(early.score - clean.score) < 3, 'settle saturation ignored');
+  assert.equal(late.reason, 'saturated'); assert.ok(late.score < SCORE_MIN, 'saturation after settle still penalised');
+});
+await t('cancelling mid-probe stops the ladder, releases the stream and never shows the white screen', async () => {
+  const st = mockNavigator({ devices: DEVICES, torchMode: 'ok' }), calls = [];
+  let abort = false, opened = 0; const base = fakeCamFactory(), fac = (cb) => { if (++opened === 2) abort = true; return base(cb); };   // cancel while lens 2 is in flight
+  const t0 = Date.now();
+  const out = await runProbeLadder(fac, { back: backTargets(DEVICES), front: true }, { ...FAST, shouldAbort: () => abort, beforeFront: async () => { calls.push('before'); }, afterFront: async () => { calls.push('after'); } });
+  assert.ok(out.cancelled); assert.ok(Date.now() - t0 < 2500, 'returned promptly'); assert.equal(st.open, 0, 'no stream left open');
+  assert.ok(out.results.length < 4 + 1); assert.ok(!calls.includes('before'), 'white overlay never shown after cancel');
+});
+await t('an abort set before the overlay hook runs still pairs afterFront', async () => {
+  const dev = DEVICES.map((d) => (/front/i.test(d.label) ? d : { ...d, p: { torch: { level: 130, amp: 0.0, noise: 1.5 }, ambient: d.p.ambient } })), calls = []; let abort = false;
+  mockNavigator({ devices: dev, torchMode: 'ok' });
+  const out = await runProbeLadder(fakeCamFactory(), { back: backTargets(dev), front: true }, { ...FAST, shouldAbort: () => abort, beforeFront: async () => { calls.push('before'); abort = true; }, afterFront: async () => { calls.push('after'); } });
+  assert.ok(out.cancelled); assert.deepEqual(calls, ['before', 'after']);
+});
 console.log(`LENS PASS (${n} checks)`);

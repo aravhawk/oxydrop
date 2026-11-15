@@ -160,6 +160,8 @@ The app never assumes a phone layout. Flash position, lens count and lens size d
 
 The probe logic is tested in Node (`npm run test:lens`) with a mocked `MediaDevices` and synthetic frames. That is a simulation of the selection logic only.
 
+The probe score thresholds (pulse score 35 to use a lens, 55 for a "good" live reading, and the autocorrelation and spectral-quality floors in `lensprobe.js`) were tuned on synthetic traces only. They have not been validated on recorded or live fingertip data and may need retuning on real phones. Saturation is measured on the frames after the 0.5 s settle window, so the first frames while auto-exposure converges do not count. Leaving the setup page or tapping Stop cancels the probe, releases the torch and removes the white screen.
+
 ## Untested phones and browsers
 
 **This has not been tested on any real phone.** The lens probe, adaptive exposure, quality meter and fallback modes are only exercised by `tests/lensprobe.mjs` (mocked `navigator.mediaDevices`, synthetic frame data, including a simulated weak diffuse signal for a far flash) and the fake-video browser test in `tests/e2e`. A single headless Chromium smoke run of the new setup flow against its fake device also ran without script errors. The following are untested:

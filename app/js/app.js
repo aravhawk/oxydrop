@@ -150,13 +150,13 @@ async function runProbe(gen) {
   const factory = (cb) => { if (gen !== camGen) throw new Error('cancelled'); return base(cb); };
   say(`Testing lens 1 of ${back.length}, keep your finger flat across the camera plateau`);
   const out = await runProbeLadder(factory, { back, front: all.front }, {
-    ambientMax: 1,
+    ambientMax: 1, shouldAbort: () => gen !== camGen,
     onProgress: (r, k) => {
       partial.push(r); $('probe-scores').textContent = probeSummary(partial, null);
       say(k < back.length ? `Testing lens ${k + 1} of ${back.length}, keep your finger flat across the camera plateau` : 'Back lenses gave no clear pulse. Trying the fallback mode (ambient light, then front camera with white screen)…');
     },
-    beforeFront: async () => { showWhite(); say('Testing the front camera. Cover it with your fingertip.'); await sleep(1200); },
-    afterFront: async () => { hideWhite(); },
+    beforeFront: async () => { if (gen !== camGen) return; showWhite(); say('Testing the front camera. Cover it with your fingertip.'); await sleep(1200); },
+    afterFront: async () => { if (gen === camGen) hideWhite(); },   // a stale probe must not hide a newer session's overlay
   });
   if (gen !== camGen) return null;
   probe = out; $('probe-scores').textContent = probeSummary(out.results, out.choice);
@@ -275,7 +275,7 @@ $('btn-replay').addEventListener('click', async () => {
 // ---------------- shared measurement logic ----------------
 function startMeasure(k, w) {
   kind = k; mode = 'measure'; chain = new Chain(w || weights); chain.n = 0;
-  stalledShown = false; calStartN = cam ? cam.rs.n : 0; if (k === 'live' && cam && !cam.locked && !lockBusy) { lockBusy = true; lockWithAdapt(cam).then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
+  stalledShown = false; calStartN = cam ? cam.rs.n : 0; if (k === 'live' && cam && !cam.locked && !lockBusy) { lockBusy = true; cam.lockExposure().then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
   calMotion = []; calFps = []; calWin = []; calFailed = false; calChecked = false; calOk = true; strip = []; $('strip').innerHTML = ''; lastD = null; lastDecision = null;
   if (k === 'live') { calGaps0 = cam ? cam.stats.gaps : 0; decLog = []; }
   tally = { normal: 0, low: 0, uns: 0, pause: 0, right: 0, wrong: 0 };

@@ -68,12 +68,13 @@ export function scoreSignal(rgb, fs = FS, opts = {}) {
  * target = { id, label, mode: 'torch'|'ambient'|'front' }. Never throws: failures come back as { ok:false, error }.
  */
 export async function probeLens(camFactory, target, opts = {}) {
-  const sec = opts.sec ?? PROBE_SEC, settle = opts.settleSec ?? SETTLE_SEC, need = Math.round((sec + settle) * FS);
+  const sec = opts.sec ?? PROBE_SEC, settle = opts.settleSec ?? SETTLE_SEC, need = Math.round((sec + settle) * FS), settleN = Math.round(settle * FS);
   const out = { deviceId: target.id ?? null, label: target.label || '', mode: target.mode || 'torch', ok: false, error: '', torchSupported: false, torchOn: false, samples: 0, score: 0, usable: false, reason: '' };
-  const buf = []; let sat = 0, cam = null, started = false, timer = null, done;
+  const buf = []; let satSum = 0, satN = 0, cam = null, started = false, timer = null, poll = null, aborted = false, done;
+  const abortNow = () => !!(opts.shouldAbort && opts.shouldAbort());
   const finished = new Promise((r) => { done = r; });
   try {
-    cam = camFactory((r, g, b) => { if (buf.length >= need) return; buf.push([r, g, b]); if (cam && Number.isFinite(cam.satFrac)) sat = Math.max(sat, cam.satFrac); if (buf.length >= need) done(); });
+    cam = camFactory((r, g, b) => { if (buf.length >= need) return; buf.push([r, g, b]); if (buf.length > settleN && cam && Number.isFinite(cam.satFrac)) { satSum += cam.satFrac; satN++; } if (buf.length >= need) done(); });   // saturation is the mean over the body only: the settle frames saturate while auto-exposure converges
     const wantTorch = out.mode === 'torch';
     await cam.start({ deviceId: target.id || null, facing: out.mode === 'front' ? 'user' : 'environment', torch: wantTorch ? 'on' : 'off' });
     started = true;
@@ -81,15 +82,19 @@ export async function probeLens(camFactory, target, opts = {}) {
     if (!out.label && cam.info && cam.info.lens) out.label = cam.info.lens;
     if (wantTorch && !out.torchOn) { out.error = out.torchSupported ? 'torch_apply_failed' : 'torch_unsupported'; out.reason = out.error; return out; }
     timer = setTimeout(done, opts.timeoutMs ?? (sec + settle) * 1000 + 3000);
+    if (opts.shouldAbort) poll = setInterval(() => { if (abortNow()) { aborted = true; done(); } }, 100);
+    if (abortNow()) { aborted = true; done(); }
     await finished;
+    if (aborted) { out.error = 'cancelled'; out.reason = 'cancelled'; return out; }
     out.samples = buf.length;
-    const s = scoreSignal(buf, FS, { settleSec: settle, satFrac: sat });
+    const s = scoreSignal(buf, FS, { settleSec: settle, satFrac: satN ? satSum / satN : 0 });
     Object.assign(out, s, { samples: buf.length, ok: true, reason: s.reason });
     out.usable = out.score >= (opts.scoreMin ?? SCORE_MIN);
   } catch (e) {
     out.error = (e && (e.name || e.message)) ? `${e.name || ''}${e.name && e.message ? ': ' : ''}${e.message || ''}` : String(e); out.reason = 'open_failed';
   } finally {
     if (timer) clearTimeout(timer);
+    if (poll) clearInterval(poll);
     if (cam) { try { await cam.stop(); } catch (e) { /* ignore */ } }
     if (started || cam) await new Promise((r) => setTimeout(r, opts.gapMs ?? 150));   // let the OS release the camera before the next lens opens
   }
@@ -99,7 +104,7 @@ export async function probeLens(camFactory, target, opts = {}) {
 /** Probe several targets one after another (never two streams open at once). Returns results sorted by score, best first. */
 export async function probeAll(camFactory, targets, opts = {}) {
   const res = [];
-  for (const t of targets) { res.push(await probeLens(camFactory, t, opts)); if (opts.onProgress) opts.onProgress(res[res.length - 1], res.length, targets.length); }
+  for (const t of targets) { if (opts.shouldAbort && opts.shouldAbort()) break; res.push(await probeLens(camFactory, t, opts)); if (opts.onProgress) opts.onProgress(res[res.length - 1], res.length, targets.length); }
   return res.sort((a, b) => b.score - a.score);
 }
 
@@ -139,19 +144,21 @@ export function chooseMode(results, ctx = {}) {
 export async function runProbeLadder(camFactory, targets, opts = {}) {
   const back = targets.back || [], results = [];
   results.push(...await probeAll(camFactory, back.map((c) => ({ ...c, mode: 'torch' })), opts));
+  const cancelled = () => !!(opts.shouldAbort && opts.shouldAbort());
   let choice = chooseMode(results, opts);
-  if (choice.usable) return { choice, results };
+  if (choice.usable || cancelled()) return { choice, results, cancelled: cancelled() };
   const torchWorked = results.some((r) => r.ok && r.torchOn);
   const ambTargets = (torchWorked ? [...results].sort((a, b) => b.score - a.score).map((r) => ({ id: r.deviceId, label: r.label })) : back).slice(0, opts.ambientMax ?? 2);
-  const doAmbient = async () => { if (ambTargets.length) results.push(...await probeAll(camFactory, ambTargets.map((c) => ({ ...c, mode: 'ambient' })), opts)); };
+  const doAmbient = async () => { if (ambTargets.length && !cancelled()) results.push(...await probeAll(camFactory, ambTargets.map((c) => ({ ...c, mode: 'ambient' })), opts)); };
   const doFront = async () => {
-    if (!targets.front) return;
+    if (!targets.front || cancelled()) return;
     if (opts.beforeFront) await opts.beforeFront();
+    if (cancelled()) { if (opts.afterFront) await opts.afterFront(); return; }
     try { results.push(...await probeAll(camFactory, [{ id: null, label: 'Front camera', mode: 'front' }], opts)); } finally { if (opts.afterFront) await opts.afterFront(); }
   };
   if (torchWorked) { await doFront(); choice = chooseMode(results, opts); if (!choice.usable) { await doAmbient(); choice = chooseMode(results, opts); } }
   else { await doAmbient(); choice = chooseMode(results, opts); if (!choice.usable) { await doFront(); choice = chooseMode(results, opts); } }
-  return { choice, results };
+  return { choice, results, cancelled: cancelled() };
 }
 
 /** Live signal-quality verdict for the on-screen meter, from the last ~6-10 s of 30 Hz RGB. level: 'good' | 'weak' | 'reposition'. */
