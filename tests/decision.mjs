@@ -1,6 +1,6 @@
 // Unit tests for the three-state decision logic and the fingertip-placement check. Usage: node tests/decision.mjs
 import assert from 'node:assert/strict';
-import { decide, hrToShow, assessPlacement, STATE_TEXT, REASON_TEXT } from '../app/js/decision.js';
+import { decide, hrToShow, assessPlacement, calibrationInterrupt, calibrationFingerReason, CAL_FINGER_LOSS_MS, CAL_FINGER_MIN, STATE_TEXT, REASON_TEXT } from '../app/js/decision.js';
 
 const good = (o = {}) => ({ calibrating: false, valid: true, sat: 0.0, hr: 72.4, label: 'normal', p: 0.1, ...o });
 const ok = (o = {}) => ({ fps: 30, recentGaps: 0, finger: true, moving: false, calOk: true, ...o });
@@ -21,6 +21,7 @@ t('LOW', () => { const r = decide(good({ label: 'HYPOXIC', p: 0.9 }), ok()); ass
 const cases = [
   ['engine label nolock', good({ label: 'nolock', valid: false, hr: NaN }), ok(), 'invalid'],
   ['engine label nolock with valid flag (inconsistent)', good({ label: 'nolock' }), ok(), 'nolock'],
+  ['engine label low_ac (amplitude below the trained range)', good({ label: 'low_ac' }), ok(), 'low_ac'],
   ['engine label unsure', good({ label: 'unsure', p: 0.52 }), ok(), 'model_unsure'],
   ['unknown label', good({ label: 'whatever' }), ok(), 'invalid'],
   ['d.valid false', good({ valid: false, hr: NaN }), ok(), 'invalid'],
@@ -66,5 +67,22 @@ t('placement: dark ambient', () => { assert.equal(assessPlacement(st([20, 10, 8]
 t('placement: open scene (grey, not finger)', () => { const p = assessPlacement(st([128, 128, 128]), { torch: true }); assert.equal(p.level, 'bad'); assert.equal(p.title, 'Cover the lens AND the flash'); });
 t('placement: saturated', () => { const p = assessPlacement(st([255, 120, 90], { satFrac: 0.6 }), { torch: true }); assert.equal(p.level, 'bad'); assert.equal(p.title, 'Press more lightly (too bright/saturated)'); });
 t('placement: uneven image', () => { assert.equal(assessPlacement(st([197, 76, 60], { spatialCV: 0.5 })).level, 'warn'); });
+
+// calibration-minute acquisition gates (REVIEW.md section 3, wrong-answer path 3: rejected live samples must not poison the baseline)
+t('calibration interrupt: short finger dip is tolerated, a sustained one voids the minute', () => {
+  assert.equal(calibrationInterrupt({ placeGood: true, badMs: 0 }), null);
+  assert.equal(calibrationInterrupt({ placeGood: false, badMs: CAL_FINGER_LOSS_MS - 1 }), null);
+  assert.equal(calibrationInterrupt({ placeGood: false, badMs: CAL_FINGER_LOSS_MS }), 'finger_lost');
+});
+t('calibration interrupt: a settings change voids the minute; a stall is left to the stall rule', () => {
+  assert.equal(calibrationInterrupt({ placeGood: true, settingsChanged: true }), 'settings_changed');
+  assert.equal(calibrationInterrupt({ placeGood: false, badMs: 99999, stalled: true, settingsChanged: true }), null);
+});
+t('calibration finger coverage: needs 90% good placement, ignores too few ticks', () => {
+  assert.equal(calibrationFingerReason(0, 5), null);
+  assert.equal(calibrationFingerReason(CAL_FINGER_MIN * 100, 100), null);
+  assert.match(calibrationFingerReason(89, 100), /only 89%/);
+  assert.match(calibrationFingerReason(0, 240), /only 0%/);
+});
 
 console.log(`DECISION PASS (${n} checks)`);

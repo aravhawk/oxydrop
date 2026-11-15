@@ -2,7 +2,9 @@ import { Chain, FS, CAL, WIN } from './engine.js';
 import { CameraSource, Motion, listBackCameras, pickDefault, listCameras, probeCamFactory } from './camera.js';
 import { runProbeLadder, liveQuality, ringState, probeSummary } from './lensprobe.js';
 import { MIN_TRACKABLE_BPM } from './hr.js';
-import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, STATE, STATE_TEXT, MOTION_MAX, STALL_MS } from './decision.js';
+import { HybridEngine, loadHybridAssets, ENGINE_ID } from './hybrid_engine.js';
+import { HybridWorker, HybridWorkerEngine, loadHybridLite } from './hybrid_async.js';
+import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, calibrationInterrupt, calibrationFingerReason, STATE, STATE_TEXT, MOTION_MAX, STALL_MS } from './decision.js';
 
 const $ = (id) => document.getElementById(id);
 const MIN_HR = MIN_TRACKABLE_BPM, MAX_HR = 110; // plausible *resting* heart rate at calibration; MIN_HR follows the HR estimator's band edge (F_LO = 0.85 Hz = 51 bpm)
@@ -18,15 +20,22 @@ const GET_READY_S = 3;          // countdown so the finger is on the plateau bef
 const WEAK_PROMPT_MS = 4000;    // live signal quality must stay in 'reposition' this long before the re-position prompt replaces a reading
 const WEAK_MSG = 'Weak signal: slide your finger so it covers the lens and the flash, press lightly.';
 const RAW_MAX = 15 * 60 * FS;   // raw trace ring buffer: 15 minutes at 30 Hz
+// Engine: the hybrid (v1 physics chain + residual CNN + conformal three-state rule, app/js/hybrid_engine.js) is the main path; ?engine=logistic runs the v2 logistic chain
+// (the baseline of the evaluation). ?alpha=0.05 sets the conformal level (debug; default is the pre-declared 0.10).
+const QS = new URLSearchParams(location.search);
+const ENGINE_REQ = QS.get('engine') === 'logistic' ? 'logistic' : 'hybrid';
+const ALPHA_REQ = QS.get('alpha') ? Number(QS.get('alpha')) : null;
+let engineUsed = ENGINE_REQ, engineNote = '', hybridLite = null, hybridFull = null, hybridWorker = null, hybridAlpha = null;
 
 let mode = null;                // null | 'setup' | 'measure'
 let kind = null;                // 'live' | 'replay'
-let chain = null, weights = null, cam = null, motion = null, wake = null, camGen = 0;
+let chain = null, weights = null, cam = null, motion = null, wake = null, camGen = 0, sessionGen = 0;   // sessionGen: one live setup attempt (bumped only by cleanup()); camGen: one CameraSource instance (bumped by every startCamera and by cleanup())
 let replay = null, replayTimer = null, uiTimer = null, anywayTimer = null, tickN = 0;
 let strip = [], tally = {}, calMotion = [], calFps = [], calWin = [], calGaps0 = 0, calFailed = false, calChecked = false, calOk = true;
 let lockHist = [], lockRun = 0, camStartedAt = 0, place = { level: 'warn', title: '', msg: '' }, fingerHist = [], gapLog = [], lastGaps = 0, lastD = null, lastDecision = null, lastWaveCh = 1;
 let probe = null, qual = null, weakSince = 0, weakNow = false, weakShown = false, chosenLabel = '';
-let goodSince = 0, badSince = 0, lockBusy = false, stalledShown = false, calStartN = 0;
+let goodSince = 0, badSince = 0, lockBusy = false, stalledShown = false, calStartN = 0, beginning = false;
+let calFingerGood = 0, calFingerN = 0, calBadSince = 0, calDirty = false, calSig = '';   // acquisition watch over the calibration minute
 const raw = new Float32Array(RAW_MAX * 3); let rawN = 0, decLog = [];
 
 function show(id) { document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id)); window.scrollTo(0, 0); }
@@ -37,34 +46,83 @@ $('compat').textContent = hasCam ? '' : 'Camera access is not available in this 
 if (!hasCam) { $('btn-live').disabled = true; $('ack').disabled = true; }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-async function loadWeights() { if (!weights) weights = await (await fetch('data/weights.json')).json(); return weights; }
+const fetchJson = async (rel) => { const r = await fetch(rel); if (!r.ok) throw new Error(`${rel}: HTTP ${r.status}`); return r.json(); };
+async function loadWeights() { if (!weights) weights = await fetchJson('data/weights.json'); return weights; }
+// Hybrid assets. Live: the CNN runs in a module Web Worker (a CNN pass on a slow phone must not delay camera frames); if no worker can be started the same engine
+// runs in the page thread. Any load failure falls back to the logistic chain and says so in the debug text (never silently).
+async function loadHybrid(needFull) {
+  if (ENGINE_REQ !== 'hybrid' || engineUsed !== 'hybrid') return;
+  try {
+    if (!hybridLite) {
+      hybridLite = await loadHybridLite(fetchJson);
+      const a = ALPHA_REQ ?? hybridLite.conformal.default_alpha, t = hybridLite.conformal.alphas[a.toFixed(2)];
+      if (!t || t.past_crossing) { engineNote = `alpha ${ALPHA_REQ} is not available; using ${hybridLite.conformal.default_alpha}. `; hybridAlpha = hybridLite.conformal.default_alpha; } else hybridAlpha = a;
+    }
+    if (needFull) { if (!hybridFull) hybridFull = await loadHybridAssets(fetchJson); return; }
+    if (!hybridWorker && !hybridFull && typeof Worker !== 'undefined') {
+      try { const w = new HybridWorker(new URL('./hybrid_worker.js', import.meta.url), hybridAlpha); await w.ready; hybridWorker = w; hybridWorker.onError = (m) => workerFailed(m); }
+      catch (e) { engineNote += `model worker unavailable (${e && e.message ? e.message : e}); running the model in the page thread. `; }
+    }
+    if (!hybridWorker && !hybridFull) hybridFull = await loadHybridAssets(fetchJson);
+  } catch (e) { engineUsed = 'logistic'; engineNote = `hybrid model could not be loaded (${e && e.message ? e.message : e}); using the logistic chain. `; }
+}
+// The hybrid model failing must never be silent: the page switched to the logistic chain alone, so the measurement screen says so (text only, no device logic).
+// Two cases: the assets could not be loaded, or the Web Worker errored or stopped answering after it had loaded. Not shown when the chain was asked for on purpose (?engine=logistic).
+const FALLBACK_NOTICE = 'Notice: the neural-network part of the model could not be loaded, so these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
+const WORKER_NOTICE = 'Notice: the neural-network part of the model stopped working, so from now on these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
+const WORKER_STALL_MS = 10000;  // a window the worker has not answered for this long counts as a dead worker (normal latency is 50 to 300 ms)
+let noticeText = FALLBACK_NOTICE;
+function showEngineNotice() {
+  const el = $('engine-note'), fell = ENGINE_REQ === 'hybrid' && engineUsed === 'logistic';
+  el.hidden = !fell; el.textContent = fell ? noticeText : '';
+}
+// The CNN worker errored, or stopped answering, after it had loaded: leave the hybrid for good (this page load), keep the running measurement on the logistic chain
+// (the quality chain inside the worker engine already holds the calibration), and say so on screen.
+function workerFailed(msg) {
+  if (engineUsed !== 'hybrid') return;
+  engineUsed = 'logistic'; noticeText = WORKER_NOTICE; engineNote += `model worker failed after loading (${msg}); using the logistic chain. `;
+  if (hybridWorker) { hybridWorker.onError = null; hybridWorker.terminate(); hybridWorker = null; }
+  if (chain && chain.degrade) chain.degrade();
+  showEngineNotice();
+}
+// a fresh engine for one measurement (calibration restarts get a new one)
+function newMeasureEngine(w) {
+  if (engineUsed === 'hybrid' && hybridLite) {
+    if (kind === 'live' && hybridWorker) { const e = new HybridWorkerEngine(hybridLite, hybridWorker, hybridAlpha, (d) => { if (chain === e) dispatchWindow(d); }); return e; }
+    if (hybridFull) return new HybridEngine(hybridFull, { alpha: hybridAlpha });
+  }
+  return new Chain(w || weights);
+}
+function dispatchWindow(d) { if (mode === 'setup') onSetupWindow(d); else if (mode === 'measure') onWindow(d); }
 
 function cleanup() {
-  camGen++; clearInterval(replayTimer); clearInterval(uiTimer); clearTimeout(anywayTimer); uiTimer = null;
+  sessionGen++; camGen++; clearInterval(replayTimer); clearInterval(uiTimer); clearTimeout(anywayTimer); uiTimer = null;
   if (cam) { cam.stop(); cam = null; } if (motion) { motion.stop(); motion = null; }
   if (wake) { try { wake.release(); } catch (e) { /* ignore */ } wake = null; }
   hideWhite(); weakSince = 0; weakNow = false; weakShown = false;
+  if (chain && chain.close) chain.close();
   replay = null; mode = null; kind = null; chain = null;
 }
 const isFront = () => lightMode() === 'front';
 function showWhite() { $('white').hidden = false; }
 function hideWhite() { $('white').hidden = true; }
 $('wm-stop').addEventListener('click', () => { cleanup(); show('home'); });
-$('wm-begin').addEventListener('click', () => { if (mode === 'setup') startMeasure('live'); else if (mode === 'measure') startMeasure('live'); });
+$('wm-begin').addEventListener('click', () => { if (mode === 'setup') beginLive(); else if (mode === 'measure') startMeasure('live'); });
 async function keepAwake() { try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) { /* ignore */ } }
 function startUi() { clearInterval(uiTimer); tickN = 0; uiTimer = setInterval(uiTick, 250); }
 
 // ---------------- raw trace recorder (bounded ring buffer) ----------------
 function resetRecorder() { rawN = 0; decLog = []; lastD = null; lastDecision = null; }
 function record(r, g, b) { const i = (rawN % RAW_MAX) * 3; raw[i] = r; raw[i + 1] = g; raw[i + 2] = b; rawN++; }
-function logDecision(d, dec) { decLog.push({ idx: rawN - 1, d, dec }); if (decLog.length > RAW_MAX / (2 * FS) + 5) decLog.shift(); }
+function logDecision(d, dec) { decLog.push({ idx: (Number.isFinite(d.n) ? d.n : rawN) - 1, d, dec });   // hybrid windows arrive after their last sample: d.n is where they ended
+  if (decLog.length > RAW_MAX / (2 * FS) + 5) decLog.shift(); }
 function buildCsv() {
   const start = Math.max(0, rawN - RAW_MAX), byIdx = new Map(decLog.map((x) => [x.idx, x]));
-  const rows = ['t_s,R,G,B,sqi,acf,hr_est,hr_beat,valid,sat,label,p,state,reason,hr_shown'];
+  const rows = ['t_s,R,G,B,sqi,acf,hr_est,hr_beat,valid,sat,label,p,state,reason,hr_shown,z,cnn_hr,engine'];
   for (let n = start; n < rawN; n++) {
-    const i = (n % RAW_MAX) * 3; let tail = ',,,,,,,,,,';
+    const i = (n % RAW_MAX) * 3; let tail = ',,,,,,,,,,,,,';
     const x = byIdx.get(n);
-    if (x) { const d = x.d, c = x.dec; tail = [f4(d.sqi), f4(d.acf), f2(d.hrEst), f2(d.hrBeat), d.valid ? 1 : 0, f4(d.sat), d.label || (d.calibrating ? 'calibrating' : ''), f4(d.p), c ? c.state : '', c && c.reason ? c.reason : '', c && c.hr != null ? c.hr.toFixed(1) : ''].join(','); }
+    if (x) { const d = x.d, c = x.dec; tail = [f4(d.sqi), f4(d.acf), f2(d.hrEst), f2(d.hrBeat), d.valid ? 1 : 0, f4(d.sat), d.label || (d.calibrating ? 'calibrating' : ''), f4(d.p), c ? c.state : '', c && c.reason ? c.reason : '', c && c.hr != null ? c.hr.toFixed(1) : '', f4(d.z), f2(d.cnnHr), d.engine || 'logistic'].join(','); }
     rows.push(`${(n / FS).toFixed(3)},${raw[i].toFixed(3)},${raw[i + 1].toFixed(3)},${raw[i + 2].toFixed(3)},${tail}`);
   }
   return rows.join('\n') + '\n';
@@ -87,13 +145,21 @@ async function copyDebug(btn) {
 document.querySelectorAll('[data-dl]').forEach((b) => b.addEventListener('click', download));
 document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyDebug(b)));
 
+function engineLine() {
+  const inf = chain && chain.info, lat = chain && chain.latency ? chain.latency() : null, f1 = (v) => (Number.isFinite(v) ? v.toFixed(0) : '-');
+  if (engineUsed !== 'hybrid' || !inf) return `engine ${engineUsed === 'hybrid' ? 'hybrid (only the quality chain runs during setup; the CNN starts with the calibration minute)' : 'logistic chain v2 (baseline / fallback)'}${ENGINE_REQ === 'logistic' ? ' (?engine=logistic)' : ''}${engineNote ? '  ' + engineNote : ''}`;
+  const th = inf.thresholds;
+  return `engine ${ENGINE_ID}: v1 physics chain + ${inf.model}, ${inf.params.toLocaleString('en-US')} parameters per seed (${inf.paramsTotal.toLocaleString('en-US')} total), runs ${chain.worker ? 'in a Web Worker' : 'in the page thread'}; conformal alpha ${inf.alpha} (Normal below z ${th.normal_below.toFixed(3)}, Low above ${th.low_above.toFixed(3)}); latency per 2 s window: ${lat && lat.n ? `last ${f1(lat.last)} ms, median ${f1(lat.median)} ms, p95 ${f1(lat.p95)} ms` + (lat.async ? ` (model ${f1(lat.coreMedian)} ms in the worker, quality chain ${f1(lat.v2Median)} ms on the page)` : '') : 'no window yet'}${engineNote ? '  ' + engineNote : ''}`;
+}
 function debugText() {
   const L = []; const st = cam ? cam.stats : null;
   L.push(`mode ${mode || '-'} / ${kind || '-'}   samples ${rawN}   t ${(rawN / FS).toFixed(1)} s`);
+  L.push(engineLine());
   if (cam && st) {
     L.push(`fps ${st.fps.toFixed(1)}  jitter ${st.jitterMs.toFixed(1)} ms  gaps ${st.gaps} (max ${(st.maxGap * 1000).toFixed(0)} ms)  skipped ${st.skipped}  frames ${st.frames}`);
     L.push(`last frame ${(st.staleMs / 1000).toFixed(1)} s ago  interrupted ${st.interrupted || 'no'}  longest gap in last 30 s ${(cam.rs.gapStats(cam.rs.n - 30 * FS).max * 1000).toFixed(0)} ms`);
     L.push(`lens "${cam.info.lens}"  ${cam.info.width}x${cam.info.height}`);
+    if (cam.info.fallback) L.push(`device fallback: ${cam.info.fallback}`);
     L.push(`torch ${cam.info.torchSupported ? (cam.info.torch ? 'on' : 'off') : 'unsupported'}  locks ${JSON.stringify(cam.info.locks)}`);
     L.push(`mean RGB ${st.mean.map((v) => v.toFixed(1)).join(' / ')}  frame-saturated ${(st.satFrac * 100).toFixed(1)}%  spatialCV ${st.spatialCV.toFixed(3)}  luma ${st.luma.toFixed(1)}`);
     L.push(`placement ${place.level}: ${place.title}`);
@@ -103,6 +169,7 @@ function debugText() {
   if (probe) { L.push('lens probe scores (per lens, 0-100, usable >= 35):'); L.push(probeSummary(probe.results, probe.choice)); } else L.push('lens probe: not run');
   if (lastD) {
     const d = lastD; L.push(`window s=${d.s}  SQI ${f4(d.sqi)}  ACF ${f4(d.acf)}  hrEst ${f2(d.hrEst)}  hrBeat ${f2(d.hrBeat)}  ch ${d.ch}  sat ${f4(d.sat)}  valid ${d.valid}  label ${d.label || 'calibrating'}  p ${f4(d.p)}`);
+    if (Number.isFinite(d.z)) L.push(`hybrid: chain logit c ${f2(d.c)}  CNN correction ${f2(d.corr)}  z ${f2(d.z)}  CNN HR ${f2(d.cnnHr)}  spectral HR ${f2(d.specHr)}  | EXPERIMENTAL SpO2 from the CNN head (not validated, do not use): ${f2(d.spo2Exp)}`);
     if (lastDecision) L.push(`decision ${lastDecision.state}${lastDecision.reason ? ' (' + lastDecision.reason + ')' : ''}  hr shown ${lastDecision.hr != null ? lastDecision.hr.toFixed(1) : '-'}`);
   } else L.push('no window yet');
   L.push(`lock history (last 5): ${lockHist.map((v) => (v ? '1' : '0')).join('') || '-'}  motion ${motion && motion.ok && motion.level(10) != null ? motion.level(10).toFixed(2) + ' m/s2' : 'no sensor'}`);
@@ -117,21 +184,24 @@ $('btn-live').addEventListener('click', () => { cleanup(); show('setup'); $('set
 
 $('btn-cam').addEventListener('click', async () => {
   $('btn-cam').hidden = true; $('cam-state').textContent = 'Starting camera…';
+  let gen = -1;
   try {
-    cleanup(); motion = new Motion(); const mp = motion.start();   // start the motion permission prompt first: iOS needs it inside the tap
-    await loadWeights(); await keepAwake();
+    cleanup(); gen = sessionGen; motion = new Motion(); const mp = motion.start();   // start the motion permission prompt first: iOS needs it inside the tap
+    await loadWeights(); $('cam-state').textContent = 'Loading the on-device model…'; await loadHybrid(false); await keepAwake();
     kind = 'live'; mode = 'setup'; startUi();
-    const gen = camGen, choice = await runProbe(gen);
-    if (gen !== camGen) return;
+    const choice = await runProbe(gen);   // session token: startCamera() below bumps camGen on purpose, which must not cancel this flow
+    if (gen !== sessionGen) return;
     const lm = choice.mode === 'torch' ? 'flash' : choice.mode;
     const radio = document.querySelector(`input[name=light][value=${lm}]`); if (radio) radio.checked = true;
     chosenLabel = choice.label || '';
     await startCamera(choice.mode === 'front' ? null : choice.deviceId);
-    if (gen !== camGen) return;
-    await populateLens(); if (choice.mode !== 'front' && choice.deviceId) $('lens').value = choice.deviceId;
+    if (gen !== sessionGen) return;
+    await populateLens(); if (choice.mode !== 'front' && choice.deviceId && !(cam && cam.info.fallback)) $('lens').value = choice.deviceId;
     await mp;
+    if (gen !== sessionGen) return;
     $('setup-live').hidden = false; renderChecks(); renderPlace();
   } catch (e) {
+    if (gen !== -1 && gen !== sessionGen) return;   // this attempt was cancelled; do not tear down the session that replaced it
     cleanup(); $('cam-state').textContent = 'Could not start the camera: ' + (e && e.message ? e.message : e) + '. Allow camera access and reload, or use the recorded demo.';
     $('btn-cam').hidden = false; $('setup-live').hidden = true; $('probe').hidden = true;
   }
@@ -145,20 +215,20 @@ async function runProbe(gen) {
   gum.getTracks().forEach((t) => t.stop());
   const all = await listCameras(), pd = pickDefault(all.back), back = [...all.back].sort((a, b) => (b === pd) - (a === pd)).slice(0, PROBE_MAX_LENSES);
   const say = (t) => { $('probe-text').textContent = t; $('cam-state').textContent = t; if (!$('white').hidden) { $('wm-title').textContent = t; $('wm-msg').textContent = ''; } };
-  for (let k = GET_READY_S; k > 0; k--) { say(`Lay your finger flat across the whole camera plateau now (lens and flash), light pressure. Testing starts in ${k}…`); await sleep(1000); if (gen !== camGen) return null; }
+  for (let k = GET_READY_S; k > 0; k--) { say(`Lay your finger flat across the whole camera plateau now (lens and flash), light pressure. Testing starts in ${k}…`); await sleep(1000); if (gen !== sessionGen) return null; }
   const video = document.createElement('video'), base = probeCamFactory(video), partial = [];
-  const factory = (cb) => { if (gen !== camGen) throw new Error('cancelled'); return base(cb); };
+  const factory = (cb) => { if (gen !== sessionGen) throw new Error('cancelled'); return base(cb); };
   say(`Testing lens 1 of ${back.length}, keep your finger flat across the camera plateau`);
   const out = await runProbeLadder(factory, { back, front: all.front }, {
-    ambientMax: 1, shouldAbort: () => gen !== camGen,
+    ambientMax: 1, shouldAbort: () => gen !== sessionGen,
     onProgress: (r, k) => {
       partial.push(r); $('probe-scores').textContent = probeSummary(partial, null);
       say(k < back.length ? `Testing lens ${k + 1} of ${back.length}, keep your finger flat across the camera plateau` : 'Back lenses gave no clear pulse. Trying the fallback mode (ambient light, then front camera with white screen)…');
     },
-    beforeFront: async () => { if (gen !== camGen) return; showWhite(); say('Testing the front camera. Cover it with your fingertip.'); await sleep(1200); },
-    afterFront: async () => { if (gen === camGen) hideWhite(); },   // a stale probe must not hide a newer session's overlay
+    beforeFront: async () => { if (gen !== sessionGen) return; showWhite(); say('Testing the front camera. Cover it with your fingertip.'); await sleep(1200); },
+    afterFront: async () => { if (gen === sessionGen) hideWhite(); },   // a stale probe must not hide a newer session's overlay
   });
-  if (gen !== camGen) return null;
+  if (gen !== sessionGen) return null;
   probe = out; $('probe-scores').textContent = probeSummary(out.results, out.choice);
   $('probe-text').textContent = out.choice.reason + (out.choice.usable ? '' : ' Re-position your finger and try again, or pick a mode below.');
   return out.choice;
@@ -172,7 +242,9 @@ async function startCamera(deviceId) {
   const c = new CameraSource((r, g, b) => { if (gen === camGen) sink(r, g, b); });
   cam = c; weakSince = 0; weakNow = false; weakShown = false; qual = null;
   const front = isFront(); if (front) showWhite(); else hideWhite();
-  await c.start(document.createElement('video'), { deviceId: front ? null : deviceId, torch: lightMode() === 'flash' ? 'auto' : 'off', facing: front ? 'user' : 'environment' });
+  try { await c.start(document.createElement('video'), { deviceId: front ? null : deviceId, torch: lightMode() === 'flash' ? 'auto' : 'off', facing: front ? 'user' : 'environment' }); }
+  catch (e) { c.stop(); if (cam === c) cam = null; throw e; }
+  if (gen !== camGen) { c.stop(); return; }   // cleanup() or a newer startCamera() ran while this camera was opening: release the stream we just got
   camStartedAt = performance.now();
   clearTimeout(anywayTimer); anywayTimer = setTimeout(() => { if (mode === 'setup' && $('btn-begin').disabled) $('btn-begin-anyway').hidden = false; }, ANYWAY_AFTER_S * 1000);
   $('cam-state').textContent = front ? 'Front camera on, white screen is the light' : c.info.torch ? 'Camera on, flash on' : (lightMode() === 'ambient' ? 'Camera on, flash off (ambient light)' : 'Camera on (flash control not available in this browser)');
@@ -210,7 +282,7 @@ function sink(r, g, b) {
   record(r, g, b);
   if (!chain) return;
   const d = chain.push(r, g, b);
-  if (d) { if (mode === 'setup') onSetupWindow(d); else if (mode === 'measure') onWindow(d); }
+  if (d) dispatchWindow(d);
 }
 
 function liveCtx() {
@@ -253,18 +325,34 @@ function renderChecks() {
   $('checks').innerHTML = li.map(([ok, t]) => `<li class="${ok ? 'ok' : 'warn'}">${ok ? '✓' : '!'} ${t}</li>`).join('');
 }
 
-$('btn-begin').addEventListener('click', () => startMeasure('live'));
-$('btn-begin-anyway').addEventListener('click', () => startMeasure('live'));
+// Calibration must not start until exposure / white balance / focus are settled: a lock taken after the baseline minute has begun changes the image
+// level and the baseline would then describe a different camera state than the readings that follow.
+async function beginLive() {
+  if (beginning || mode !== 'setup' || !cam) return;
+  beginning = true;
+  try {
+    const c0 = cam, g = sessionGen;
+    while (lockBusy && g === sessionGen) await sleep(100);
+    if (g === sessionGen && cam === c0 && !c0.locked) { lockBusy = true; try { await lockWithAdapt(c0); } catch (e) { /* best effort */ } finally { lockBusy = false; } }
+    if (g !== sessionGen || cam !== c0 || mode !== 'setup') return;
+    startMeasure('live');
+  } finally { beginning = false; }
+}
+$('btn-begin').addEventListener('click', beginLive);
+$('btn-begin-anyway').addEventListener('click', beginLive);
 
 // ---------------- replay flow ----------------
 $('btn-replay').addEventListener('click', async () => {
-  cleanup(); await loadWeights(); show('measure'); kind = 'replay'; resetRecorder();
+  cleanup(); await loadWeights(); await loadHybrid(true); show('measure'); kind = 'replay'; resetRecorder();
   const pick = new URLSearchParams(location.search).get('rec') || (Math.random() < 0.5 ? '100001L' : '100004R');
   const [meta, buf] = await Promise.all([fetch(`data/replay/${pick}.json`).then((r) => r.json()), fetch(`data/replay/${pick}.bin`).then((r) => r.arrayBuffer())]);
   replay = { meta, rgb: new Float32Array(buf), i: 0, speed: 30 };
   startMeasure('replay', meta.weights);
   const note = $('replay-note'); note.hidden = false;
-  note.innerHTML = `Recorded demo: study participant ${meta.person} (UW Hoffman 2022 data, MIT licence). The model used here was fitted <b>without</b> this person, so these are genuinely held-out decisions. Replaying at ${replay.speed}× speed.${meta.person === 4 ? ' <b>This is the hardest person in the study: a resting heart rate of 43 bpm is below the 51 bpm this version can follow, so it correctly answers &ldquo;unsure&rdquo; throughout.</b>' : ''}`;
+  const heldOut = !(chain && chain.core);   // the logistic replay weights are fitted without this person; the hybrid weights are not
+  note.innerHTML = `Recorded demo: study participant ${meta.person} (UW Hoffman 2022 data, MIT licence). ` + (heldOut
+    ? 'The model used here was fitted <b>without</b> this person, so these are genuinely held-out decisions. '
+    : '<b>Model trained on this person: demo only, not a test.</b> The on-device model saw this participant during training, so these answers show how the screen behaves, not how accurate the model is. The held-out results are in the results table (README). ') + `Replaying at ${replay.speed}× speed.${meta.person === 4 ? ' <b>This is the hardest person in the study: a resting heart rate of 43 bpm is below the 51 bpm this version can follow, so it correctly answers &ldquo;unsure&rdquo; throughout.</b>' : ''}`;
   replayTimer = setInterval(() => {
     const per = Math.round(replay.speed * FS * 0.05);
     for (let k = 0; k < per && replay.i < replay.meta.n; k++, replay.i++) { const j = replay.i * 3; sink(replay.rgb[j], replay.rgb[j + 1], replay.rgb[j + 2]); }
@@ -274,12 +362,14 @@ $('btn-replay').addEventListener('click', async () => {
 
 // ---------------- shared measurement logic ----------------
 function startMeasure(k, w) {
-  kind = k; mode = 'measure'; chain = new Chain(w || weights); chain.n = 0;
-  stalledShown = false; calStartN = cam ? cam.rs.n : 0; if (k === 'live' && cam && !cam.locked && !lockBusy) { lockBusy = true; cam.lockExposure().then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
+  kind = k; mode = 'measure'; if (chain && chain.close) chain.close(); chain = newMeasureEngine(w);
+  stalledShown = false; calStartN = cam ? cam.rs.n : 0;
+  calFingerGood = 0; calFingerN = 0; calBadSince = 0; calDirty = false; calSig = acquisitionSig();
   calMotion = []; calFps = []; calWin = []; calFailed = false; calChecked = false; calOk = true; strip = []; $('strip').innerHTML = ''; lastD = null; lastDecision = null;
   if (k === 'live') { calGaps0 = cam ? cam.stats.gaps : 0; decLog = []; }
   tally = { normal: 0, low: 0, uns: 0, pause: 0, right: 0, wrong: 0 };
   clearTimeout(anywayTimer); show('measure'); $('btn-restart').hidden = k !== 'live'; $('ref-tile').hidden = k !== 'replay'; if (k !== 'replay') $('replay-note').hidden = true;
+  showEngineNotice();
   setStatus('calibrating', '◔', 'Calibrating', 'Rest, keep still. Learning your normal heart-rate and light baseline.');
   $('phase').textContent = 'Calibrating'; $('cal-progress').hidden = false; $('tally').textContent = '';
   $('hr').textContent = '–'; $('dhr').textContent = '–'; $('sig').textContent = '–'; $('sig-u').textContent = '';
@@ -289,8 +379,28 @@ function startMeasure(k, w) {
 $('btn-restart').addEventListener('click', () => startMeasure('live'));
 $('btn-stop').addEventListener('click', () => { cleanup(); show('home'); });
 
+// Anything that changes how the camera sees the finger voids the calibration minute (the baseline would describe a different camera state).
+const acquisitionSig = () => (kind === 'live' && cam ? `${cam.info.deviceId}|${cam.locked}|${JSON.stringify(cam.info.locks)}|${cam.info.torch}|${isFront()}` : '');
+const RESTART_TEXT = {
+  finger_lost: 'Your fingertip came off the lens or flash during calibration, so the minute was started again. Keep it covering both and still.',
+  settings_changed: 'The camera settings changed during calibration, so the minute was started again. Keep still.',
+};
+function restartCalibration(why) { startMeasure('live'); setStatus('calibrating', '◔', 'Calibrating', RESTART_TEXT[why]); $('phase').textContent = 'Calibrating (restarted)'; }
+// Called every UI tick while the calibration minute runs (live only). A frame stall is left to the calibration stall rule, not counted as finger loss.
+function watchCalibration(now, stalled) {
+  if (stalled) { calBadSince = 0; return false; }
+  const good = place.level === 'good';
+  calFingerN++; if (good) { calFingerGood++; calBadSince = 0; } else if (!calBadSince) calBadSince = now;
+  const why = calibrationInterrupt({ placeGood: good, stalled, badMs: calBadSince ? now - calBadSince : 0, settingsChanged: acquisitionSig() !== calSig });
+  if (why === 'settings_changed') { restartCalibration(why); return true; }
+  if (why === 'finger_lost') calDirty = true;
+  if (calDirty && good) { restartCalibration('finger_lost'); return true; }   // the finger is back: begin the minute again from zero
+  return false;
+}
+
 function uiTick() {
   tickN++;
+  if (chain && chain.worker && chain.oldestPendingMs && chain.oldestPendingMs() > WORKER_STALL_MS) workerFailed('no answer from the model worker for ' + Math.round(WORKER_STALL_MS / 1000) + ' s');
   if (kind === 'live' && cam) {
     const st = cam.stats, now = performance.now();
     if (st.gaps > lastGaps) { gapLog.push([now, st.gaps - lastGaps]); lastGaps = st.gaps; }
@@ -305,6 +415,7 @@ function uiTick() {
     else if (mode === 'setup' && cam.locked && !lockBusy && badSince && now - badSince >= UNLOCK_AFTER_MS) { const c0 = cam; lockBusy = true; c0.unlockExposure().then(() => { lockBusy = false; }, () => { lockBusy = false; }); }
     if (!stalled) { fingerHist.push(place.level === 'good'); if (fingerHist.length > 40) fingerHist.shift(); }   // a stall is not evidence about the finger
     updateQuality(st, now, stalled);
+    if (mode === 'measure' && !calChecked && !calFailed && chain && watchCalibration(now, stalled)) return;
     if (mode === 'setup') { renderPlace(weakNow && !stalled ? WEAK_PLACE : place); if (tickN % 4 === 0) renderChecks(); if (stalled) { $('btn-begin').disabled = true; lockRun = 0; } }
     if (mode === 'measure') { watchStall(stalled, st); if (!stalled) watchWeak(); }
     updateRing(st); updateWhite();
@@ -402,13 +513,13 @@ function onWindow(d) {
   showHr(d, ctx); if (weakNow && kind === 'live') $('hr').textContent = '–'; setSig(d); $('dhr').textContent = d.valid && dec.hr != null && Number.isFinite(d.dHR) ? (d.dHR >= 0 ? '+' : '') + d.dHR.toFixed(0) : '–';
   let ref = null; if (kind === 'replay') { ref = refAt(d.s); $('ref').textContent = ref == null ? '–' : ref.toFixed(0); }
   const t = `${d.s + WIN}s` + (Number.isFinite(d.p) ? ` p=${d.p.toFixed(2)}` : '');
-  if (dec.state === STATE.NORMAL) { tally.normal++; setStatus('normal', '✓', dec.text, 'No drop from your own baseline detected in this window.'); pushStrip('d-normal', 'normal ' + t); }
+  if (dec.state === STATE.NORMAL) { tally.normal++; setStatus('normal', '✓', dec.text, 'No drop from your own first minute detected in this window. It cannot know whether you were already low when you started.'); pushStrip('d-normal', 'normal ' + t); }
   else if (dec.state === STATE.LOW) { tally.low++; setStatus('hyp', '↓', dec.text, 'Your signs look like a drop from your own baseline. This is not a diagnosis. If you feel unwell, get medical help.'); pushStrip('d-hyp', 'possible low oxygen ' + t); }
   else if (dec.reason === 'moving') { tally.pause++; setStatus('uns', '✋', dec.text, dec.detail); pushStrip('d-pause', 'unsure: moving'); }
   else { tally.uns++; setStatus('uns', '?', dec.text, dec.detail); pushStrip('d-uns', 'unsure: ' + dec.reason); }
   if (ref != null && dec.state !== STATE.UNSURE) { ((dec.state === STATE.LOW) === (ref < 90)) ? tally.right++ : tally.wrong++; }
   const n = tally.normal + tally.low + tally.uns + tally.pause;
-  $('tally').textContent = `${n} readings: ${tally.normal} normal, ${tally.low} possible low oxygen, ${tally.uns + tally.pause} unsure.` + (kind === 'replay' ? ` Against the study reference, ${tally.right} of ${tally.right + tally.wrong} answered readings were correct.` : '');
+  $('tally').textContent = `${n} readings: ${tally.normal} normal, ${tally.low} possible low oxygen, ${tally.uns + tally.pause} unsure.` + (kind === 'replay' ? ` Against the study reference, ${tally.right} of ${tally.right + tally.wrong} answered readings were correct` + (chain && chain.core ? ' (the model saw this person: demo only, not a test).' : '.') : '');
 }
 function setSig(d) {
   const lvl = d.valid ? (d.sqi >= 0.45 ? 'Good' : 'Fair') : 'Poor';
@@ -420,6 +531,8 @@ function checkCalibration() {
   if (kind === 'live' && calFps.length && Math.min(...calFps) < CAL_FPS_MIN) return 'The camera frame rate was too low during calibration.';
   if (kind === 'live' && cam && cam.rs.gapStats(calStartN).max > CAL_GAP_S_MAX) return 'The camera stalled during calibration.';
   if (kind === 'live' && cam && cam.stats.gaps - calGaps0 > CAL_GAPS_MAX) return 'The camera dropped too many frames during calibration.';
+  if (kind === 'live') { const fr = calibrationFingerReason(calFingerGood, calFingerN); if (fr) return fr; }
+  if (kind === 'live' && calDirty) return 'Your fingertip came off the lens or flash during calibration and was not put back.';
   if (!Number.isFinite(s.hr)) return 'No pulse was found during calibration.';
   const cw = calWin.filter((x) => x[0] > CAL_WARM_S), vf = cw.length ? cw.filter((x) => x[1]).length / cw.length : 0;
   if (vf < CAL_VALID_MIN) return `The pulse was only clearly detected in ${Math.round(vf * 100)}% of the calibration minute (need ${Math.round(CAL_VALID_MIN * 100)}%).`;

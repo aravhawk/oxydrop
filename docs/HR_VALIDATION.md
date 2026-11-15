@@ -55,14 +55,14 @@ The cross-fit supports 0.85 Hz, so the app cannot lock on a resting rate below 5
 
 ## Benchmark table (BUT PPG, shipped gate)
 
-`results/hr_validation/HR_SUMMARY.csv` has every subset. Estimators: old peak interval (v1 feature), naive FFT peak (largest spectral peak 0.7 to 3.5 Hz), v2 on every clip with no gate, v2 accepted by the gate. "Accepted" rows are in-sample for the gate (its parameters came from the same dataset, in cross-fit halves); the held-out numbers are in the table above and agree within 0.1 bpm (11.87 versus 11.89).
+`results/hr_validation/HR_SUMMARY.csv` has every subset. Estimators: old peak interval (v1 feature), naive FFT peak (largest spectral peak 0.7 to 3.5 Hz), v2 on every clip with no gate, v2 accepted by the gate. "Accepted" rows are in-sample for the gate (its parameters came from the same dataset, in cross-fit halves); the held-out numbers are in the table above and agree within 0.1 bpm (11.86 versus 11.89). The cross-fit and the final fixed gate are different estimators with different denominators (1,359 versus 1,351 accepted clips), so do not interchange them. These HR errors use the **10-second** validation window; the engine estimates heart rate over 30 seconds, so they are not exact shipped-engine errors.
 
 | Subset | Estimator | Clips | Coverage | MAE (bpm) | Median AE | Within 5 | Within 10 | Doubling | Halving |
 |---|---|---|---|---|---|---|---|---|---|
 | All clips | old peak interval | 3,840 | 98.1% | 15.30 | 10.0 | 33.1% | 50.5% | 3.1% | 1.1% |
 | All clips | naive FFT | 3,840 | 100% | 20.73 | 17.5 | 27.1% | 37.3% | 1.0% | 12.3% |
 | All clips | v2 no gate | 3,840 | 100% | 16.56 | 13.3 | 30.6% | 42.4% | 0.4% | 6.0% |
-| All clips | v2 accepted | 3,840 | 35.2% | 11.87 | 6.2 | 47.2% | 60.0% | 0.07% | 4.5% |
+| All clips | v2 accepted | 3,840 | 35.2% | 11.86 | 6.2 | 47.15% | 60.0% | 0.074% | 4.5% |
 | Expert-good | old peak interval | 795 | 99.0% | 6.49 | 2.7 | 71.2% | 84.2% | 2.0% | 0.1% |
 | Expert-good | naive FFT | 795 | 100% | 7.03 | 2.3 | 71.9% | 81.8% | 0.5% | 2.9% |
 | Expert-good | v2 no gate | 795 | 100% | 5.95 | 2.0 | 74.6% | 82.9% | 0.0% | 1.5% |
@@ -111,7 +111,7 @@ On clean resting Hoffman recordings the old peak counter is already fine (1.2 bp
 | Fast 130 to 160 bpm | 0.0% | 0.00% | 100% |
 | Resting 52 to 75 bpm, dicrotic 2nd harmonic 1.2 to 2.0x the fundamental (the field failure) | 90.0% | 0.00% | 100% |
 
-The request asked for strong-notch 130 to 160 bpm cases. There the v1 estimate is not doubled either, because the second harmonic of a 130+ bpm pulse (4.3 Hz and above) is removed by the 0.7 to 4 Hz band-pass. Doubling is a problem for rates below about 120 bpm, which is where the field failure happened, so the table includes the 75 bpm field case. These synthetic tests pass by construction of the simulator, so they check the code path, not the physiology. The 90% and 28.8% doubling rates for the old counter are simulator rates for a worst-case waveform. They are not field rates; the field-like figure is the 3.1% on BUT PPG.
+The request asked for strong-notch 130 to 160 bpm cases. There the v1 estimate is not doubled either, because the second harmonic of a 130+ bpm pulse (4.3 Hz and above) is removed by the 0.7 to 4 Hz band-pass. That explanation does not cover 110 bpm, whose second harmonic (3.67 Hz) is still inside the filter, so the fast-range result is not fully explained. Doubling is a problem for rates below about 120 bpm, which is where the field failure happened, so the table includes the 75 bpm field case. These synthetic tests pass by construction of the simulator, so they check the code path, not the physiology. The 90% and 28.8% doubling rates for the old counter are simulator rates for a worst-case waveform. They are not field rates; the field-like figure is the 3.1% on BUT PPG.
 
 ## Limits of this validation
 

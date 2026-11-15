@@ -1,0 +1,15 @@
+{
+ "n_windows": 1141,
+ "n_people": 61,
+ "n_eval_windows_with_label": 1141,
+ "n_people_with_label": 61,
+ "ref_min": 88.1,
+ "ref_p5": 93.9,
+ "ref_median": 97.0,
+ "ref_max": 100.0,
+ "share_below_95": 0.14198071866783524,
+ "windows_below_90": 2,
+ "people_with_window_below_90": 1,
+ "seconds": 139,
+ "caveat": "MTHS is normoxic: the train-mean predictor is nearly optimal and nothing here measures hypoxemia detection"
+}

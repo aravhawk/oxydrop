@@ -1,0 +1,3 @@
+scheme,dark,light,n_dark,n_light,gap,lo,hi,estimable
+monk,7+,1-3,7,55,1.7744434869959598,0.6366115659528565,2.611444418619677,True
+ita,darkest tertile,lightest tertile,42,42,1.102893285100195,0.6525119093195768,1.5529161553309152,True

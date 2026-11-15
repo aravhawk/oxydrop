@@ -1,0 +1,51 @@
+<!-- GENERATED from docs/templates/WRITEUP.md.in by scripts/render_docs.py. Edit the template, not this file. -->
+# OxyDrop: a phone-camera check for a drop in blood oxygen
+
+**Track:** Health
+**Team:** Arav Jain, [TEAMMATE 2 NAME], [TEAMMATE 3 NAME]  *(Arav: fill in or delete before submitting; see CHECKLIST.md)*
+**Live app:** https://aravhawk.github.io/oxydrop/ · **Code:** https://github.com/aravhawk/oxydrop · **Paper-style write-up:** [WHITEPAPER.md](../WHITEPAPER.md) · **Model card:** [MODEL.md](../MODEL.md)
+
+> **This project is a prototype and is not medical advice.**
+
+## The problem
+Low blood oxygen (SpO2 below 90%) is easy to miss because it often feels like nothing, and the people most exposed to it (people with COVID-19, COPD or asthma at home, hikers and skiers at altitude, low-resource clinics) are often far from a pulse oximeter. A phone is already in their pocket. Our design scenario is **a person resting, without a pulse oximeter, who wants to know "should I re-check with a real oximeter, or go down?"** This is a scenario, not evidence: the app has not been tested at altitude, on patients, or on a live phone by anyone outside the team.
+
+## What we built
+A web app (works in a phone browser, nothing to install, video never leaves the phone). The user sits at rest and covers the rear camera and flash with a fingertip. After a 60-second calibration of *their own* normal (the first answer arrives at 70 seconds), every 2 seconds it says **Normal vs your baseline**, **Possible low oxygen: re-check with a pulse oximeter**, or **Unsure, re-measure**, and shows heart rate and a quality score. It does not output an SpO2 number, and because it compares you with your own first minute it cannot know whether you were already low at the start (oxygen status at start unknown). A "recorded demo" mode replays real study recordings so anyone can try it without a camera.
+
+![From video to three states](figures/ml_flow.png)
+
+## How it works
+**Model.** A hybrid: the v1 logistic chain (heart-rate rise, pulse shape and ratio-of-ratios features relative to your first minute) gives a low-oxygen logit, and a {{v:params}}-parameter 1D CNN (three seeds, plain JavaScript, offline) learns a residual correction. The CNN was pretrained self-supervised on {{v:ssl_rows}} unlabeled windows and warmed up on contact-oximeter data (OpenOximetry) before fine-tuning on phone video. It also outputs heart rate and a quality score. Details and every lever, kept or dropped: [MODEL.md](../MODEL.md).
+
+![Architecture](figures/ml_architecture.png)
+
+**Testing.** Leave-one-person-out: every result is scored on a person the model never saw, with nested selection on the training people only, three seeds and 95% person-bootstrap intervals, under a protocol committed before any CNN result existed (commit `{{v:prereg_commit}}`). A "win" requires the paired interval against the **best** baseline to exclude zero.
+
+## Results (all leave-one-person-out)
+**Who it is for, input to output, baseline beaten on held-out data, and where it fails:**
+
+* **Primary pre-registered metric (P1, six Hoffman people, time-matched balanced accuracy): not beaten.** The deployed hybrid (fixed pipeline R) scores {{hy:default_R:tm_bacc|full}} against {{b1:chain_v1:tm_bacc|full}} for the best baseline (the shipped logistic chain): a tie. The {{hy:default_R:tm_bacc}} is optimistic, because R was chosen after its outer-fold scores were seen; the nested per-person-selected hybrid scores {{hy:HYBRID_FINAL:tm_bacc|full}} ({{pd1:HYBRID_FINAL/chain_v1|d}} against the chain). The simpler chain has the higher point estimates: a chain refit with the same levers and no CNN scores {{hy:CHAIN_SAME_LEVERS:tm_bacc}}, and the chain-only conformal control answers {{cf:chain_v1/0.1:coverage|pct}} of windows at {{cf:chain_v1/0.1:acc|pct}} accuracy against {{cf:deployed_R/0.1:coverage|pct}} at {{cf:deployed_R/0.1:acc|pct}}; the intervals overlap. The CNN alone ties too. The hybrid and CNN are clearly better than the clock-only baseline ({{b1:clock:tm_bacc}}) and the ratio-of-ratios rules ({{b1:ror_textbook_RB:tm_bacc}}), which are weak baselines.
+* **Heart rate (P2, 100 people): exploratory, not a clean win.** {{hp:all/HYBRID_agree:within5_full|full}} within 5 bpm against {{hp:all/v2_spectral_acf__forced:within5_full|full}} for the best baseline ({{hpd:all/v2_spectral_acf__forced|d}}); the rule was chosen after the pooled table had been seen, the gain comes from BUT PPG, the spectral estimator is nominally better on MTHS and better on the Hoffman inner folds ({{hr:spec:within5_full}} against {{hr:agree:within5_full}}; pooled out-of-fold windows used to select the rule, not an outer-fold test result).
+* **Absolute SpO2 (P3, MTHS):** no model beats the training mean ({{ab:full/p23:p3_mae}} CNN against {{b3:train_mean:mae}}); MTHS is normoxic, so SpO2 is not shown to users.
+* **What drives the CNN:** the OpenOximetry warm-up (P1 {{ab:no_openox/p23k:p1_tm_bacc}} without it against {{ab:full/p23:p1_tm_bacc}} with it). A device-agnostic-augmentation benefit is not supported.
+* **Where it fails:** only six hypoxic phone-camera people exist in open data, so intervals are wide; motion, cold fingers, saturated red channel and far-flash phones produce *Unsure*; skin-tone fairness cannot be shown on phones; low oxygen already present during the first minute is invisible; person 4's resting pulse of about 48 bpm is below the 51 bpm spectral floor of the v2 estimator. The app is built to work on every phone and is not tuned to any specific phone; untested Android and other phones are a limitation.
+
+{{@app_state}}
+
+The v1/v2 chain tables, the heart-rate validation on BUT PPG and the earlier audit are in [ENGINEERED_CHAIN.md](ENGINEERED_CHAIN.md).
+
+## Prior work, and what we added
+Phone-camera low-oxygen detection is **not new**. Hoffman et al. (2022) demonstrated fingertip camera and flash hypoxemia screening with induced desaturation and held-out testing (81% sensitivity, 79% specificity below 90% SpO2, 5.00-point SpO2 MAE; their protocol differs from ours, so this is not a direct comparison). MTHS (Samavati et al., 2022), Sun et al. (2021) and Tian et al. (2022) studied smartphone and camera vital signs and oximetry with ratios, calibration and heart-rate-adaptive filtering. We add: a personalised chain-plus-residual-CNN hybrid on the device with abstention, an open pre-registered leave-one-person-out audit that reports ties and losses, and OpenOximetry-based pretraining and fairness analysis. We do not claim a new sensing principle, a first detector, or superiority over earlier work.
+
+## What we'd do next
+1. Collect consented phone-camera data from a broader, deliberately diverse group in a safe, supervised hypoxia protocol (altitude or clinical breath-holding studies), including many phone models, to test fairness and per-phone behaviour.
+2. Replace the first-minute baseline assumption with an independently established baseline, and add a motion and exertion detector so the app refuses to answer after activity.
+
+## Sources
+- Hoffman et al., "Smartphone camera oximetry in an induced hypoxemia study", npj Digital Medicine 2022; data https://github.com/ubicomplab/oximetry-phone-cam-data (MIT)
+- BUT PPG v2.0, PhysioNet (CC BY 4.0): https://physionet.org/content/butppg/2.0.0/
+- MTHS (CC BY-NC-ND 4.0, non-commercial research), arXiv:2204.08989
+- OpenOximetry (PhysioNet, credentialed; derived aggregates only, never redistributed); moshekam PPG-during-exercise data (MIT); HealthRing (experiment, no gain). Full list and licences: https://github.com/aravhawk/oxydrop/blob/main/DATA_LICENSES.md
+- Libraries: numpy, scipy, scikit-learn, PyTorch, XGBoost, LightGBM, matplotlib, Node.js.
+- AI tools: Claude (Anthropic) was used for code, analysis and drafting. The team reviewed the work and can explain every part.

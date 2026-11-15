@@ -1,6 +1,7 @@
 // End-to-end browser test of the live-camera path with synthetic fingertip videos (no real camera needed).
 // Case "good": a 72 bpm pulse. Expect: lens select works, ambient/flash toggle works, placement reads "Fingertip detected", calibration begins and completes,
-//              heart rate within +-3 of 72, state "Normal vs your baseline", debug CSV non-empty, zero console errors.
+//              the default engine is the hybrid CNN (in a Web Worker), heart rate within +-6 of 72 (the CNN heart-rate head reads 4-5 bpm high on this synthetic pulse;
+//              the spectral estimate is exact), state "Normal vs your baseline", debug CSV non-empty, zero console errors.
 // Case "bad":  grey noise, no finger. Expect: placement refuses, "start anyway" appears after 20 s, result is "Unsure, re-measure", and no heart-rate number.
 // Usage: see tests/e2e/README.md. Env: CHROME (chromium binary), FAKE_GOOD / FAKE_BAD (y4m files), PLAYWRIGHT_CORE (path to playwright-core/index.mjs if not installed locally), CASES=good,bad,replay,stall,calstall
 import http from 'node:http';
@@ -59,7 +60,11 @@ async function good() {
   await p.waitForFunction((s) => document.getElementById('status-main').textContent !== 'Calibrating' && document.getElementById('hr').textContent !== '–', null, { timeout: 30000 });
   await p.waitForTimeout(8000);
   const hr = Number(await p.textContent('#hr')), st = await p.textContent('#status-main');
-  check('heart rate within 72 +-3', Math.abs(hr - 72) <= 3, 'hr=' + hr);
+  check('heart rate within 72 +-6 (hybrid HR rule: CNN and spectral)', Math.abs(hr - 72) <= 6, 'hr=' + hr);
+  const dbg = await p.textContent('#dbg-measure');
+  check('default engine is the hybrid CNN, in a Web Worker', /engine oxydrop-hybrid-v1: .*167,588 parameters per seed.*runs in a Web Worker; conformal alpha 0\.1 /.test(dbg), dbg.split('\n').find((l) => l.startsWith('engine')));
+  check('latency per window is reported', /latency per 2 s window: last \d+ ms, median \d+ ms, p95 \d+ ms/.test(dbg));
+  check('experimental SpO2 only in the debug view, labelled', /EXPERIMENTAL SpO2 from the CNN head \(not validated, do not use\)/.test(dbg) && !/SpO/.test(await p.textContent('#status')));
   check('state is NORMAL text', st === NORMAL, st);
   console.log('       dHR', await p.textContent('#dhr'), '| sig', await p.textContent('#sig'), '| tally', await p.textContent('#tally'));
   await p.click('#debug-measure > summary');
@@ -98,13 +103,16 @@ async function bad() {
   await b.close();
 }
 
-async function replayCase(rec) {
-  console.log('--- case replay ' + rec + ': recorded Hoffman demo, same decision function, no camera');
-  const { b, p, errs } = await open(process.env.FAKE_GOOD || 'fake_good.y4m', URL0 + '?rec=' + rec);
+async function replayCase(rec, engine = 'hybrid') {
+  console.log('--- case replay ' + rec + ' (' + engine + '): recorded Hoffman demo, same decision function, no camera');
+  const { b, p, errs } = await open(process.env.FAKE_GOOD || 'fake_good.y4m', URL0 + '?rec=' + rec + (engine === 'logistic' ? '&engine=logistic' : ''));
   await p.click('#btn-replay');
   await p.waitForFunction(() => document.getElementById('phase').textContent === 'Replay finished', null, { timeout: 120000 });
   const tally = await p.textContent('#tally'), st = await p.textContent('#status-main'), hr = await p.textContent('#hr');
   console.log('       ', tally, '| last state:', st, '| hr:', hr);
+  const note = await p.textContent('#replay-note');
+  if (engine === 'hybrid') { check('replay says the model was trained on this person (demo only, not a test)', /Model trained on this person: demo only, not a test/.test(note) && /demo only, not a test/.test(tally), note.slice(0, 120)); check('replay runs the hybrid engine', /engine oxydrop-hybrid-v1/.test(await p.textContent('#dbg-measure'))); }
+  else { check('?engine=logistic replay runs the logistic chain and says it is held out', /fitted without/.test(note) && /logistic chain v2/.test(await p.textContent('#dbg-measure')), note.slice(0, 120)); }
   if (rec === '100004R') { check('person 4 (43 bpm) is UNSURE throughout', st === UNSURE && /: 0 normal, 0 possible low oxygen,/.test(tally), tally); check('no HR number without a lock', hr === '–', hr); }
   else check('person 1 gets confident answers', /[1-9]\d* (normal|possible)/.test(tally) || / [1-9]\d* normal/.test(tally), tally);
   check('no console errors', errs.length === 0, JSON.stringify(errs));
@@ -152,8 +160,8 @@ async function calstall() {
   await b.close();
 }
 
-const cases = (process.env.CASES || 'good,bad,replay,stall,calstall').split(',');
-try { if (cases.includes('good')) await good(); if (cases.includes('bad')) await bad(); if (cases.includes('replay')) { await replayCase('100001L'); await replayCase('100004R'); } if (cases.includes('stall')) await stall(); if (cases.includes('calstall')) await calstall(); }
+const cases = (process.env.CASES || 'good,bad,replay,replaylog,stall,calstall').split(',');
+try { if (cases.includes('good')) await good(); if (cases.includes('bad')) await bad(); if (cases.includes('replay')) { await replayCase('100001L'); await replayCase('100004R'); } if (cases.includes('replaylog')) { await replayCase('100001L', 'logistic'); await replayCase('100004R', 'logistic'); } if (cases.includes('stall')) await stall(); if (cases.includes('calstall')) await calstall(); }
 catch (e) { console.log('FAIL  exception:', e.message); failures++; }
 server.close();
 console.log(failures ? `E2E FAIL (${failures})` : 'E2E PASS');
