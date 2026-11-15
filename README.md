@@ -147,6 +147,34 @@ Held-out gate result (each clip scored with a gate chosen on the other half of t
 
 Per-frame red/green/blue AC/DC ratio-of-ratios, quality gate, per-person calibration from the first 30 s, ridge and small gradient-boosted corrections, person-level leave-one-person-out, intervals by person bootstrap. On the strict gate only 22 of 62 people could be calibrated (the red channel was clipped in 66% of windows with the phone's automatic exposure), 220 windows from 20 people. Results: training-mean 2.21 [1.66, 2.68], ridge optics + HR 2.22, gradient boosting 2.28, textbook 3.49 [2.51, 4.63], time-only 2.37 (MAE in SpO₂ points). Predicting the change from the person's own start was worse than saying "no change" (0.87 vs 0.77). Decision rule (fixed before the run, applied to Hoffman, `results/optics_experiment/decision_rule.csv`): none of 16 optics variants beat TINY v2 on accuracy and time-matched accuracy with a bootstrap lower bound above 0, so it is not shipped.
 
+## Model-agnostic camera flow
+
+The app never assumes a phone layout. Flash position, lens count and lens size differ a lot between models (on iPhone 17 Pro and 18 Pro class phones the flash sits about 2-3 cm from the main lens, some phones put the flash between large lenses, some lenses are too big for one fingertip to seal). So the app decides from the signal:
+
+1. **Lens probe.** After camera permission it lists every back camera and tests each one for about 3 seconds with the torch on (up to 4 lenses, about 15 s). Each lens gets a score from 0 to 100 from the pulsatile AC/DC amplitude, the spectral peak SNR and the periodicity of the band-passed signal, with a penalty for saturation (`app/js/lensprobe.js`). The best lens is selected and shown by name. The lens menu stays available as an override.
+2. **Generic placement guide.** Lay the fingertip flat across the whole camera plateau so it covers the picked lens and, if possible, the flash, with light pressure. A live ring shows the picked camera's brightness and redness (green border when it looks covered).
+3. **Adaptive exposure.** After a steady placement the app steps exposure compensation, brightness, ISO or exposure time (whatever the browser exposes) toward a mid-range image with little saturation, then locks. Needed because a far-away flash gives a weaker, more diffuse signal.
+4. **Live signal-quality meter.** AC/DC, spectral SNR and periodicity over the last 8 s. If it stays poor for 4 s while the pulse lock also fails, the app shows "Weak signal: slide your finger so it covers the lens and the flash, press lightly" and answers "Unsure, re-measure" with no heart rate, instead of a reading. The Chain and the three-state thresholds are unchanged.
+5. **Fallback modes.** If the torch cannot be used, the ladder tries ambient light, then the front camera. If the torch works but every back lens scores below 35, it picks the **front camera with a full-white screen** first (front camera geometry is the same on all phones; the screen is the light source). Turn the screen brightness up; the app requests a screen wake lock. Modes can also be chosen by hand.
+6. **Debug view.** Per-lens probe scores, the mode chosen and why, exposure adaptation and live quality are listed in the debug view and the copied debug summary, so each phone's pick can be reviewed.
+
+The probe logic is tested in Node (`npm run test:lens`) with a mocked `MediaDevices` and synthetic frames. That is a simulation of the selection logic only.
+
+## Untested phones and browsers
+
+**This has not been tested on any real phone.** The lens probe, adaptive exposure, quality meter and fallback modes are only exercised by `tests/lensprobe.mjs` (mocked `navigator.mediaDevices`, synthetic frame data, including a simulated weak diffuse signal for a far flash) and the fake-video browser test in `tests/e2e`. A single headless Chromium smoke run of the new setup flow against its fake device also ran without script errors. The following are untested:
+
+| Device or browser | Status |
+|---|---|
+| iPhone 17 Pro / 18 Pro (flash 2-3 cm from the main lens) | Untested. The far-flash diffuse-signal case is simulated only |
+| Other iPhones (Safari cannot control the torch, so ambient or front-camera mode is expected) | Untested |
+| Google Pixel | Untested |
+| Samsung Galaxy | Untested |
+| Other Android phones (Chrome) | Untested |
+| Firefox, Edge, desktop webcams | Untested |
+
+Real-phone results are collected with `docs/PHONE_RETEST.md`.
+
 ## Limitations
 - 6 test people, one phone (Nexus 6P), fingertip only, one-way desaturation protocol, controlled FiO₂. Wide confidence intervals.
 - **Not tested on a real phone.** v2's capture path (frame timestamps, exposure and white-balance lock, torch, placement check, motion sensor) was checked only against a synthetic fake camera in headless Chromium and a simulator. The decision thresholds for frame gaps, stalls and finger placement are untuned heuristics. The finger check is a colour test (red at least 50 and at least 1.4 times green and blue, little saturation, even image), so a warm lit surface can read "Fingertip detected"; the pulse lock is what then refuses it. A pulsatile-amplitude test would be a better finger check, but its threshold needs real-phone data and was not guessed. The exposure lock timing and the stall watchdog have only been exercised in headless Chromium with a fake camera (stalls are injected by withholding frames). Run the [2-minute phone retest](docs/PHONE_RETEST.md) and send back the trace.

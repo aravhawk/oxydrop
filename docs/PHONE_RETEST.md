@@ -13,7 +13,7 @@ Purpose: find out whether the v2 capture path works on a **real phone**. So far 
 
 | Time | What to do | What you should see |
 |---|---|---|
-| 0:00 to 0:20 **Setup** | Open https://aravhawk.github.io/oxydrop/ and tap *Measure with my camera*. Tap *Turn on camera* and allow it. Pick the **main (wide) rear lens** (the app avoids ultra-wide and tele). Choose **Flash** (Android) or **Ambient** (iPhone, bright lamp). Cover the lens and light **fully** with a fingertip, light pressure. | The placement indicator turns to "Fingertip detected". About 3 s later the checklist changes from "Hold still: locking exposure, white balance and focus…" to "Locked: …" (the lock is taken on the covered lens, not on the open scene, and is taken again if you switch Flash/Ambient). The start button enables after about 3 locked windows. If it never does, note the message and go to *If it fails*. |
+| 0:00 to 0:30 **Setup and lens probe** | Open https://aravhawk.github.io/oxydrop/ and tap *Measure with my camera*, then *Turn on camera* and allow it. After a 3 second countdown the app tests every back camera for about 3 seconds each. **Lay your fingertip flat across the whole camera plateau**, covering the lenses and the flash, light pressure, and keep still. You do not pick the lens: the app picks the one with the strongest pulse and names it. | A progress line "Testing lens 2 of 4, keep your finger flat across the camera plateau" with a score per lens. Then the picked lens name, the mode (torch, ambient or front camera + white screen) and the reason. The ring next to the lens name turns green when the picked lens looks covered. The placement indicator turns to "Fingertip detected". About 3 s later the checklist changes from "Hold still: locking exposure, white balance and focus…" to "Locked: …" (after the adaptive exposure step, which is listed in the checklist). The start button enables after about 3 locked windows. If it never does, note the message and go to *If it fails*. |
 | 0:20 to 1:20 **Calibration (60 s)** | Tap *Start 60-second calibration*. Sit still, breathe normally, do not talk. Do not move the finger. | Calibration bar fills. The clock reaches 1:00. The first answer arrives about 10 s later because the first window needs 10 s of data. |
 | 1:20 to 2:00 **Measurement (about 40 s)** | Keep still. Write down the reference pulse once, about 10 s after calibration ends. For the last 10 s, **lift your finger off the lens** for about 5 s, then put it back. | HR tile near your reference. State **Normal vs your baseline**. With the finger lifted, the state should change to **Unsure, re-measure** and the HR should disappear. Also write down what the placement indicator says while the finger is lifted (a warm lit surface can read "Fingertip detected"; the pulse lock should still refuse it). |
 | 2:00 | Tap **Copy debug summary**, paste it into a note. Tap **Download raw trace (CSV)** and keep the file. | |
@@ -23,7 +23,7 @@ The calibration check reports a failed calibration as "Unsure, re-measure" with 
 ## What to send back
 1. The **Copy debug summary** text.
 2. The **raw trace CSV** (about 3,500 lines for a 2-minute run).
-3. Phone model, OS and browser version, lens used, Flash or Ambient, and whether the torch actually turned on.
+3. Phone model, OS and browser version, the lens the app picked, the mode (torch, ambient or front + white screen), and whether the torch actually turned on. The **lens probe scores per lens** are in the debug summary under "lens probe scores"; copy them in full.
 4. The reference pulse and how you measured it.
 5. Screenshot of the final screen (optional).
 
@@ -47,8 +47,15 @@ If the reference pulse is below 51 bpm or above about 110 bpm, record it but tre
 - HR is about double the reference: this is the failure v2 is meant to remove. Send the CSV.
 - Answers are always "Unsure, re-measure": send the debug summary, which lists the reason.
 
+## Fallback modes to try (one extra minute each, optional)
+After the normal run, use the *Light source* buttons in setup to try each mode on the same phone and note which gives a green quality meter and "Fingertip detected":
+- **Flash on** (torch, best back lens). Try the lens menu override on a second lens too, if you have one, and note which gives the better quality meter.
+- **Ambient light** (no flash, bright lamp or window).
+- **Front camera + white screen**: cover the front camera with the fingertip, screen brightness at maximum. This is also what the app picks automatically if every back lens scores below 35.
+Also check that a **Weak signal** message appears (and the answer becomes "Unsure, re-measure" with no heart rate) if you only half cover the lens for about 5 seconds.
+
 ## Result table template
 
-| Phone / OS / browser | Lens | Flash or ambient | Torch on? | Reference pulse (method) | App HR (before / after finger lift) | Within 5 bpm? | 2x readings? | State at rest | State with finger lifted | fps / dropped frames | Notes |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| | | | | | | | | | | | |
+| Phone / OS / browser | Lens picked by app | Probe scores per lens | Mode picked (torch / ambient / front) | Quality meter (good / weak) | Flash or ambient | Torch on? | Reference pulse (method) | App HR (before / after finger lift) | Within 5 bpm? | 2x readings? | State at rest | State with finger lifted | fps / dropped frames | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | | | | | | | | |
