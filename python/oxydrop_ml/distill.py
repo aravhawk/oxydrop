@@ -8,6 +8,8 @@ Families (`install` swaps the loss and the validation prediction of `train.fit`,
   P  plain CNN, no change.
   R  residual: low-oxygen logit = prior + net output (the network learns a correction). MTHS low-oxygen terms are off (no prior there).
   D  distillation: P plus `lam * BCE(net logit, sigmoid(prior))` on Hoffman training rows.
+  L  (Amendment 4, exploratory extension) residual with a FROZEN backbone: as R, but only the low-oxygen linear head is trained (BatchNorm in eval mode, learning rate
+     LR_L), a low-variance correction on top of the OpenOximetry-pretrained representation.
 The exported network is the same graph for all families; for R the app adds the chain logit to the network output.
 """
 from __future__ import annotations
@@ -25,7 +27,9 @@ from . import train as T
 
 C_HR, C_FUS = 0.01, 0.1                 # shipped C of the v1 chain (baselines/chain_v1.SHIPPED)
 LAM_DISTILL = 0.5
-FAMILIES = ('P', 'R', 'D')
+FAMILIES = ('P', 'R', 'D', 'L')
+RESIDUAL = ('R', 'L')
+LR_L = 5e-3                             # a priori, not tuned (Amendment 4)
 
 
 # ------------------------------------------------------------------------------------------------ the chain
@@ -96,7 +100,7 @@ class _State:
 
 
 STATE = _State()
-_ORIG = dict(batch_loss=T.batch_loss, predict=T.predict)
+_ORIG = dict(batch_loss=T.batch_loss, predict=T.predict, make_net=T.make_net)
 
 
 def batch_loss_hybrid(net, pool, rows, x, s, dom, eb, hp, pos_w, adv=None, lam=0.0, ds_t=None, device='cpu'):
@@ -116,7 +120,7 @@ def batch_loss_hybrid(net, pool, rows, x, s, dom, eb, hp, pos_w, adv=None, lam=0
     L['spo2'] = LS.spo2_loss(o['spo2'].float(), o['spo2_logvar'].float(), spo2, m(pool.has_spo2[rows]), t(pool.w_spo2[rows]))
     raw = o['lowox_logit'].float()
     has_low = pool.has_low[rows].copy()
-    if fam == 'R':
+    if fam in RESIDUAL:
         has_low &= pool.ds[rows] != 'mths'
         L['low'] = LS.low_loss(raw + prior * t(is_hof), low, m(has_low), w_low, pos_w, hp.focal)
     else:                                                  # D
@@ -136,7 +140,7 @@ def batch_loss_hybrid(net, pool, rows, x, s, dom, eb, hp, pos_w, adv=None, lam=0
 def predict_hybrid(net, pool, rows, norm, hp, device='cpu', bs=512):
     """train.predict with the prior added to the low-oxygen logit for family R (used by the early-stopping score)."""
     out = _ORIG['predict'](net, pool, rows, norm, hp, device, bs)
-    if STATE.family == 'R':
+    if STATE.family in RESIDUAL:
         rows = np.asarray(rows)
         p = np.clip(out['p_low'].astype(np.float64), 1e-6, 1 - 1e-6)
         z = np.log(p / (1 - p)) + STATE.prior[rows] * (pool.ds[rows] == 'hoffman')
@@ -167,16 +171,28 @@ def predict_raw(net, pool, rows, norm, hp, device='cpu', bs=512):
     return {k: (np.concatenate(v) if v else np.zeros(0)) for k, v in res.items()}
 
 
+def make_net_frozen(hp, device='cpu'):
+    """train.make_net with every parameter frozen except the low-oxygen head, and train() keeping the whole network (BatchNorm, dropout) in eval mode."""
+    import types
+    net = _ORIG['make_net'](hp, device)
+    for n, p in net.named_parameters():
+        p.requires_grad = n.startswith('lowox')
+    net.train = types.MethodType(lambda self, mode=True: torch.nn.Module.train(self, False), net)
+    return net
+
+
 @contextlib.contextmanager
 def install(family, prior=None, lam=LAM_DISTILL):
     """Context manager: train.fit uses the family loss and the prior-aware validation prediction inside the block; the originals are restored on exit."""
     assert family in FAMILIES, family
     if family != 'P':
-        assert prior is not None, 'family R/D needs the chain prior'
+        assert prior is not None, 'family R/D/L needs the chain prior'
     STATE.family, STATE.prior, STATE.lam = family, prior, lam
     T.batch_loss, T.predict = batch_loss_hybrid, predict_hybrid
+    if family == 'L':
+        T.make_net = make_net_frozen
     try:
         yield
     finally:
-        T.batch_loss, T.predict = _ORIG['batch_loss'], _ORIG['predict']
+        T.batch_loss, T.predict, T.make_net = _ORIG['batch_loss'], _ORIG['predict'], _ORIG['make_net']
         STATE.family, STATE.prior = 'P', None

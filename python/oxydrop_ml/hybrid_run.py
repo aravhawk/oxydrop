@@ -11,6 +11,7 @@ a job is claimed with an exclusive lock file, finished jobs are skipped. Each jo
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import sys
@@ -45,6 +46,11 @@ def job_name(job):
     return f'{kind}_{o}' + (f'_{q}' if q else '')
 
 
+def family_hp(hp: HP, family):
+    """Family L (frozen backbone, Amendment 4) trains a 73-weight head with its own learning rate; every other family uses the recipe."""
+    return dataclasses.replace(hp, lr=DS.LR_L) if family == 'L' else hp
+
+
 def rows_of(pool: Pool, people):
     return np.nonzero(np.isin(pool.subject, people) & (pool.ds == 'hoffman') & (pool.eval | pool.in_base))[0]
 
@@ -74,6 +80,7 @@ def run_job(pool: Pool, X19, job, family, hp: HP, seed, device, out_dir, log=pri
     tr, va, vs = fold_rows(pool, excl, seed)
     S.assert_no_leak(pool.subject, tr, np.nonzero(np.isin(pool.subject, excl))[0])
     prior = DS.prior_for_pool(pool, X19, tprime, excl) if family != 'P' else None
+    hp = family_hp(hp, family)
     with DS.install(family, prior):
         fr = fit(pool, tr, va, hp, seed, device)
     parts = []
@@ -107,6 +114,7 @@ def final_fit(pool: Pool, X19, family, hp: HP, seed, device, out_dir, log=print)
     hof = pool.subjects_of('hoffman')
     tr, va, vs = fold_rows(pool, [], seed)
     prior = DS.prior_for_pool(pool, X19, hof, []) if family != 'P' else None
+    hp = family_hp(hp, family)
     with DS.install(family, prior):
         fr = fit(pool, tr, va, hp, seed, device)
     folded = fold_norm(fr.net, fr.norm, 0)

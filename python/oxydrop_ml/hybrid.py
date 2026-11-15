@@ -36,15 +36,17 @@ COMPONENTS = {'c': 'chain', 'p': 'P', 'd': 'D', 'corr': 'R'}
 CANDS = {
     'chain_shipped': None,                 # raw chain logit, no meta-learner: the incumbent (control)
     'chain_platt': ['c'],                  # control
-    'P': ['p'], 'D': ['d'], 'R': ['r'],
-    'c+p': ['c', 'p'], 'c+d': ['c', 'd'], 'c+corr': ['c', 'corr'], 'all': ['c', 'p', 'd', 'corr'],
+    'P': ['p'], 'D': ['d'], 'R': ['r'], 'L': ['rL'],
+    'c+p': ['c', 'p'], 'c+d': ['c', 'd'], 'c+corr': ['c', 'corr'], 'c+corrL': ['c', 'corrL'], 'all': ['c', 'p', 'd', 'corr'],
 }
-CNN_ORDER = ['P', 'D', 'R', 'c+p', 'c+d', 'c+corr', 'all']          # simplest first (tie rule)
+CNN_ORDER = ['P', 'D', 'R', 'c+p', 'c+d', 'c+corr', 'all']          # simplest first (tie rule); Amendment 2, the confirmatory headline set
+CNN_ORDER_EXT = ['P', 'D', 'R', 'L', 'c+p', 'c+d', 'c+corr', 'c+corrL', 'all']   # Amendment 4: adds the frozen-backbone residual family L (exploratory)
+L_CANDS = ('L', 'c+corrL')
 CHAIN_ORDER = ['chain_platt']
 
 
 # ------------------------------------------------------------------------------------------------ loading
-def load_runs(dirs, families=('P', 'R', 'D'), seeds=(0,), require_complete=True):
+def load_runs(dirs, families=('P', 'R', 'D', 'L'), seeds=(0,), require_complete=True):
     """Concatenate the job CSVs of hybrid_run.py found under the run directories. Returns (DataFrame, dict (family, seed) -> number of job files)."""
     dirs = [dirs] if isinstance(dirs, str) else list(dirs)
     frames, counts = [], {}
@@ -84,7 +86,7 @@ def wide(df):
     m = g.agg(logit=('logit', 'mean'), hr=('hr', 'mean'), p_sqi=('p_sqi', 'mean'), n_seeds=('seed', 'nunique')).reset_index()
     base = df.drop_duplicates(KEYS)[KEYS + INFO]
     out = base.copy()
-    for fam, col in (('P', 'p'), ('D', 'd'), ('R', 'corr')):
+    for fam, col in (('P', 'p'), ('D', 'd'), ('R', 'corr'), ('L', 'corrL')):
         s = m[m.family == fam].set_index(KEYS)
         if len(s):
             out = out.join(s[['logit']].rename(columns={'logit': col}), on=KEYS)
@@ -121,6 +123,8 @@ def add_chain(w, meta, X19, hof):
     w['c'] = c
     if 'corr' in w:
         w['r'] = w['c'] + w['corr']
+    if 'corrL' in w:
+        w['rL'] = w['c'] + w['corrL']
     return w
 
 
@@ -300,6 +304,9 @@ def evaluate(runs, seeds, hof_meta=None, B=2000, base=None, fold_ens=True):
     order = [n for n in CNN_ORDER if has_cols(w, n)]
     sel, ch, tr = run_pipeline_over_folds(F, order, with_train=True)
     res['final_scores'], res['final_choices'], res['final_train'] = sel, ch, tr
+    if has_cols(w, 'L'):
+        ext_order = [n for n in CNN_ORDER_EXT if has_cols(w, n)]
+        res['ext_scores'], res['ext_choices'], res['ext_train'] = run_pipeline_over_folds(F, ext_order, with_train=True)
     cs, cch, ctr = run_pipeline_over_folds(F, CHAIN_ORDER, with_train=True)
     res['chain_levers_scores'], res['chain_levers_choices'], res['chain_levers_train'] = cs, cch, ctr
     cr, _, _ = run_pipeline_over_folds(F, ['chain_shipped'], fixed=('chain_shipped', False, 1))

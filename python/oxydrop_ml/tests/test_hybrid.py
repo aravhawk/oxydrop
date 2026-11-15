@@ -246,3 +246,22 @@ def test_load_runs_counts_a_job_once_and_wide_averages_seeds(tmp_path):
     assert len(w) == 2 and np.allclose(w.p.values, [2.0, 0.0])               # mean of the two seeds: (1 + 3) / 2 and (-1 + 1) / 2
     with pytest.raises(RuntimeError):
         H.load_runs([str(tmp_path / 'a')], families=('P',), seeds=(0,))        # 36 job files are required by default
+
+
+def test_frozen_backbone_family_trains_only_the_low_oxygen_head(world):
+    pool = T.Pool(root=world)
+    X19 = fake_x19(pool)
+    hof = pool.subjects_of('hoffman')
+    excl = ['hof_2']
+    prior = DS.prior_for_pool(pool, X19, [p for p in hof if p not in excl], excl)
+    tr, va, _ = T.fold_rows(pool, excl, 3)
+    hp = HR.family_hp(tiny_hp(), 'L')
+    assert hp.lr == DS.LR_L and HR.family_hp(tiny_hp(), 'R').lr == tiny_hp().lr
+    T.seed_all(3)                                                                 # fit() seeds before it builds the network: same initial weights
+    init = {k: v.clone() for k, v in T.make_net(hp).state_dict().items()}
+    with DS.install('L', prior):
+        fr = T.fit(pool, tr, va, hp, seed=3)
+    assert T.make_net is not DS.make_net_frozen                                   # restored after the block
+    after = fr.net.state_dict()
+    changed = [k for k in init if not torch.equal(init[k], after[k])]
+    assert changed and all(k.startswith('lowox') for k in changed), changed       # BatchNorm statistics and every other weight are untouched
