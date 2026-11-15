@@ -30,7 +30,7 @@ from .export_js import export_graph
 
 ROOT = Path(__file__).resolve().parents[2]
 FORMAT = 'oxydrop-hybrid-v1'
-FAMILY_OF = {'p': 'P', 'd': 'D', 'corr': 'R', 'r': 'R'}
+FAMILY_OF = {'p': 'P', 'd': 'D', 'corr': 'R', 'r': 'R', 'corrL': 'L', 'rL': 'L'}
 
 
 def oof_table(w):
@@ -41,7 +41,7 @@ def oof_table(w):
 
 
 def deploy_pipeline(w, order=None):
-    order = order or [n for n in H.CNN_ORDER if H.has_cols(w, n)]
+    order = order or [n for n in H.CNN_ORDER_EXT if H.has_cols(w, n)]
     oof = oof_table(w)
     ch = H.select(oof, order)
     cols = H.cand_cols(ch['source'])
@@ -99,7 +99,7 @@ def main(argv=None):
     for fam in fams:
         for s in a.seeds:
             ck = Path(a.final_dir or '.') / f'{fam}_s{s}.pt'
-            item = dict(family=fam, seed=s, weights=f'hybrid_{fam}_s{s}.json', role={'P': 'p', 'D': 'd', 'R': 'corr'}[fam])
+            item = dict(family=fam, seed=s, weights=f'hybrid_{fam}_s{s}.json', role={'P': 'p', 'D': 'd', 'R': 'corr', 'L': 'corrL'}[fam])
             if ck.exists():
                 sha, size = export_member(ck, out / item['weights'], fam, s)
                 item.update(ckpt_sha256=sha, bytes=size)
@@ -114,8 +114,8 @@ def main(argv=None):
         pipeline=dict(source=ch['source'], features=cols, calibration=bool(ch['cal']), aggregate_windows=int(ch['k']), threshold=0.0,
                       meta=f.params, inner_cv_tm_bacc=ch['inner_cv']),
         features_definition=dict(c='logit(p_chain) with p_chain the mean probability of the two v1 chain models, clipped to [1e-6, 1-1e-6]',
-                                 p='mean over p-members of lowox_logit', d='mean over d-members of lowox_logit', corr='mean over R-members of lowox_logit (the residual correction)',
-                                 r='c + corr'),
+                                 p='mean over p-members of lowox_logit', d='mean over d-members of lowox_logit', corr='mean over R-members of lowox_logit (the residual correction)', corrL='mean over L-members (frozen backbone) of lowox_logit',
+                                 r='c + corr', rL='c + corrL'),
         chain=dict(models=chain.params(), combine='mean_probability_then_logit', clip=1e-6, features='app/js/engine_v1.js FUSION deltas (19), model 0 uses column 0 only',
                    engine_v1_weights=engine_v1_weights(chain, shipped),
                    max_abs_coef_diff_vs_app_weights_json=chain_diff,

@@ -380,15 +380,17 @@ def gap_row(name, frame, train, choices):
     return out
 
 
-def final_score_frame(res):
-    """Per-window OOF scores of the final hybrid (for the conformal stream): one row per evaluated Hoffman window."""
-    s = res['final_scores']; ch = res['final_choices'].set_index('outer')
+def final_score_frame(res, which='final'):
+    """Per-window OOF scores of the final hybrid (for the conformal stream): one row per evaluated Hoffman window. `which`: 'final' (Amendment 2 set) or 'ext' (Amendment 4 set)."""
+    s = res[f'{which}_scores']; ch = res[f'{which}_choices'].set_index('outer')
     w = res['w']
-    o = w[w.target == 'outer'][['outer', 'local', 'p', 'd', 'corr', 'c', 'hr', 'p_sqi'] if 'd' in w else ['outer', 'local', 'c']]
+    keep = [c for c in ('outer', 'local', 'p', 'd', 'corr', 'corrL', 'c', 'hr', 'p_sqi') if c in w]
+    o = w[w.target == 'outer'][keep]
     d = s[s['eval'].astype(bool)].merge(o, on=['outer', 'local'], how='left')
     d['prob'] = 1.0 / (1.0 + np.exp(-d.score))
     d['source'] = d.outer.map(ch.source); d['cal'] = d.outer.map(ch.cal); d['k'] = d.outer.map(ch.k)
-    return d.rename(columns={'score': 'logit', 'c': 'chain_logit', 'p': 'cnn_logit', 'd': 'distilled_logit', 'corr': 'residual_corr', 'hr': 'cnn_hr', 'p_sqi': 'cnn_sqi'})
+    d['ruleset'] = 'EXT' if which == 'ext' else 'A2'
+    return d.rename(columns={'score': 'logit', 'c': 'chain_logit', 'p': 'cnn_logit', 'd': 'distilled_logit', 'corr': 'residual_corr', 'corrL': 'residual_frozen_corr', 'hr': 'cnn_hr', 'p_sqi': 'cnn_sqi'})
 
 
 def report_cli(a):
@@ -404,7 +406,11 @@ def report_cli(a):
     res = evaluate(runs, seeds, B=a.B)
     tag = a.tag
     rows = []
-    named = {'HYBRID_FINAL': res['final_scores'], 'CHAIN_SAME_LEVERS': res['chain_levers_scores'], 'CHAIN_SHIPPED': res['chain_shipped_scores']}
+    has_ext = 'ext_scores' in res
+    named = {'HYBRID_FINAL': res['final_scores']}
+    if has_ext:
+        named['HYBRID_FINAL_EXT'] = res['ext_scores']
+    named.update({'CHAIN_SAME_LEVERS': res['chain_levers_scores'], 'CHAIN_SHIPPED': res['chain_shipped_scores']})
     named.update({f'default_{k}': v for k, v in res['default_scores'].items()})
     for nm, fr in named.items():
         r = summarize(fr, B=a.B, name=nm)
@@ -412,19 +418,38 @@ def report_cli(a):
     final = pd.DataFrame(rows)
     final['seeds'] = ','.join(map(str, seeds))
     final.to_csv(os.path.join(out, f'hybrid_p1_final{tag}.csv'), index=False)
-    pairs = [paired_vs_baselines(res['final_scores'], base, a.B, 'HYBRID_FINAL', bname), paired_vs_baselines(res['chain_levers_scores'], base, a.B, 'CHAIN_SAME_LEVERS', bname)]
-    pairs.append(pd.DataFrame([paired_models(res['final_scores'], res['chain_levers_scores'], a.B, 'HYBRID_FINAL', 'CHAIN_SAME_LEVERS'),
-                               paired_models(res['final_scores'], res['default_scores']['P'], a.B, 'HYBRID_FINAL', 'P_alone_default'),
-                               paired_models(res['default_scores']['P'], res['chain_shipped_scores'], a.B, 'P_alone_default', 'CHAIN_SHIPPED')]))
+    pairs = [paired_vs_baselines(res['final_scores'], base, a.B, 'HYBRID_FINAL', bname)]
+    if has_ext:
+        pairs.append(paired_vs_baselines(res['ext_scores'], base, a.B, 'HYBRID_FINAL_EXT', bname))
+    pairs.append(paired_vs_baselines(res['chain_levers_scores'], base, a.B, 'CHAIN_SAME_LEVERS', bname))
+    pm = [paired_models(res['final_scores'], res['chain_levers_scores'], a.B, 'HYBRID_FINAL', 'CHAIN_SAME_LEVERS'),
+          paired_models(res['final_scores'], res['default_scores']['P'], a.B, 'HYBRID_FINAL', 'P_alone_default'),
+          paired_models(res['default_scores']['P'], res['chain_shipped_scores'], a.B, 'P_alone_default', 'CHAIN_SHIPPED')]
+    if has_ext:
+        pm += [paired_models(res['ext_scores'], res['chain_levers_scores'], a.B, 'HYBRID_FINAL_EXT', 'CHAIN_SAME_LEVERS'),
+               paired_models(res['ext_scores'], res['final_scores'], a.B, 'HYBRID_FINAL_EXT', 'HYBRID_FINAL'),
+               paired_models(res['default_scores']['L'], res['chain_shipped_scores'], a.B, 'L_default', 'CHAIN_SHIPPED')]
+    pairs.append(pd.DataFrame(pm))
     pd.concat(pairs, ignore_index=True).to_csv(os.path.join(out, f'hybrid_p1_final_paired{tag}.csv'), index=False)
     ch = res['final_choices'].assign(pipeline='HYBRID_FINAL')
+    if has_ext:
+        ch = pd.concat([ch, res['ext_choices'].assign(pipeline='HYBRID_FINAL_EXT')], ignore_index=True)
     ch = pd.concat([ch, res['chain_levers_choices'].assign(pipeline='CHAIN_SAME_LEVERS')], ignore_index=True)
     ch.to_csv(os.path.join(out, f'hybrid_p1_final_choices{tag}.csv'), index=False)
     res['grid'].to_csv(os.path.join(out, f'hybrid_p1_final_grid{tag}.csv'), index=False)
-    gaps = pd.DataFrame([gap_row('HYBRID_FINAL', res['final_scores'], res['final_train'], res['final_choices']),
-                         gap_row('CHAIN_SAME_LEVERS', res['chain_levers_scores'], res['chain_levers_train'], res['chain_levers_choices'])])
+    gl = [gap_row('HYBRID_FINAL', res['final_scores'], res['final_train'], res['final_choices'])]
+    if has_ext:
+        gl.append(gap_row('HYBRID_FINAL_EXT', res['ext_scores'], res['ext_train'], res['ext_choices']))
+    gl.append(gap_row('CHAIN_SAME_LEVERS', res['chain_levers_scores'], res['chain_levers_train'], res['chain_levers_choices']))
+    gaps = pd.DataFrame(gl)
     gaps.to_csv(os.path.join(out, f'hybrid_p1_final_gap{tag}.csv'), index=False)
-    final_score_frame(res).to_csv(os.path.join(out, 'scores', f'hybrid_final{tag}_hoffman.csv'), index=False)
+    which = 'final'
+    if has_ext:                                    # Amendment 4: the nested scores of the pipeline family that is deployed (same rule on the six out-of-fold tables)
+        from .export_hybrid import deploy_pipeline
+        dep = deploy_pipeline(res['w'], order=[n for n in CNN_ORDER_EXT if has_cols(res['w'], n)])[0]
+        which = 'ext' if dep['source'] in L_CANDS else 'final'
+        print('deployed pipeline', dep['source'], dep['cal'], dep['k'], '-> scores of ruleset', which)
+    final_score_frame(res, which).to_csv(os.path.join(out, 'scores', f'hybrid_final{tag}_hoffman.csv'), index=False)
     # single seeds (exploratory): default levers
     srows = []
     meta, X19 = hoffman_meta()
@@ -432,11 +457,11 @@ def report_cli(a):
         r1, _ = load_runs(runs_dirs, families=tuple(a.families), seeds=[s])
         w1 = add_chain(wide(r1), meta, X19, None)
         F1 = folds(w1)
-        for nm in [n for n in ('P', 'D', 'R', 'c+p', 'c+d', 'c+corr', 'all') if has_cols(w1, n)]:
+        for nm in [n for n in ('P', 'D', 'R', 'L', 'c+p', 'c+d', 'c+corr', 'c+corrL', 'all') if has_cols(w1, n)]:
             fr, _, _ = run_pipeline_over_folds(F1, [nm], fixed=(nm, False, 1))
             srows.append(dict(seed=s, **summarize(fr, B=0, name=nm)))
     Fall = folds(res['w'])
-    for nm in [n for n in ('P', 'D', 'R', 'c+p') if has_cols(res['w'], n)]:
+    for nm in [n for n in ('P', 'D', 'R', 'L', 'c+p') if has_cols(res['w'], n)]:
         fr, _, _ = run_pipeline_over_folds(Fall, [nm], fixed=(nm, False, 1))
         srows.append(dict(seed=-1, **summarize(fr, B=0, name=nm)))
     fe = fold_ensemble_scores(Fall, 'P')
