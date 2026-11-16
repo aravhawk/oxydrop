@@ -25,14 +25,8 @@ Manual build: `cd paper && pdflatex oxydrop_photon && bibtex oxydrop_photon && p
 
 Macro names cannot contain digits, so levels are spelled out: `\WinLzero`, `\WinLzeroCI`, `\WinLzeroDiff`, `\WinLzeroDiffCI`, `\WinLzeroVerdict`, `\WinLzeroBetter`, `\WinLzeroWorst`, `\WinLzeroCov`, `\WinLzeroAnsAcc`, and likewise `Lone` ... `Lfive`, `Xone`. Prefix `Win` is the shipped model; other prefixes are fixed per model (`Chain`, `DcLr`, `Distill`, `Oxyseq`, `Photonnet`, `Oxyssl`, `DistillTwo`, `Multida`, `SslThree`, `PhotonnetXl`, `EnsThree`, ...; see `MODELS` in `make_numbers.py`). A missing model or level prints `n/a`. Switches for the shipped model: `\ifWinLossLzero`, `\ifWinTieLzero`, `\ifWinWinLzero` (and the same for each level), `\ifWinNinety`, `\ifWinIsDistill`, `\ifWinNullPass`, `\ifDraft`.
 
-## Status (20:30 CT, after the round-3 lock)
+## Status (22:10 CT, final)
 
-Built with `bash paper/build.sh --winner distill2 --locked`. The shipped model is PhotonDistill2 (`distill2`); the lock (20:22 CT) is recorded in `task.json`. All red TODOs are resolved. `shipped_model.tex` describes distill2 (the `\ifWinIsDistillTwo` branch); `WINNER2.md` still names `distill`, so always pass `--winner distill2`.
-
-## What remains
-
-1. After the planner's final commit (about 21:30 CT) rerun `bash paper/build.sh --winner distill2 --locked` so `\RepoCommit` is clean (the paper notes an uncommitted tree otherwise). If `ens3` or `ssl3` score files and null controls exist by then, run `cd python && python -m oxydrop_ml.photon.evalkit` first so they enter `TABLE.csv`; the paper switches on `\ifHasEnsThree` / `\ifHasSslThree`. At 20:30 CT ens3 had score files (landed 20:25, after the lock) but no null controls, and ssl3 had no files.
-2. Confirm `app/data/distill.json` was regenerated from `results/photon/distill2_weights.json` (the paper says the same app export converts it).
-3. Number checks: sentences that quote a number from a log (PhotonDistill v1 0.696 via `\DistillVoneLzero`, 18 seed folds, nested-choice counts, 2.4e-9 export parity, 15.4 k vs 4.9 k parameters) are typed from `distill2_log.md`, `distill_log.md` and `photonnet_xl_log.md`.
+Built with `bash paper/build.sh --winner distill2 --locked`. The shipped model is PhotonDistill2 (`distill2`, locked 20:22 CT). The text calls it on par with the logistic chain on clean light (paired interval includes 0) and discloses the GPU rerun (`distill2_gpu`, `results/photon/distill2_gpu_log.md`) as seed variance: the rows come from `TABLE.csv` (macro prefix `DistillTwoGpu`). The paper has no accuracy-target claim. `WINNER2.md` still names `distill`, so always pass `--winner distill2`.
 
 No em dashes in prose; `grep -n -- '---' oxydrop_photon.tex` should stay empty.

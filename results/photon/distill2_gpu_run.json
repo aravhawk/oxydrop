@@ -1,0 +1,546 @@
+{
+ "model": "distill2_gpu",
+ "code": "python/oxydrop_ml/photon/distill2_gpu.py (distill2 pipeline, student on cuda)",
+ "weights": "results/photon/distill2_gpu_weights.json (refit on all 6 people, kernel a, on the GPU)",
+ "runs": {
+  "a": {
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "dataset": "aravhawk/oxy-distill2-gpu",
+   "device": "Tesla T4",
+   "n_gpu": 2,
+   "torch": "2.11.0+cu130",
+   "cuda": "13.0",
+   "cpus": 4,
+   "workers": 4,
+   "wall_s": 2539.5,
+   "models": [
+    "distill2_gpu_s0",
+    "distill2_gpu_s1",
+    "distill2_gpu_s2"
+   ],
+   "fold_jobs": [
+    {
+     "model": "distill2_gpu_s0",
+     "fold": 0,
+     "rc": 0,
+     "s": 535.1
+    },
+    {
+     "model": "distill2_gpu_s0",
+     "fold": 1,
+     "rc": 0,
+     "s": 535.1
+    },
+    {
+     "model": "distill2_gpu_s0",
+     "fold": 2,
+     "rc": 0,
+     "s": 537.1
+    },
+    {
+     "model": "distill2_gpu_s0",
+     "fold": 3,
+     "rc": 0,
+     "s": 547.1
+    },
+    {
+     "model": "distill2_gpu_s1",
+     "fold": 0,
+     "rc": 0,
+     "s": 523.1
+    },
+    {
+     "model": "distill2_gpu_s0",
+     "fold": 4,
+     "rc": 0,
+     "s": 531.1
+    },
+    {
+     "model": "distill2_gpu_s1",
+     "fold": 1,
+     "rc": 0,
+     "s": 523.1
+    },
+    {
+     "model": "distill2_gpu_s0",
+     "fold": 5,
+     "rc": 0,
+     "s": 558.1
+    },
+    {
+     "model": "distill2_gpu_s1",
+     "fold": 2,
+     "rc": 0,
+     "s": 522.1
+    },
+    {
+     "model": "distill2_gpu_s1",
+     "fold": 3,
+     "rc": 0,
+     "s": 535.1
+    },
+    {
+     "model": "distill2_gpu_s1",
+     "fold": 4,
+     "rc": 0,
+     "s": 534.1
+    },
+    {
+     "model": "distill2_gpu_s1",
+     "fold": 5,
+     "rc": 0,
+     "s": 543.1
+    },
+    {
+     "model": "distill2_gpu_s2",
+     "fold": 0,
+     "rc": 0,
+     "s": 522.2
+    },
+    {
+     "model": "distill2_gpu_s2",
+     "fold": 1,
+     "rc": 0,
+     "s": 517.2
+    },
+    {
+     "model": "distill2_gpu_s2",
+     "fold": 2,
+     "rc": 0,
+     "s": 521.2
+    },
+    {
+     "model": "distill2_gpu_s2",
+     "fold": 3,
+     "rc": 0,
+     "s": 513.1
+    },
+    {
+     "model": "distill2_gpu_s2",
+     "fold": 4,
+     "rc": 0,
+     "s": 385.1
+    },
+    {
+     "model": "distill2_gpu_s2",
+     "fold": 5,
+     "rc": 0,
+     "s": 374.1
+    }
+   ]
+  },
+  "b": {
+   "kernel": "aravhawk/oxy-distill2-gpu-b",
+   "kernel_version": 1,
+   "dataset": "aravhawk/oxy-distill2-gpu",
+   "device": "Tesla T4",
+   "n_gpu": 2,
+   "torch": "2.11.0+cu130",
+   "cuda": "13.0",
+   "cpus": 4,
+   "workers": 4,
+   "wall_s": 2349.4,
+   "models": [
+    "distill2_gpu_null",
+    "distill2_gpu_d1_null",
+    "distill2_gpu_d2_null"
+   ],
+   "fold_jobs": [
+    {
+     "model": "distill2_gpu_null",
+     "fold": 0,
+     "rc": 0,
+     "s": 510.1
+    },
+    {
+     "model": "distill2_gpu_null",
+     "fold": 2,
+     "rc": 0,
+     "s": 510.1
+    },
+    {
+     "model": "distill2_gpu_null",
+     "fold": 3,
+     "rc": 0,
+     "s": 519.1
+    },
+    {
+     "model": "distill2_gpu_null",
+     "fold": 1,
+     "rc": 0,
+     "s": 521.1
+    },
+    {
+     "model": "distill2_gpu_d1_null",
+     "fold": 1,
+     "rc": 0,
+     "s": 476.1
+    },
+    {
+     "model": "distill2_gpu_d1_null",
+     "fold": 0,
+     "rc": 0,
+     "s": 485.1
+    },
+    {
+     "model": "distill2_gpu_null",
+     "fold": 5,
+     "rc": 0,
+     "s": 504.1
+    },
+    {
+     "model": "distill2_gpu_null",
+     "fold": 4,
+     "rc": 0,
+     "s": 510.1
+    },
+    {
+     "model": "distill2_gpu_d1_null",
+     "fold": 2,
+     "rc": 0,
+     "s": 486.1
+    },
+    {
+     "model": "distill2_gpu_d1_null",
+     "fold": 3,
+     "rc": 0,
+     "s": 485.1
+    },
+    {
+     "model": "distill2_gpu_d1_null",
+     "fold": 4,
+     "rc": 0,
+     "s": 506.1
+    },
+    {
+     "model": "distill2_gpu_d1_null",
+     "fold": 5,
+     "rc": 0,
+     "s": 502.1
+    },
+    {
+     "model": "distill2_gpu_d2_null",
+     "fold": 0,
+     "rc": 0,
+     "s": 477.1
+    },
+    {
+     "model": "distill2_gpu_d2_null",
+     "fold": 1,
+     "rc": 0,
+     "s": 480.1
+    },
+    {
+     "model": "distill2_gpu_d2_null",
+     "fold": 2,
+     "rc": 0,
+     "s": 493.1
+    },
+    {
+     "model": "distill2_gpu_d2_null",
+     "fold": 3,
+     "rc": 0,
+     "s": 496.1
+    },
+    {
+     "model": "distill2_gpu_d2_null",
+     "fold": 5,
+     "rc": 0,
+     "s": 355.1
+    },
+    {
+     "model": "distill2_gpu_d2_null",
+     "fold": 4,
+     "rc": 0,
+     "s": 372.1
+    }
+   ]
+  }
+ },
+ "score_files": {
+  "distill2_gpu_s0__L0.csv": {
+   "model": "distill2_gpu_s0",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s0__L1.csv": {
+   "model": "distill2_gpu_s0",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s0__L2.csv": {
+   "model": "distill2_gpu_s0",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s0__L3.csv": {
+   "model": "distill2_gpu_s0",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s0__L4.csv": {
+   "model": "distill2_gpu_s0",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s0__L5.csv": {
+   "model": "distill2_gpu_s0",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s0__X1.csv": {
+   "model": "distill2_gpu_s0",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s1__L0.csv": {
+   "model": "distill2_gpu_s1",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s1__L1.csv": {
+   "model": "distill2_gpu_s1",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s1__L2.csv": {
+   "model": "distill2_gpu_s1",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s1__L3.csv": {
+   "model": "distill2_gpu_s1",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s1__L4.csv": {
+   "model": "distill2_gpu_s1",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s1__L5.csv": {
+   "model": "distill2_gpu_s1",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s1__X1.csv": {
+   "model": "distill2_gpu_s1",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s2__L0.csv": {
+   "model": "distill2_gpu_s2",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s2__L1.csv": {
+   "model": "distill2_gpu_s2",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s2__L2.csv": {
+   "model": "distill2_gpu_s2",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s2__L3.csv": {
+   "model": "distill2_gpu_s2",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s2__L4.csv": {
+   "model": "distill2_gpu_s2",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s2__L5.csv": {
+   "model": "distill2_gpu_s2",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu_s2__X1.csv": {
+   "model": "distill2_gpu_s2",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5
+  },
+  "distill2_gpu__L0.csv": {
+   "model": "distill2_gpu",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5,
+   "ensemble_of": [
+    "distill2_gpu_s0",
+    "distill2_gpu_s1",
+    "distill2_gpu_s2"
+   ]
+  },
+  "distill2_gpu__L1.csv": {
+   "model": "distill2_gpu",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5,
+   "ensemble_of": [
+    "distill2_gpu_s0",
+    "distill2_gpu_s1",
+    "distill2_gpu_s2"
+   ]
+  },
+  "distill2_gpu__L2.csv": {
+   "model": "distill2_gpu",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5,
+   "ensemble_of": [
+    "distill2_gpu_s0",
+    "distill2_gpu_s1",
+    "distill2_gpu_s2"
+   ]
+  },
+  "distill2_gpu__L3.csv": {
+   "model": "distill2_gpu",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5,
+   "ensemble_of": [
+    "distill2_gpu_s0",
+    "distill2_gpu_s1",
+    "distill2_gpu_s2"
+   ]
+  },
+  "distill2_gpu__L4.csv": {
+   "model": "distill2_gpu",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5,
+   "ensemble_of": [
+    "distill2_gpu_s0",
+    "distill2_gpu_s1",
+    "distill2_gpu_s2"
+   ]
+  },
+  "distill2_gpu__L5.csv": {
+   "model": "distill2_gpu",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5,
+   "ensemble_of": [
+    "distill2_gpu_s0",
+    "distill2_gpu_s1",
+    "distill2_gpu_s2"
+   ]
+  },
+  "distill2_gpu__X1.csv": {
+   "model": "distill2_gpu",
+   "kernel": "aravhawk/oxy-distill2-gpu-a",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2539.5,
+   "ensemble_of": [
+    "distill2_gpu_s0",
+    "distill2_gpu_s1",
+    "distill2_gpu_s2"
+   ]
+  },
+  "distill2_gpu_null__L0.csv": {
+   "model": "distill2_gpu_null",
+   "kernel": "aravhawk/oxy-distill2-gpu-b",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2349.4
+  },
+  "distill2_gpu_d1_null__L0.csv": {
+   "model": "distill2_gpu_d1_null",
+   "kernel": "aravhawk/oxy-distill2-gpu-b",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2349.4
+  },
+  "distill2_gpu_d2_null__L0.csv": {
+   "model": "distill2_gpu_d2_null",
+   "kernel": "aravhawk/oxy-distill2-gpu-b",
+   "kernel_version": 1,
+   "device": "Tesla T4",
+   "torch": "2.11.0+cu130",
+   "kernel_wall_s": 2349.4
+  }
+ }
+}

@@ -56,6 +56,7 @@ MODELS = {
     'oxyssl_init': ('OxysslInit', 'OxySSL, init only'),
     'oxyssl_noaug': ('OxysslNoAug', 'OxySSL, no augmentation'),
     'distill2': ('DistillTwo', 'PhotonDistill2'),
+    'distill2_gpu': ('DistillTwoGpu', 'PhotonDistill2, GPU rerun (seed variance)'),
     'multida': ('Multida', 'MultiDA'),
     'ssl3': ('SslThree', 'SSL-3'),
     'photonnet_xl': ('PhotonnetXl', 'PhotonNet-XL'),
@@ -67,7 +68,7 @@ ROUND_OF = {  # which table group a model belongs to
     'control': ['ctl_dc_lr', 'ctl_dc_ror_lr', 'ctl_dc_hr_lr'],
     'round1': ['twin_inverse', 'twin_inverse_noresid', 'flashgap', 'oxytrack', 'twin_gate', 'flashgap_gate'],
     'round2': ['distill', 'oxyseq', 'photonnet', 'oxyssl'],
-    'round3': ['distill2', 'multida', 'ssl3', 'photonnet_xl', 'ens3'],
+    'round3': ['distill2', 'distill2_gpu', 'multida', 'ssl3', 'photonnet_xl', 'ens3'],
 }
 GROUP_TITLE = {'baseline': 'Baselines', 'control': 'Controls (no network)', 'round1': 'Round 1 (designed before any score)',
                'round2': 'Round 2 (trained end to end)', 'round3': 'Round 3 (scaled up)'}
