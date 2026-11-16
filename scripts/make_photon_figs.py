@@ -1,14 +1,15 @@
 """Figures for the PhotonTwin / FlashGap / OxyTrack comparison, drawn only from results/photon/TABLE.csv and STRESS.csv.
 
-    python scripts/make_photon_figs.py                          # all three figures, architecture of --winner (default twin_inverse)
-    python scripts/make_photon_figs.py --winner oxytrack --mark-winner   # architecture layout of the winner, highlighted in the other two
+    python scripts/make_photon_figs.py                          # all three figures, architecture of --winner (default twin_gate, the shipped model)
+    python scripts/make_photon_figs.py --winner twin_gate --mark-winner  # the shipped model highlighted in the other two figures
     python scripts/make_photon_figs.py results stress           # a subset: results | stress | architecture
     python scripts/make_photon_figs.py --all-variants           # stress curves also for ablations and controls
 
 Outputs (docs/figures/):
-    photon_results_ci.png     forest plot of L0 time-matched balanced accuracy with person-bootstrap 95 % CIs, baselines greyed
-    photon_stress_curve.png   (a) TM bal. acc. vs simulated distant-flash level with CI bands, (b) answered accuracy and coverage
-    photon_architecture.png   block diagram of the model chosen with --winner (twin_inverse | flashgap | oxytrack)
+    photon_results_ci.png     forest plot of L0 time-matched balanced accuracy with person-bootstrap 95 % CIs, baselines greyed (key models; --all-variants lists every file)
+    photon_stress_curve.png   (a) TM bal. acc. vs simulated distant-flash level with CI bands, (b) answered accuracy, (c) coverage (chain_v1, twin_gate,
+                              twin_inverse_noresid, ctl_dc_lr, oxytrack, flashgap; --all-variants adds the rest)
+    photon_architecture.png   block diagram of the model chosen with --winner (twin_gate | twin_inverse | flashgap | oxytrack)
 
 Column names are read from the CSV header (tm_bacc, tm_lo, tm_hi, acc_ans, coverage, ...), nothing is recomputed. The stress levels are
 a simulation (python/oxydrop_ml/photon/stress.py), not measurements of any phone. The architecture drawing is a schematic, not data.
@@ -39,7 +40,17 @@ NOTE = 'Research prototype, not a medical device. Stress levels are a simulation
 BASELINES = {'chain_v1': 'Logistic chain v1 (reference)', 'chain_v1_nestedC': 'Chain v1, C by nested CV', 'hybrid_final': 'Hybrid, per-person selected (nested)',
              'cnn_full': 'CNN alone (3-seed mean)'}
 BASE_STYLE = {'chain_v1': '#222222', 'chain_v1_nestedC': '#6B6B6B', 'hybrid_final': '#8F8F8F', 'cnn_full': '#B0B0B0'}
-FAMILIES = {'twin_inverse': ('PhotonTwin-Inverse', BLUE), 'flashgap': ('FlashGap', ORANGE), 'oxytrack': ('OxyTrack', GREEN)}
+BROWN = '#8C564B'
+FAMILIES = {'twin_gate': ('PhotonTwin gate', PURPLE), 'twin_inverse': ('PhotonTwin-Inverse', BLUE), 'flashgap': ('FlashGap', ORANGE), 'oxytrack': ('OxyTrack', GREEN),
+            'twin_chain': ('PhotonTwin + chain', SKY), 'ctl': ('Control', BROWN)}
+PRETTY = {'twin_gate': 'PhotonTwin gate (shipped, post hoc)', 'twin_inverse_noresid': 'PhotonTwin-Inverse, physics path only', 'ctl_dc_lr': 'Control: 3-number DC colour LR',
+          'ctl_dc_ror_lr': 'Control: DC + ratio-of-ratios LR', 'ctl_dc_hr_lr': 'Control: DC + heart-rate LR', 'flashgap_gate': 'FlashGap gate (post hoc)',
+          'oxytrack_nosnr': 'OxyTrack, no SNR weighting', 'oxytrack_ema': 'chain v1 + causal EMA', 'flashgap_noaug': 'FlashGap, no augmentation'}
+CANDIDATES = ['twin_gate', 'twin_inverse', 'flashgap', 'oxytrack']
+FOREST_MODELS = ['chain_v1', 'chain_v1_nestedC', 'hybrid_final', 'cnn_full', 'twin_gate', 'twin_inverse', 'twin_inverse_noresid', 'flashgap', 'flashgap_gate', 'flashgap_noaug', 'oxytrack',
+                 'oxytrack_nosnr', 'oxytrack_ema', 'twin_chain', 'ctl_dc_lr', 'twin_inverse_null', 'flashgap_null', 'oxytrack_blank', 'twin_gate_null']
+STRESS_MODELS = ['chain_v1', 'twin_gate', 'twin_inverse_noresid', 'ctl_dc_lr', 'oxytrack', 'flashgap']
+STRESS_STYLE = {'twin_inverse_noresid': (BLUE, '-'), 'ctl_dc_lr': (BROWN, '--')}
 REFERENCE = 'chain_v1'
 
 
@@ -62,6 +73,8 @@ def is_control(model):
 
 
 def pretty(model):
+    if model in PRETTY:
+        return PRETTY[model]
     if model in BASELINES:
         return BASELINES[model]
     fam = family_of(model)
@@ -77,7 +90,7 @@ def kind(model):
         return 'baseline'
     if is_control(model):
         return 'control'
-    if family_of(model) and model in FAMILIES:
+    if model in CANDIDATES:
         return 'candidate'
     return 'variant'
 
@@ -88,7 +101,9 @@ def style(model, winner=None):
     if k == 'baseline':
         return BASE_STYLE[model], BASE_STYLE[model], 0.9, 1.4
     fam = family_of(model)
-    col = FAMILIES[fam][1] if fam else PURPLE
+    col = FAMILIES[fam][1] if fam else GREY
+    if model in STRESS_STYLE:
+        col = STRESS_STYLE[model][0]
     if k == 'candidate':
         return col, col, 1.0, 2.4 if model == winner else 1.8
     return col, 'white', 0.75, 1.1
@@ -103,48 +118,61 @@ def save(fig, name):
 
 
 # ------------------------------------------------------------------------------------------------------------------------- 1. forest
-def fig_results(winner=None):
+def fig_results(winner=None, all_variants=False):
     t, _ = load()
     d = t[t['level'] == '0'].copy()
     ref = d[d['model'] == REFERENCE]
-    order_key = {'baseline': 0, 'candidate': 1, 'variant': 2, 'control': 3}
-    d['k'] = d['model'].map(kind)
-    d['fam'] = d['model'].map(lambda m: list(FAMILIES).index(family_of(m)) if family_of(m) else -1)
-    d['bo'] = d['model'].map(lambda m: list(BASELINES).index(m) if m in BASELINES else 0)
-    d['ko'] = d['k'].map(order_key)
-    d = d.sort_values(['ko', 'fam', 'bo', 'model']).reset_index(drop=True)
+    if all_variants:
+        order_key = {'baseline': 0, 'candidate': 1, 'variant': 2, 'control': 3}
+        d['k'] = d['model'].map(kind)
+        d['ko'] = d['k'].map(order_key)
+        d = d.sort_values(['ko', 'model']).reset_index(drop=True)
+    else:
+        d = d[d['model'].isin(FOREST_MODELS)].copy()
+        d['ko'] = d['model'].map(FOREST_MODELS.index)
+        d = d.sort_values('ko').reset_index(drop=True)
     n = len(d)
-    fig, ax = plt.subplots(figsize=(10.5, 0.46 * n + 1.9))
+    fig, ax = plt.subplots(figsize=(11.5, 0.42 * n + 2.3))
     ys = np.arange(n)[::-1]
     if len(ref):
         r = ref.iloc[0]
         ax.axvspan(r['tm_lo'], r['tm_hi'], color='#DDDDDD', alpha=0.45, lw=0, zorder=0, label=f'chain_v1 95 % CI [{r["tm_lo"]:.3f}, {r["tm_hi"]:.3f}]')
         ax.axvline(r['tm_bacc'], color='#222222', lw=1.3, ls='--', zorder=1, label=f'chain_v1 = {r["tm_bacc"]:.3f}')
-    ax.axvline(0.5, color=VERM, lw=1.0, ls=':', zorder=1, label='clock only / chance = 0.50')
+    ax.axvline(0.5, color=VERM, lw=1.0, ls=':', zorder=1, label='chance = 0.50')
     for y, (_, row) in zip(ys, d.iterrows()):
         col, face, alpha, lw = style(row['model'], winner)
         ax.errorbar(row['tm_bacc'], y, xerr=[[row['tm_bacc'] - row['tm_lo']], [row['tm_hi'] - row['tm_bacc']]], fmt='o' if kind(row['model']) != 'control' else 's',
                     color=col, mfc=face, mec=col, ms=7.5, elinewidth=lw, capsize=3.5, alpha=alpha, zorder=3)
         txt = f'{row["tm_bacc"]:.3f} [{row["tm_lo"]:.3f}, {row["tm_hi"]:.3f}]'
         v = row.get('verdict')
-        if isinstance(v, str) and v != 'reference':
+        if isinstance(v, str) and v != 'reference' and kind(row['model']) != 'control':
             txt += f'  {v}'
+            if pd.notna(row.get('diff_vs_chain_v1')) and row.get('n_people_compared', 0) > 0:
+                txt += f' ({row["diff_vs_chain_v1"]:+.3f})'
+            elif row['model'] == winner:
+                txt += ' (= chain_v1 at L0)'
+        if isinstance(row.get('null_check'), str) and row['null_check'].startswith('FLAG'):
+            txt += '  FLAG: null above 0.55'
         ax.text(1.005, y, txt, transform=ax.get_yaxis_transform(), va='center', fontsize=8.6, color='#222' if kind(row['model']) != 'baseline' else '#555')
     ax.set_yticks(ys)
-    labels = [pretty(m) + ('  (winner)' if m == winner else '') for m in d['model']]
+    labels = [pretty(m).replace(' (shipped, post hoc)', '') + ('  (shipped)' if m == winner else '') for m in d['model']]
     ax.set_yticklabels(labels)
     for tl, m in zip(ax.get_yticklabels(), d['model']):
         tl.set_color(style(m, winner)[0] if kind(m) != 'baseline' else '#555555')
         if m == winner:
             tl.set_fontweight('bold')
-    ax.set_xlim(0.40, 0.95)
+    ax.set_xlim(0.20, 0.95)
     ax.set_ylim(-0.7, n - 0.3)
     ax.set_xlabel('Time-matched balanced accuracy, clean L0 (Hoffman, leave-one-person-out), 95 % person-bootstrap CI')
-    ax.set_title('Photon models against the baselines on clean data: tie unless the paired interval to chain_v1 excludes 0', loc='left', fontsize=11)
+    ax.set_title('No photon model beats chain_v1 on clean data: every paired interval to chain_v1 includes 0 or lies below it', loc='left', fontsize=11)
     ax.grid(axis='y', alpha=0)
     h, lab = ax.get_legend_handles_labels()
-    ax.legend(h, lab, loc='upper left', bbox_to_anchor=(0.0, 1.0), fontsize=8.6)
-    ax.text(0.0, -0.13 - 0.18 / max(n / 10, 1), 'Baselines in grey. Open markers = ablations and variants, squares = null / blank controls (should sit near 0.50).\n'
+    ax.legend(h, lab, loc='lower left', bbox_to_anchor=(0.0, 0.0), fontsize=8.6)
+    nf = os.path.join(RES, 'NULLS.csv')
+    nulls = pd.read_csv(nf).tm_bacc.values if os.path.exists(nf) else None
+    ntxt = f'chain_v1 own null, {len(nulls)} permutation draws: mean {nulls.mean():.2f}, SD {nulls.std(ddof=1):.2f}' if nulls is not None else 'single null draws are noisy'
+    ax.text(0.0, -0.075 - 0.4 / max(n, 1), 'Baselines in grey. Open markers = ablations and controls, squares = null / blank controls (a single null draw near 0.50 is expected; FLAG = above 0.55).\n'
+            f'Chain-like models share chain_v1\'s own null noise ({ntxt}; see results/photon/WINNER.md). The shipped gate is identical to chain_v1 on clean data.\n'
             'hybrid_final and cnn_full exist at L0 only (no leave-one-person-out checkpoints under stress). Six people, one dark-skinned (n = 1): no skin-tone claim.\n' + NOTE,
             transform=ax.transAxes, fontsize=8, color='#555', va='top')
     save(fig, 'photon_results_ci.png')
@@ -155,69 +183,70 @@ def fig_stress(winner=None, all_variants=False):
     _, s = load()
     levels = [str(i) for i in range(6)]
     xpos = {**{lv: int(lv) for lv in levels}, 'X1': 6.6}
-    models = []
-    for m in s['model'].unique():
-        k = kind(m)
-        if k in ('baseline', 'candidate') or all_variants:
-            models.append(m)
-    models.sort(key=lambda m: ({'baseline': 0, 'candidate': 1, 'variant': 2, 'control': 3}[kind(m)], list(BASELINES).index(m) if m in BASELINES else 0, m))
-    fig, axes = plt.subplots(1, 2, figsize=(13.2, 5.2), gridspec_kw={'width_ratios': [1.15, 1]})
-    axa, axb = axes
+    models = [m for m in STRESS_MODELS if m in set(s['model'])]
+    if all_variants:
+        models += sorted(m for m in s['model'].unique() if m not in models and not is_control(m) and len(s[(s['model'] == m) & (s['level'] == 'X1')]))
+    fig, axes = plt.subplots(1, 3, figsize=(17.5, 5.4), gridspec_kw={'width_ratios': [1.35, 1, 1]})
+    axa, axb, axc = axes
+    d_rho = s.drop_duplicates('level').set_index('level')['d_rho_mm'].to_dict() if 'd_rho_mm' in s.columns else {}
     for m in models:
         sub = s[s['model'] == m]
         col, face, alpha, lw = style(m, winner)
-        ls = '-' if kind(m) in ('baseline', 'candidate') else '--'
-        lab = pretty(m) + ('  (winner)' if m == winner else '')
+        face = col
+        alpha = 1.0
+        ls = STRESS_STYLE.get(m, (None, '-'))[1]
+        if m == REFERENCE:
+            col, lw = '#222222', 2.0
+            face = col
+        if m == winner:
+            lw = 3.0
+        lab = pretty(m).replace(' (shipped, post hoc)', '') + ('  (shipped)' if m == winner else '')
         main = sub[sub['level'].isin(levels)].copy()
         main['x'] = main['level'].map(xpos)
         main = main.sort_values('x')
         if len(main) >= 2:
-            axa.fill_between(main['x'], main['tm_lo'], main['tm_hi'], color=col, alpha=0.10 if kind(m) == 'baseline' else 0.14, lw=0)
-        axa.plot(main['x'], main['tm_bacc'], ls=ls, color=col, lw=lw, marker='o', ms=5, mfc=face, alpha=alpha, label=lab)
+            axa.fill_between(main['x'], main['tm_lo'], main['tm_hi'], color=col, alpha=0.16 if m in (REFERENCE, winner) else 0.06, lw=0)
+        axa.plot(main['x'], main['tm_bacc'], ls=ls, color=col, lw=lw, marker='o', ms=5, mfc=face, alpha=alpha, label=lab, zorder=4 if m == winner else 3)
         x1 = sub[sub['level'] == 'X1']
         if len(x1):
             r = x1.iloc[0]
-            axa.errorbar([xpos['X1']], [r['tm_bacc']], yerr=[[r['tm_bacc'] - r['tm_lo']], [r['tm_hi'] - r['tm_bacc']]], fmt='D', color=col, mfc=face, ms=7, capsize=3,
-                         elinewidth=lw, alpha=alpha)
-        for c, ls2, mk in (('acc_ans', '-', 'o'), ('coverage', ':', 's')):
-            if c not in sub.columns:
-                continue
+            axa.errorbar([xpos['X1'] + 0.13 * (models.index(m) - (len(models) - 1) / 2)], [r['tm_bacc']], yerr=[[r['tm_bacc'] - r['tm_lo']], [r['tm_hi'] - r['tm_bacc']]], fmt='D', color=col, mfc=face, ms=7, capsize=3,
+                         elinewidth=lw * 0.7, alpha=alpha)
+        for ax_, c in ((axb, 'acc_ans'), (axc, 'coverage')):
             mm = sub[sub['level'].isin(levels)].copy()
             mm['x'] = mm['level'].map(xpos)
-            mm = mm.sort_values('x').dropna(subset=[c])
-            axb.plot(mm['x'], mm[c], ls=ls2 if kind(m) in ('baseline', 'candidate') else '-.', color=col, lw=lw if c == 'acc_ans' else max(lw - 0.4, 0.9), marker=mk, ms=4.2,
-                     mfc=face, alpha=alpha)
-            xx = sub[(sub['level'] == 'X1')].dropna(subset=[c])
-            if len(xx):
-                axb.plot([xpos['X1']], [xx.iloc[0][c]], marker='D' if c == 'acc_ans' else 's', color=col, mfc=face, ms=6, alpha=alpha)
+            mm = mm.sort_values('x')
+            ax_.plot(mm['x'], mm[c], ls=ls, color=col, lw=lw, marker='o', ms=4.5, mfc=face, alpha=alpha, zorder=4 if m == winner else 3)
+            xx = sub[sub['level'] == 'X1']
+            if len(xx) and pd.notna(xx.iloc[0][c]):
+                ax_.plot([xpos['X1']], [xx.iloc[0][c]], marker='D', color=col, mfc=face, ms=6, alpha=alpha)
     ticks = [0, 1, 2, 3, 4, 5, xpos['X1']]
-    d_rho = s.drop_duplicates('level').set_index('level')['d_rho_mm'].to_dict() if 'd_rho_mm' in s.columns else {}
     tl = [f'{lv}\n+{int(float(d_rho.get(lv, 2 * int(lv))))} mm' for lv in levels] + ['X1\nout-of-\nfamily']
     for ax in axes:
         ax.set_xticks(ticks)
-        ax.set_xticklabels(tl)
+        ax.set_xticklabels(tl, fontsize=8.3)
         ax.axvline(5.8, color='#999', lw=0.8, ls='-')
         ax.set_xlim(-0.3, 7.1)
         ax.set_xlabel('Simulated flash-to-lens offset d_rho (level)')
     axa.axhline(0.5, color=VERM, lw=1, ls=':')
     axa.text(-0.25, 0.502, 'chance', color=VERM, fontsize=8, ha='left', va='bottom')
-    axa.set_ylabel('Time-matched balanced accuracy (95 % person CI)')
+    axa.set_ylabel('TM balanced accuracy (band = 95 % person CI)')
     axa.set_ylim(0.38, 0.95)
-    axa.set_title('(a) Accuracy against a simulated distant flash', loc='left')
-    axa.legend(fontsize=8.2, loc='upper right')
+    axa.set_title('(a) Accuracy of the forced decision against a simulated distant flash', loc='left', fontsize=10.5)
+    axa.legend(fontsize=8.4, loc='upper right')
     axb.axhline(0.9, color='#888', lw=0.8, ls='--')
-    axb.set_ylim(0.0, 1.03)
-    axb.set_ylabel('Answered accuracy (solid) and coverage (dotted)')
-    axb.set_title('(b) Own abstention: answered accuracy and coverage', loc='left')
-    # style key for panel b
-    axb.plot([], [], color='#333', ls='-', marker='o', ms=4, label='answered accuracy')
-    axb.plot([], [], color='#333', ls=':', marker='s', ms=4, label='coverage')
-    axb.plot([], [], color='#333', ls='', marker='D', ms=5, label='X1 point')
-    axb.plot([], [], color='#888', ls='--', lw=0.8, label='target answered accuracy 0.90')
-    axb.legend(fontsize=8.2, loc='lower left')
-    fig.suptitle('Distant-flash stress test (simulation, only the held-out person is degraded, models not refit per level)', x=0.01, ha='left', fontsize=12, fontweight='bold')
-    fig.text(0.01, -0.02, NOTE, fontsize=8, color='#555')
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    axb.text(7.05, 0.905, 'target 0.90', fontsize=7.5, color='#666', ha='right', va='bottom')
+    axb.set_ylim(0.3, 1.03)
+    axb.set_ylabel('Accuracy on the windows the model answers')
+    axb.set_title('(b) Answered accuracy (own abstention)', loc='left', fontsize=10.5)
+    axb.text(0.5, 0.04, 'a line stops where the model answers nothing (L5);\ntwin_gate at L4 answers 0.5 % of windows (a handful)', transform=axb.transAxes, ha='center', fontsize=8, color='#555')
+    axa.text(0.02, 0.03, 'twin_gate and the physics path are the same model at L4 and L5 (the gate routes every window to it)', transform=axa.transAxes, fontsize=8, color='#555')
+    axc.set_ylim(-0.03, 1.03)
+    axc.set_ylabel('Coverage (share of windows answered)')
+    axc.set_title('(c) Coverage', loc='left', fontsize=10.5)
+    fig.suptitle('Distant-flash stress test (simulation, only the held-out person is degraded, models not refit per level; diamond = out-of-family X1)', x=0.01, ha='left', fontsize=12, fontweight='bold')
+    fig.text(0.01, -0.02, NOTE + '', fontsize=8, color='#555')
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
     save(fig, 'photon_stress_curve.png')
 
 
@@ -267,6 +296,50 @@ class Diagram:
 
 
 CREAM, MINT, LAV, ROSE = '#FFF6E5', '#E8F5EE', '#F4ECF7', '#FBEAE6'
+
+
+def arch_twin_gate():
+    t, _ = load()
+
+    def row(m, lv):
+        r = t[(t['model'] == m) & (t['level'] == lv)]
+        return r.iloc[0] if len(r) else None
+
+    parts = []
+    for lv in ('3', '4', '5'):
+        r = row('twin_gate', lv)
+        if r is not None and pd.notna(r['diff_vs_chain_v1']):
+            parts.append(f'L{lv} {r["diff_vs_chain_v1"]:+.3f}')
+    x1 = row('twin_gate', 'X1')
+    l0 = row('twin_gate', '0')
+    res = ('Simulated distant flash, TM bal. acc. minus chain_v1: ' + ', '.join(parts) + (f'; X1 {x1["diff_vs_chain_v1"]:+.3f} (tie)' if x1 is not None else '')
+           + (f'. Clean L0 {l0["tm_bacc"]:.3f}, identical to chain_v1.' if l0 is not None else ''))
+    d = Diagram('PhotonTwin gate (shipped): chain v1 when the pulse is clear, physics inversion when it is not',
+                'Per window, the measured red-channel pulsatile SNR picks the path. Threshold 10 dB fixed a priori, not tuned. Post hoc design (after outer results were seen); ties chain v1 on clean data.',
+                figsize=(13, 7.0))
+    d.box('rgb', 0.00, 0.69, 0.15, 0.21, 'Phone camera\nper-frame ROI mean\nR, G, B (30 Hz,\nflash on)', CREAM, ORANGE, fs=8.8)
+    d.box('snr', 0.20, 0.69, 0.18, 0.21, 'Red pulsatile SNR\nper 10 s window,\nlabel-free\n(pulse-band power vs\nout-of-band noise)', CREAM, ORANGE, fs=8.4)
+    d.box('gate', 0.43, 0.69, 0.14, 0.21, 'SNR >= 10 dB ?\n(fixed a priori)', LAV, PURPLE, fs=9, bold=True)
+    d.box('chain', 0.69, 0.69, 0.31, 0.21, 'Logistic chain v1\n(the shipped baseline)\nheart-rate rise, ratio-of-ratios,\npulse shape, each relative to the\nperson\'s own first minute;\nconformal rule decides "Unsure"', '#EEF4FA', BLUE, fs=8.2)
+    d.arrow('rgb', 'r', 'snr', 'l')
+    d.arrow('snr', 'r', 'gate', 'l')
+    d.arrow('gate', 'r', 'chain', 'l', label='>= 10 dB:\nclear pulse', ly=0.012)
+    gx = d.side('gate', 'b')[0]
+    d.box('inv', 0.28, 0.36, 0.18, 0.24, 'PhotonTwin-Inverse\n(physics path only)\nbaseline-relative\nln DC, ln |AC|;\nGauss-Newton inversion\nthrough the differentiable\nband-integrated\ndiffusion optics model', LAV, PURPLE, fs=7.8, bold=False)
+    d.box('lat', 0.50, 0.36, 0.17, 0.24, 'Physical latents\nSpO2 (saturation)\nblood volume\nmelanin\npulse swing\nflash-lens\ndistance rho', LAV, PURPLE, fs=8.2, bold=True)
+    d.box('pabs', 0.71, 0.36, 0.19, 0.24, 'P(SpO2 < 90)\nfrom the saturation\nlatent, plus an\ninput-support gate:\nabstain if the signal\nis outside the support\nof training', '#EEF4FA', BLUE, fs=8.0)
+    d.elbow([(gx, 0.69), (gx, 0.645), (0.37, 0.645), (0.37, 0.603)], PURPLE, label='< 10 dB: weak pulse', lpos=(0.435, 0.652), fs=8)
+    d.arrow('inv', 'r', 'lat', 'l')
+    d.arrow('lat', 'r', 'pabs', 'l')
+    d.box('out', 0.30, 0.07, 0.42, 0.20, 'Output (three states)\nNormal vs your baseline\nPossible low oxygen\nUnsure, re-measure', MINT, GREEN, fs=9.2, bold=True)
+    px = d.side('pabs', 'b')[0]
+    d.elbow([(px, 0.36), (px, 0.21), (0.725, 0.21)])
+    cx = 0.965
+    d.elbow([(cx, 0.69), (cx, 0.12), (0.725, 0.12)])
+    d.tag(0.00, 0.40, 'Abstention under stress comes\nfrom the input-support gate,\nnot from a posterior that\nwidens in weak light\n(it does not).', GREY, fs=8)
+    d.tag(0.00, 0.17, 'Not claimed: a gain on clean\ndata (the gate is chain v1\nthere), a skin-tone result\n(n = 1 dark-skinned person),\nor behaviour on a real phone.', GREY, fs=8)
+    d.tag(0.0, 0.035, res, GREY, fs=8.5)
+    d.done('photon_architecture.png')
 
 
 def arch_twin_inverse():
@@ -361,7 +434,7 @@ def arch_oxytrack():
     d.done('photon_architecture.png')
 
 
-ARCH = {'twin_inverse': arch_twin_inverse, 'flashgap': arch_flashgap, 'oxytrack': arch_oxytrack}
+ARCH = {'twin_gate': arch_twin_gate, 'twin_inverse': arch_twin_inverse, 'flashgap': arch_flashgap, 'oxytrack': arch_oxytrack}
 
 
 # --------------------------------------------------------------------------------------------------------------------------------- main
@@ -369,8 +442,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('figs', nargs='*', help='subset of: results stress architecture (default: all three)')
     ap.add_argument('--mark-winner', action='store_true', help='bold and label the --winner model in the results and stress figures (use only after the winner rule was applied)')
-    ap.add_argument('--winner', choices=sorted(ARCH), default='twin_inverse', help='model whose architecture is drawn (default twin_inverse)')
-    ap.add_argument('--all-variants', action='store_true', help='stress curves also for ablations and controls')
+    ap.add_argument('--winner', choices=sorted(ARCH), default='twin_gate', help='model whose architecture is drawn and, with --mark-winner, highlighted (default twin_gate, the shipped model)')
+    ap.add_argument('--all-variants', action='store_true', help='forest plot and stress curves also for every ablation, seed file and control')
     a = ap.parse_args(argv)
     todo = a.figs or ['results', 'stress', 'architecture']
     bad = [f for f in todo if f not in ('results', 'stress', 'architecture')]
@@ -378,7 +451,7 @@ def main(argv=None):
         ap.error(f'unknown figure(s): {bad}')
     mark = a.winner if a.mark_winner else None
     if 'results' in todo:
-        fig_results(mark)
+        fig_results(mark, a.all_variants)
     if 'stress' in todo:
         fig_stress(mark, a.all_variants)
     if 'architecture' in todo:

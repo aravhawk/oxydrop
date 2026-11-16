@@ -27,9 +27,10 @@ Deterministic in (level, seed, the recording): the random stream is seeded from 
 Level 0 returns the input unchanged (float64 copy).
 
 DEVIATIONS FROM A PLAIN CALL OF PhotonTwin (stated so nobody is surprised):
-  * `PhotonTwin.ln_reflectance` (optics.py) SUBTRACTS the image-source term of the Farrell et al. 1992 dipole. Farrell's Eq. 10 ADDS the two terms. With
-    the subtraction the decay with rho is 10-20 orders of magnitude too fast, so this module re-evaluates the reflectance in log space with the
-    correct sign (np.logaddexp) on the twin's own mu_a, mu_s', camera bands and flash spectrum. optics.py is not modified here.
+  * The committed draft of `PhotonTwin.ln_reflectance` (optics.py) SUBTRACTED the image-source term of the Farrell et al. 1992 dipole; Farrell's Eq. 10
+    ADDS the two terms. optics.py has since been fixed (it now adds them with logaddexp, FEAT-002). This module was written against the draft and still
+    re-evaluates the reflectance in log space with the correct sign (np.logaddexp) on the twin's own mu_a, mu_s', camera bands and flash spectrum, so the
+    levels do not depend on that fix and the scores already written are unchanged. optics.py is not modified here.
   * Even with the correct sign a semi-infinite diffusion medium over-attenuates a real finger slab (the light that reaches a distant lens also travels
     through the finger thickness): +10 mm of separation would cost red about 10^-11. The separation passed to the renderer is therefore
     rho0 + PATH_SCALE * d_rho (PATH_SCALE = 0.25, fixed BEFORE any model was scored, from the input-side SNR of the recordings only) so that the five levels form a graded ladder instead of a cliff.

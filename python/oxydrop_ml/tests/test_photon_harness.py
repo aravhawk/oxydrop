@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from oxydrop_ml import metrics as M  # noqa: E402
 from oxydrop_ml.baselines import chain_v1, common as C  # noqa: E402
-from oxydrop_ml.photon import evalkit as E, stress as S  # noqa: E402
+from oxydrop_ml.photon import evalkit as E, stress as S, winner as W  # noqa: E402
 
 HAVE_WINDOWS = E.WINDOWS.exists()
 
@@ -133,3 +133,20 @@ def test_chain_threshold_and_C_ignore_the_test_person_even_when_its_features_are
     fb = [f for f in C.run_cls(b_ctx, spec(b_ctx)) if f.subject == 's2'][0]
     assert fa.hp == fb.hp and fa.thr == fb.thr and fa.band == fb.band and fa.spec_thr == fb.spec_thr
     assert np.array_equal(fa.s_tr, fb.s_tr)
+
+
+def test_winner_report_is_generated_from_table_csv(tmp_path, monkeypatch):
+    """WINNER.md is written from TABLE.csv: the shipped model's numbers appear verbatim and the no-win statement is present."""
+    import shutil
+    if not (W.RES / 'TABLE.csv').exists() or not (W.RES / 'NULLS.csv').exists():
+        pytest.skip('results/photon/TABLE.csv or NULLS.csv not present')
+    for f in ('TABLE.csv', 'NULLS.csv'):
+        shutil.copy(W.RES / f, tmp_path / f)
+    monkeypatch.setattr(W, 'RES', tmp_path)
+    W.main(['--no-nulls'])
+    text = (tmp_path / 'WINNER.md').read_text(encoding='utf-8')
+    t = pd.read_csv(tmp_path / 'TABLE.csv', dtype={'level': str})
+    r = t[(t.model == W.SHIPPED) & (t.level == '3')].iloc[0]
+    assert f'{r.tm_bacc:.3f} [{r.tm_lo:.3f}, {r.tm_hi:.3f}]' in text
+    assert 'No candidate beats logistic chain v1' in text
+    assert 'No skin-tone claim' in text
