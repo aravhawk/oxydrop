@@ -1,6 +1,6 @@
 # Round 3 winner (mechanical application of ROUND3.md, Amendment 8)
 
-Written by `python -m oxydrop_ml.photon.winner3` (Sun Nov 15 20:18:35 CST 2026) from the score files that existed at that moment. Rule, verbatim from `.agents/tasks/task-oxydrop-photon-model/ROUND3.md` (stated 19:55 CT, before any round-3 score):
+Written by `python -m oxydrop_ml.photon.winner3` (Sun Nov 15 20:37:00 CST 2026) from the score files that existed at that moment. Rule, verbatim from `.agents/tasks/task-oxydrop-photon-model/ROUND3.md` (stated 19:55 CT, before any round-3 score):
 
 > Eligible: trained models from rounds 2 and 3 that pass nulls and rule 3. Replace `distill` only if a candidate's L0 3-seed ensemble TM point estimate exceeds distill's (0.758) AND its paired difference vs distill has a lower CI bound > -0.02 AND its stress mean paired diff vs chain_v1 over L3-L5 and X1 is >= 0. "Beats chain" still requires the paired CI vs chain_v1 excluding 0, >= 5/6 people better, worst person not below chain's. All round-3 models are designed after rounds 1-2 outer results were seen (Amendment 8).
 
@@ -10,12 +10,13 @@ Written by `python -m oxydrop_ml.photon.winner3` (Sun Nov 15 20:18:35 CST 2026) 
 * `photonnet` does NOT replace distill: nulls: NOT PASSED (null mean 0.618 > 0.55): null mean 0.618 over 3 distinct draw(s); g1 fails: L0 0.668 does not exceed distill 0.758; g2 fails: paired CI lower bound vs distill -0.157 <= -0.02.
 * `oxyssl` does NOT replace distill: nulls: NOT PASSED (null mean 0.643 > 0.55): null mean 0.643 over 3 distinct draw(s); g1 fails: L0 0.667 does not exceed distill 0.758; g2 fails: paired CI lower bound vs distill -0.211 <= -0.02.
 * `oxyseq` does NOT replace distill: nulls: NOT PASSED (only 1 distinct null draw(s), need >= 3): null mean 0.475 over 1 distinct draw(s), blank mean 0.500 over 1 distinct draw(s); g1 fails: L0 0.708 does not exceed distill 0.758; g2 fails: paired CI lower bound vs distill -0.167 <= -0.02; g3 fails: mean stress paired diff vs chain_v1 -0.040 < 0.
-* `distill2` passes the numeric rule (g1, g2, g3, nulls): L0 0.784, vs distill +0.026 [-0.010, +0.040], stress mean vs chain +0.144. LATE (cannot replace the shipped model): distill2_d1_null, distill2_d2_null, distill2_null, distill2__L0; rule 3 (shippable in browser) unconfirmed.
+* `distill2` passes the numeric rule (g1, g2, g3, nulls): L0 0.784, vs distill +0.026 [-0.010, +0.040], stress mean vs chain +0.144. LATE (cannot replace the shipped model): distill2_d1_null, distill2_d2_null, distill2_null, distill2__L0.
 * `multida` does NOT replace distill: g1 fails: L0 0.744 does not exceed distill 0.758; g2 fails: paired CI lower bound vs distill -0.055 <= -0.02.
 * `ssl3`: no L0 score file yet.
 * `photonnet_xl` does NOT replace distill: g1 fails: L0 0.660 does not exceed distill 0.758; g2 fails: paired CI lower bound vs distill -0.161 <= -0.02.
-* `ens3`: no L0 score file yet.
-* **NO REPLACEMENT**: every candidate passing the numeric rule is late (ROUND3.md rule 4).
+* `ens3` does NOT replace distill: nulls: NOT PASSED (missing null control).
+* **REPLACE `distill` with `distill2`** by the planner's ROUND3 LOCK: planner ROUND3 LOCK, 20:22 CT (task.json): winner = distill2; its files landed 20:16 CT per its author log, one minute after the 20:15 CT cutoff, and the planner accepted that with disclosure (file mtime on this box 20:18, copied after the sandbox run). Rule 3 is author-confirmed (same 39-feature front end and an nn-runtime-v1 MLP), not verified by R3-EVAL. `distill2` passes every numeric condition (L0 0.784 > 0.758; paired vs distill CI lower bound -0.010 > -0.02; stress mean vs chain_v1 +0.144 >= 0; nulls passed); the mtime flag above marks it late (distill2_d1_null, distill2_d2_null, distill2_null, distill2__L0), and the lock waives that by disclosure, not silently.
+* At L0 `distill2` TIES the logistic chain_v1: paired -0.012 [-0.091, +0.012], 4/6 people better, worst person 0.500. It does not beat chain_v1.
 
 ## Beats chain_v1?
 
@@ -35,7 +36,7 @@ Reference `chain_v1`: L0 TM 0.796 [0.636, 0.857], worst person 0.458.
 | multida | 3 | 0.744 [0.553, 0.807] | -0.014 [-0.055, +0.023] | no | no | yes (+0.135) | -0.053 [-0.142, -0.010] 3/6 | no | passed: null mean 0.522 over 3 distinct draw(s) | none |
 | ssl3 | 3 | no L0 score file yet |  |  |  |  |  |  | no null files yet | L0, L1, L2, L3, L4, L5, X1 |
 | photonnet_xl | 3 | 0.660 [0.545, 0.762] | -0.098 [-0.161, -0.011] | no | no | yes (+0.139) | -0.136 [-0.210, -0.033] 2/6 | no | passed: null mean 0.412 over 3 distinct draw(s) | none |
-| ens3 | 3 | no L0 score file yet |  |  |  |  |  |  | no null files yet | L0, L1, L2, L3, L4, L5, X1 |
+| ens3 | 3 | 0.789 [0.621, 0.842] | +0.031 [-0.012, +0.078] | yes | yes | yes (+0.143) | -0.007 [-0.092, +0.043] 4/6 | no | NOT PASSED (missing null control) | none |
 
 ## Stress: paired difference to chain_v1 [95 % CI] people better
 
@@ -48,6 +49,7 @@ Reference `chain_v1`: L0 TM 0.796 [0.636, 0.857], worst person 0.458.
 | distill2 | +0.133 [+0.001, +0.248] 4/6 | +0.097 [+0.011, +0.195] 6/6 | +0.170 [+0.027, +0.249] 5/6 | +0.174 [+0.044, +0.284] 6/6 | 0.144 |
 | multida | +0.115 [+0.003, +0.216] 4/6 | +0.093 [+0.002, +0.189] 6/6 | +0.161 [+0.026, +0.232] 5/6 | +0.170 [+0.027, +0.328] 6/6 | 0.135 |
 | photonnet_xl | +0.115 [-0.028, +0.229] 3/6 | +0.086 [-0.020, +0.207] 5/6 | +0.169 [+0.018, +0.269] 5/6 | +0.184 [+0.072, +0.290] 6/6 | 0.139 |
+| ens3 | +0.149 [-0.007, +0.255] 4/6 | +0.085 [+0.003, +0.193] 6/6 | +0.141 [+0.043, +0.248] 5/6 | +0.197 [+0.074, +0.280] 6/6 | 0.143 |
 
 ## Seeds, timeline, rule 3
 
@@ -57,11 +59,11 @@ Reference `chain_v1`: L0 TM 0.796 [0.636, 0.857], worst person 0.458.
 | distill | 3 | distill_s0, distill_s1, distill_s2 | none | unconfirmed (manual) |
 | oxyssl | 3 | oxyssl_s0, oxyssl_s1, oxyssl_s2 | none | unconfirmed (manual) |
 | oxyseq | 0 | none | none | unconfirmed (manual) |
-| distill2 | 3 | distill2_s0, distill2_s1, distill2_s2 | distill2_d1_null, distill2_d2_null, distill2_null, distill2__L0 | unconfirmed (manual) |
+| distill2 | 3 | distill2_s0, distill2_s1, distill2_s2 | distill2_d1_null, distill2_d2_null, distill2_null, distill2__L0 | confirmed |
 | multida | 3 | multida_s0, multida_s1, multida_s2 | multida_null, multida_null_d1, multida_null_d2, multida__L0 | unconfirmed (manual) |
 | ssl3 | 0 | none | none | unconfirmed (manual) |
 | photonnet_xl | 3 | photonnet_xl_seed0, photonnet_xl_seed1, photonnet_xl_seed2 | none | unconfirmed (manual) |
-| ens3 | 0 | none | none | unconfirmed (manual) |
+| ens3 | 0 | none | ens3__L0 | unconfirmed (manual) |
 
 ## Skipped files
 

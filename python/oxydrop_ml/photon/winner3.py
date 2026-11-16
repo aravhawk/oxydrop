@@ -1,7 +1,12 @@
 """Round-3 evaluation: results/photon/WINNER3.md (the mechanical winner rule of ROUND3.md / Amendment 8).
 
     cd python && python -m oxydrop_ml.photon.winner3 [--boot 2000] [--candidates distill2,multida,ssl3,photonnet_xl,ens3] [--scores DIR] [--out DIR]
-                                                     [--no-write] [--ignore-deadline]
+                                                     [--no-write] [--ignore-deadline] [--shippable m] [--lock m --lock-note TEXT]
+
+ROUND3 LOCK (20:22 CT, planner): the winner was locked to distill2 although its nulls/stress files landed at 20:16 CT, one minute after the 20:15 cutoff.
+The regenerated report is made with
+    python -m oxydrop_ml.photon.winner3 --shippable distill2 --lock distill2 --lock-note '...'
+so the mechanical LATE flag stays visible in the report and the waiver is written next to it.
 
 Written BEFORE any round-3 score file existed (see Amendment 8). It reads results/photon/scores/*.csv through the evalkit / winner2 machinery (same person
 bootstrap, same closed-form TM, same 5,644 windows), so every number equals the TABLE.csv value. Missing or partial files are skipped with a note. No number is typed
@@ -180,8 +185,8 @@ def evaluate(ev, models, names, shippable, today, check_deadline):
     return rows
 
 
-def verdict(rows, inc, shippable_known):
-    """-> (replacement model or None, lines)."""
+def verdict(rows, inc, shippable_known, lock=None):
+    """-> (replacement model or None, lines). `lock` = dict(model, note) records the planner's ROUND3 LOCK decision (see main())."""
     lines = []
     if inc is None or inc['r0'] is None:
         return None, ['`distill__L0.csv` is missing or unusable: no comparison is possible.']
@@ -217,6 +222,19 @@ def verdict(rows, inc, shippable_known):
                          f'stress mean vs chain {c["g3_mean"]:+.3f}.' + (' ' + '; '.join(extra) + '.' if extra else ''))
         else:
             lines.append(f'`{c["model"]}` does NOT replace distill: ' + '; '.join(why) + '.')
+    if lock:
+        lk = next((c for c in passers if c['model'] == lock['model']), None)
+        if lk is None:
+            lines.append(f'**PLANNER LOCK REJECTED**: `{lock["model"]}` does not pass the numeric rule (g1, g2, g3, nulls), so it cannot replace distill.')
+        else:
+            lines.append(f'**REPLACE `distill` with `{lk["model"]}`** by the planner\'s ROUND3 LOCK: {lock["note"]} '
+                         f'`{lk["model"]}` passes every numeric condition (L0 {lk["tm"]:.3f} > {inc["tm"]:.3f}; paired vs distill CI lower bound {lk["vd"]["lo"]:+.3f} > {G2_MIN}; '
+                         f'stress mean vs chain_v1 {lk["g3_mean"]:+.3f} >= 0; nulls passed)'
+                         + (f'; the mtime flag above marks it late ({", ".join(lk["late"])}), and the lock waives that by disclosure, not silently.' if lk['late'] else '.'))
+            tie = 'TIES' if lk['clo'] <= 0 <= lk['chi'] else ('LOSES TO' if lk['chi'] < 0 else 'is above')
+            lines.append(f'At L0 `{lk["model"]}` {tie} the logistic chain_v1: paired {lk["chain_diff"]:+.3f} [{lk["clo"]:+.3f}, {lk["chi"]:+.3f}], {lk["nb"]}/{lk["nc"]} people better, '
+                         f'worst person {lk["worst"]:.3f}. It does not beat chain_v1.')
+            return lk['model'], lines
     valid = [c for c in passers if not c['late'] and c['shippable']]
     if valid:
         valid.sort(key=lambda c: -c['tm'])
@@ -280,19 +298,46 @@ def md(ev, rows, lines, winner, stamp, notes):
     return '\n'.join(out) + '\n'
 
 
-def run(scores_dir=E.SCORES, out_dir=E.RES, B=2000, candidates=None, shippable=(), write=True, log=print, check_deadline=True):
+def write_csv(rows, path, winner):
+    """Machine-readable copy of the WINNER3.md tables (read by scripts/ml_numbers.py; candidates that landed after TABLE.csv was written are only here)."""
+    import csv
+    cols = ['model', 'round', 'status', 'tm', 'tm_lo', 'tm_hi', 'worst', 'd_distill', 'd_distill_lo', 'd_distill_hi', 'g1', 'g2', 'g3', 'g3_mean',
+            'd_chain', 'd_chain_lo', 'd_chain_hi', 'nb_chain', 'nc_chain', 'beats_chain', 'null_mean', 'null_draws', 'nulls_ok', 'late', 'shippable', 'winner']
+    for l in STRESS_LEVELS:
+        cols += [f'{W.lname(l)}_d', f'{W.lname(l)}_lo', f'{W.lname(l)}_hi', f'{W.lname(l)}_nb', f'{W.lname(l)}_nc']
+    with open(path, 'w', newline='') as fh:
+        w = csv.writer(fh)
+        w.writerow(cols)
+        for c in rows:
+            ns = c['nulls']['ns'].get('null') if c['nulls']['ns'] else None
+            r = dict(model=c['model'], round=c['round'], status=c.get('status', 'scored'), null_mean=round(ns['mean'], 6) if ns else '', null_draws=ns['n'] if ns else 0,
+                     nulls_ok=int(c['nulls']['ok']), late=';'.join(c['late']), shippable=int(c['shippable']), winner=int(c['model'] == winner))
+            if c['r0'] is not None:
+                vd = c.get('vd')
+                r.update(tm=round(c['tm'], 6), tm_lo=round(c['lo'], 6), tm_hi=round(c['hi'], 6), worst=round(c['worst'], 6),
+                         d_distill=round(vd['diff'], 6) if vd else '', d_distill_lo=round(vd['lo'], 6) if vd else '', d_distill_hi=round(vd['hi'], 6) if vd else '',
+                         g1='' if c['g1'] is None else int(c['g1']), g2='' if c['g2'] is None else int(c['g2']), g3='' if c['g3'] is None else int(c['g3']),
+                         g3_mean=round(c['g3_mean'], 6) if np.isfinite(c['g3_mean']) else '', d_chain=round(c['chain_diff'], 6), d_chain_lo=round(c['clo'], 6),
+                         d_chain_hi=round(c['chi'], 6), nb_chain=c['nb'], nc_chain=c['nc'], beats_chain=int(c['beats']))
+                for l, q in c['stress'].items():
+                    r.update({f'{l}_d': round(q['diff'], 6), f'{l}_lo': round(q['lo'], 6), f'{l}_hi': round(q['hi'], 6), f'{l}_nb': q['nb'], f'{l}_nc': q['nc']})
+            w.writerow([r.get(k, '') for k in cols])
+
+
+def run(scores_dir=E.SCORES, out_dir=E.RES, B=2000, candidates=None, shippable=(), write=True, log=print, check_deadline=True, lock=None):
     names = list(dict.fromkeys(ROUND2 + list(candidates or ROUND3)))
     models = sorted(W.discover(scores_dir))
     ev = W.Evaluator(scores_dir, B)
     today = dt.datetime.now()
     rows = evaluate(ev, models, names, set(shippable), today, check_deadline)
     inc = next((c for c in rows if c['model'] == INCUMBENT), None)
-    winner, lines = verdict(rows, inc, bool(shippable))
+    winner, lines = verdict(rows, inc, bool(shippable), lock)
     stamp = subprocess.run(['date', '+%a %b %d %H:%M:%S %Z %Y'], capture_output=True, text=True).stdout.strip()
     text = md(ev, rows, lines, winner, stamp, ev.notes)
     if write:
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         (Path(out_dir) / 'WINNER3.md').write_text(text)
+        write_csv(rows, Path(out_dir) / 'WINNER3.csv', winner)
     for n in ev.notes:
         log(n)
     for l in lines:
@@ -311,9 +356,12 @@ def main(argv=None):
     ap.add_argument('--shippable', default='', help='comma-separated models whose author confirms rule 3 (browser-shippable); manual input')
     ap.add_argument('--no-write', action='store_true')
     ap.add_argument('--ignore-deadline', action='store_true')
+    ap.add_argument('--lock', default='', help='planner ROUND3 LOCK: model name chosen by the planner (must pass the numeric rule); recorded with --lock-note')
+    ap.add_argument('--lock-note', default='', help='the planner decision text, quoted in the verdict (time, reason, waived flags)')
     a = ap.parse_args(argv)
+    lock = dict(model=a.lock, note=a.lock_note) if a.lock else None
     run(a.scores, a.out, B=a.boot, candidates=[x for x in a.candidates.split(',') if x], shippable=[x for x in a.shippable.split(',') if x],
-        write=not a.no_write, check_deadline=not a.ignore_deadline)
+        write=not a.no_write, check_deadline=not a.ignore_deadline, lock=lock)
 
 
 if __name__ == '__main__':

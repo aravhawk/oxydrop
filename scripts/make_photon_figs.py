@@ -1,6 +1,7 @@
 """Figures for the PhotonTwin / FlashGap / OxyTrack comparison, drawn only from results/photon/TABLE.csv and STRESS.csv.
 
-    python scripts/make_photon_figs.py                          # all three figures, round-2 layout, architecture of the shipped PhotonDistill (--winner distill)
+    python scripts/make_photon_figs.py                          # all three figures, grouped layout, architecture of the shipped PhotonDistill v2 (--winner distill2)
+    python scripts/make_photon_figs.py --winner distill         # the round-2 figures (PhotonDistill marked)
     python scripts/make_photon_figs.py --winner twin_gate --mark-winner  # the round-1 layout (twin_gate was the round-1 decision, Amendment 6)
     python scripts/make_photon_figs.py results stress           # a subset: results | stress | architecture
     python scripts/make_photon_figs.py --all-variants           # stress curves also for ablations and controls
@@ -45,28 +46,34 @@ BROWN = '#8C564B'
 RED, TEAL, WINE, OLIVE = '#C0392B', '#44AA99', '#882255', '#117733'
 FAMILIES = {'twin_gate': ('PhotonTwin gate', PURPLE), 'twin_inverse': ('PhotonTwin-Inverse', BLUE), 'flashgap': ('FlashGap', ORANGE), 'oxytrack': ('OxyTrack', GREEN),
             'twin_chain': ('PhotonTwin + chain', SKY), 'ctl': ('Control', BROWN),
-            'distill': ('PhotonDistill', RED), 'photonnet': ('PhotonNet', OLIVE), 'oxyssl': ('OxySSL', WINE), 'oxyseq': ('OxySeq', TEAL)}
+            'distill2': ('PhotonDistill v2', RED), 'distill': ('PhotonDistill', '#E8838A'), 'multida': ('MultiDA', SKY), 'photonnet_xl': ('PhotonNet-XL', '#7FAF3F'),
+            'photonnet': ('PhotonNet', OLIVE), 'oxyssl': ('OxySSL', WINE), 'oxyseq': ('OxySeq', TEAL)}
 PRETTY = {'twin_gate': 'PhotonTwin gate (shipped, post hoc)', 'twin_inverse_noresid': 'PhotonTwin-Inverse, physics path only', 'ctl_dc_lr': 'Control: 3-number DC colour LR',
           'ctl_dc_ror_lr': 'Control: DC + ratio-of-ratios LR', 'ctl_dc_hr_lr': 'Control: DC + heart-rate LR', 'flashgap_gate': 'FlashGap gate (post hoc)',
           'oxytrack_nosnr': 'OxyTrack, no SNR weighting', 'oxytrack_ema': 'chain v1 + causal EMA', 'flashgap_noaug': 'FlashGap, no augmentation',
-          'distill': 'PhotonDistill student', 'distill_nokd': 'PhotonDistill, no teachers (ablation)', 'distill_v1': 'PhotonDistill v1 (before the post hoc grid)',
+          'distill': 'PhotonDistill (round 2)', 'distill_nokd': 'PhotonDistill, no teachers (ablation)', 'distill_v1': 'PhotonDistill v1 (before the post hoc grid)',
           'photonnet': 'PhotonNet (null fails)', 'photonnet_nophys': 'PhotonNet, no physics layer', 'oxyssl': 'OxySSL (null fails)', 'oxyseq': 'OxySeq',
           'oxyseq_notta': 'OxySeq, no test-time adaptation', 'distill_null': 'PhotonDistill null (draw 0 of 3)', 'photonnet_null': 'PhotonNet null (draw 0 of 3)',
-          'oxyssl_null': 'OxySSL null (draw 0 of 3)', 'oxyseq_null': 'OxySeq null', 'oxyseq_blank': 'OxySeq blank'}
+          'oxyssl_null': 'OxySSL null (draw 0 of 3)', 'oxyseq_null': 'OxySeq null', 'oxyseq_blank': 'OxySeq blank',
+          'distill2': 'PhotonDistill v2', 'multida': 'MultiDA', 'photonnet_xl': 'PhotonNet-XL', 'distill2_null': 'PhotonDistill v2 null (draw 0 of 3)',
+          'multida_null': 'MultiDA null (draw 0 of 3)', 'photonnet_xl_null': 'PhotonNet-XL null (draw 0 of 3)', 'multida_hofonly': 'MultiDA, Hoffman only (ablation)'}
 ROUND1 = ['twin_gate', 'twin_inverse', 'flashgap', 'oxytrack']
 ROUND2 = ['distill', 'photonnet', 'oxyssl', 'oxyseq']
-CANDIDATES = ROUND1 + ROUND2
+ROUND3 = ['distill2', 'multida', 'photonnet_xl']          # round-3 models with score files in TABLE.csv at the 20:22 CT lock (ssl3: none; ens3 landed later, no nulls)
+CANDIDATES = ROUND1 + ROUND2 + ROUND3
+SHIPPED_LAYOUT = ('distill', 'distill2')
 FOREST_MODELS = ['chain_v1', 'chain_v1_nestedC', 'hybrid_final', 'cnn_full', 'twin_gate', 'twin_inverse', 'twin_inverse_noresid', 'flashgap', 'flashgap_gate', 'flashgap_noaug', 'oxytrack',
                  'oxytrack_nosnr', 'oxytrack_ema', 'twin_chain', 'ctl_dc_lr', 'twin_inverse_null', 'flashgap_null', 'oxytrack_blank', 'twin_gate_null']
 STRESS_MODELS = ['chain_v1', 'twin_gate', 'twin_inverse_noresid', 'ctl_dc_lr', 'oxytrack', 'flashgap']
 # round-2 layout (--winner distill): grouped forest of every round-1 and round-2 model, stress curves of the trained models
 FOREST_GROUPS = [('Baselines', ['chain_v1', 'chain_v1_nestedC', 'hybrid_final', 'cnn_full']),
+                 ('Round 3: trained candidates (designed after rounds 1-2 outer results, Amendment 8)', ['distill2', 'multida', 'photonnet_xl']),
                  ('Round 2: trained end-to-end candidates (designed after round-1 results, Amendment 7)', ['distill', 'oxyseq', 'photonnet', 'oxyssl']),
                  ('Round 2: ablations', ['distill_v1', 'distill_nokd', 'photonnet_nophys', 'oxyseq_notta']),
                  ('Round 1 candidates (Amendment 6)', ['twin_gate', 'oxytrack', 'twin_inverse', 'flashgap', 'flashgap_gate']),
                  ('Controls', ['ctl_dc_lr', 'twin_inverse_noresid']),
-                 ('Null / blank controls (single draws)', ['distill_null', 'oxyseq_null', 'oxyseq_blank', 'photonnet_null', 'oxyssl_null'])]
-STRESS_MODELS_R2 = ['chain_v1', 'distill', 'photonnet', 'oxyssl', 'oxyseq', 'ctl_dc_lr']
+                 ('Null / blank controls (single draws)', ['distill2_null', 'multida_null', 'photonnet_xl_null', 'distill_null', 'oxyseq_null', 'oxyseq_blank', 'photonnet_null', 'oxyssl_null'])]
+STRESS_MODELS_R2 = ['chain_v1', 'distill2', 'distill', 'multida', 'photonnet_xl', 'photonnet', 'oxyssl', 'oxyseq', 'ctl_dc_lr']
 STRESS_STYLE = {'twin_inverse_noresid': (BLUE, '-'), 'ctl_dc_lr': (BROWN, '--')}
 REFERENCE = 'chain_v1'
 
@@ -118,7 +125,7 @@ def style(model, winner=None):
     if k == 'baseline':
         return BASE_STYLE[model], BASE_STYLE[model], 0.9, 1.4
     fam = family_of(model)
-    if winner == 'distill' and model in ROUND1:
+    if winner in SHIPPED_LAYOUT and model in ROUND1:
         return FAMILIES[fam][1], 'white', 0.8, 1.3
     col = FAMILIES[fam][1] if fam else GREY
     if model in STRESS_STYLE:
@@ -477,7 +484,7 @@ def _ml_ref():
     return out
 
 
-def fig_results_r2(winner='distill'):
+def fig_results_r2(winner='distill2'):
     t, _ = load()
     d = t[t['level'] == '0'].set_index('model')
     ref = d.loc[REFERENCE]
@@ -505,7 +512,7 @@ def fig_results_r2(winner='distill'):
         col = BASE_STYLE.get(m) or (FAMILIES[fam][1] if fam else GREY)
         if m in STRESS_STYLE:
             col = STRESS_STYLE[m][0]
-        face = col if kd in ('baseline', 'candidate') and m not in ROUND1 else 'white'
+        face = col if kd in ('baseline', 'candidate') and m not in ROUND1 and not (winner == 'distill2' and m in ROUND2) else 'white'
         lw = 2.6 if m == winner else 1.5
         ax.errorbar(row['tm_bacc'], y, xerr=[[row['tm_bacc'] - row['tm_lo']], [row['tm_hi'] - row['tm_bacc']]], fmt='s' if kd == 'control' else ('*' if m == winner else 'o'),
                     color=col, mfc=face, mec=col, ms=13 if m == winner else 7, elinewidth=lw, capsize=3.5, zorder=3)
@@ -518,7 +525,8 @@ def fig_results_r2(winner='distill'):
             txt += ', null mean > 0.55'
         ax.text(1.005, y, txt, transform=ax.get_yaxis_transform(), va='center', fontsize=8.4, color='#222' if kd != 'baseline' else '#555',
                 fontweight='bold' if m == winner else 'normal')
-        labels.append(('PhotonTwin gate (round-1 decision, post hoc)' if m == 'twin_gate' else pretty(m)) + ('  [SHIPPED]' if m == winner else ''))
+        lab = 'PhotonTwin gate (round-1 decision, post hoc)' if m == 'twin_gate' else ('PhotonDistill (round-2 winner, replaced)' if (m == 'distill' and winner == 'distill2') else pretty(m))
+        labels.append(lab + ('  [SHIPPED]' if m == winner else ''))
         colors.append(col if kd != 'baseline' else '#555555'); weights.append('bold' if m == winner else 'normal')
     ax.set_yticks(ys)
     ax.set_yticklabels(labels)
@@ -529,21 +537,24 @@ def fig_results_r2(winner='distill'):
     ax.set_xlabel('Time-matched balanced accuracy, clean L0 (Hoffman, leave-one-person-out), 95 % person-bootstrap CI')
     w = d.loc[winner]
     ax.text(1.005, n - 0.2, 'TM [95 % CI]   paired diff vs chain_v1 [95 % CI] verdict', transform=ax.get_yaxis_transform(), fontsize=8.4, color='#555', va='bottom')
-    ax.set_title(f'Clean light: no model beats chain_v1; the shipped trained model PhotonDistill loses by {-w["diff_vs_chain_v1"]:.3f} '
-                 f'[{w["diff_lo"]:+.3f}, {w["diff_hi"]:+.3f}]', loc='left', fontsize=11, pad=16)
+    vb = {'tie': 'ties it', 'loss': 'loses to it', 'win': 'is above it'}.get(str(w['verdict']), str(w['verdict']))
+    ax.set_title(f'Clean light: no model beats chain_v1; the shipped trained model {pretty(winner).replace(" student", "")} {vb}: {w["diff_vs_chain_v1"]:+.3f} '
+                 f'[{w["diff_lo"]:+.3f}, {w["diff_hi"]:+.3f}], {int(w["n_people_improved"])}/{int(w["n_people_compared"])} people better', loc='left', fontsize=11, pad=16)
     ax.grid(axis='y', alpha=0)
     ax.legend(loc='lower right', fontsize=8.4, frameon=True, facecolor='white', edgecolor='#DDDDDD', framealpha=1.0)
     refs = '; '.join(f'{lab} {v:.3f}' + (f' [{lo:.3f}, {hi:.3f}]' if pd.notna(lo) else '') for lab, v, lo, hi in _ml_ref())
     ax.text(0.0, -0.06 - 0.5 / max(n, 1),
-            'Filled markers: candidates and baselines; open markers: round-1 models and ablations; squares: null / blank controls (single draws; the rule uses the mean of 3 draws).\n'
-            'Round-2 models were designed after the round-1 outer results were seen; PhotonDistill v2 was tuned after its v1 outer result. All L0 numbers on the same six people.\n'
+            ('Filled markers: round-3 candidates and baselines; open markers: round-1 and round-2 models and ablations; ' if winner == 'distill2' else 'Filled markers: candidates and baselines; open markers: round-1 models and ablations; ')
+            + 'squares: null / blank controls (single draws; the rule uses the mean of 3 draws).\n'
+            'Round-2 models were designed after the round-1 outer results were seen (PhotonDistill tuned after its v1 outer result); round-3 models after rounds 1-2 (Amendment 8).\n'
+            'All L0 numbers on the same six people. Not shown: ssl3 (no score file) and ens3 (3-model stack, landed after the 20:22 CT lock, no null controls).\n'
             + (f'From results/ml (other bootstrap, not on this harness): {refs}.\n' if refs else '')
             + 'Six people, Nexus 6P recordings, one dark-skinned person (no skin-tone claim). ' + NOTE.split(' Stress')[0],
             transform=ax.transAxes, fontsize=8, color='#555', va='top')
     save(fig, 'photon_results_ci.png')
 
 
-def fig_stress_r2(winner='distill'):
+def fig_stress_r2(winner='distill2'):
     _, s = load()
     levels = [str(i) for i in range(6)]
     xpos = {**{lv: int(lv) for lv in levels}, 'X1': 6.6}
@@ -557,11 +568,14 @@ def fig_stress_r2(winner='distill'):
         col = '#222222' if m == REFERENCE else (STRESS_STYLE.get(m, (None,))[0] or (FAMILIES[fam][1] if fam else GREY))
         ls = STRESS_STYLE.get(m, (None, '-'))[1]
         lw = 3.0 if m == winner else (2.0 if m == REFERENCE else 1.5)
+        if winner == 'distill2' and m in ROUND2:
+            lw = 1.1
         lab = pretty(m) + ('  [SHIPPED]' if m == winner else '')
         main = sub[sub['level'].isin(levels)].copy()
         main['x'] = main['level'].map(xpos)
         main = main.sort_values('x')
-        axa.fill_between(main['x'], main['tm_lo'], main['tm_hi'], color=col, alpha=0.18 if m in (REFERENCE, winner) else 0.07, lw=0)
+        if m in (REFERENCE, winner) or winner != 'distill2':          # with 9 models, CI bands only for the reference and the shipped model
+            axa.fill_between(main['x'], main['tm_lo'], main['tm_hi'], color=col, alpha=0.18 if m in (REFERENCE, winner) else 0.07, lw=0)
         axa.plot(main['x'], main['tm_bacc'], ls=ls, color=col, lw=lw, marker='o', ms=5, label=lab, zorder=5 if m == winner else 3)
         x1 = sub[sub['level'] == 'X1']
         dx = 0.11 * (i - (len(models) - 1) / 2)
@@ -584,7 +598,10 @@ def fig_stress_r2(winner='distill'):
     axa.axhline(0.5, color='#999999', lw=1, ls=':')
     axa.text(-0.25, 0.502, 'chance', color='#777', fontsize=8, ha='left', va='bottom')
     axa.set_ylabel('TM balanced accuracy (band = 95 % person CI)')
-    axa.set_ylim(0.38, 0.95)
+    if winner == 'distill2':
+        axa.set_yticks([0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+        axa.text(0.99, 0.015, 'bands: chain_v1 and the shipped model only', transform=axa.transAxes, ha='right', fontsize=7.8, color='#666')
+    axa.set_ylim(0.38, 1.06 if winner == 'distill2' else 0.95)
     axa.set_title('(a) Accuracy of the forced decision (every window)', loc='left', fontsize=10.5)
     axa.legend(fontsize=8.2, loc='upper right', ncol=2)
     t, _ = load()
@@ -593,7 +610,7 @@ def fig_stress_r2(winner='distill'):
         r = _row(t, winner, lv)
         if r is not None:
             wins.append(f'{"L" + lv if lv != "X1" else "X1"} {r["diff_vs_chain_v1"]:+.3f} [{r["diff_lo"]:+.3f}, {r["diff_hi"]:+.3f}] {r["verdict"]}')
-    wins_txt = 'PhotonDistill minus chain_v1 (paired TM difference [95 % CI]): ' + '; '.join(wins) + '. The DC-colour control ctl_dc_lr (3 numbers, LR) is nearly as robust (ties by CI).'
+    wins_txt = f'{pretty(winner).replace(" student", "")} minus chain_v1 (paired TM difference [95 % CI]): ' + '; '.join(wins) + '. The DC-colour control ctl_dc_lr (3 numbers, LR) is nearly as robust (ties by CI).'
     axb.axhline(0.9, color='#888', lw=0.8, ls='--')
     axb.text(7.05, 0.905, 'target 0.90', fontsize=7.5, color='#666', ha='right', va='bottom')
     axb.set_ylim(0.3, 1.03)
@@ -603,11 +620,11 @@ def fig_stress_r2(winner='distill'):
     axc.set_ylim(-0.03, 1.03)
     axc.set_ylabel('Coverage (share of windows answered)')
     axc.set_title('(c) Coverage', loc='left', fontsize=10.5)
-    axc.text(0.5, 0.04, 'PhotonDistill answers fewer windows as the light weakens', transform=axc.transAxes, ha='center', fontsize=8, color='#555')
+    axc.text(0.5, 0.04, 'PhotonDistill (v1, v2) answers fewer windows as the light weakens', transform=axc.transAxes, ha='center', fontsize=8, color='#555')
     fig.suptitle('Simulated distant-flash stress: only the held-out person is degraded (whole recording scaled), models not refit per level; diamond = out-of-family X1',
                  x=0.01, ha='left', fontsize=12, fontweight='bold')
     fig.text(0.01, -0.005, wins_txt, fontsize=9, color='#222')
-    fig.text(0.01, -0.04, NOTE + ' Baseline-relative inputs cancel a constant attenuation by design. PhotonNet and OxySSL fail their null controls.', fontsize=8, color='#555')
+    fig.text(0.01, -0.04, NOTE + ' Baseline-relative inputs cancel a constant attenuation by design. PhotonNet and OxySSL fail their null controls. Round-3 models: Amendment 8.', fontsize=8, color='#555')
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     save(fig, 'photon_stress_curve.png')
 
@@ -656,7 +673,55 @@ def arch_distill():
 
 
 
-ARCH = {'distill': arch_distill, 'twin_gate': arch_twin_gate, 'twin_inverse': arch_twin_inverse, 'flashgap': arch_flashgap, 'oxytrack': arch_oxytrack}
+def arch_distill2():
+    """PhotonDistill v2 (round 3, shipped after the 20:22 CT lock). Layer sizes are read per seed from results/photon/distill2_weights.json."""
+    t, _ = load()
+    w = json.load(open(os.path.join(RES, 'distill2_weights.json')))
+    st = w['students']
+    n_in, n_out = len(st[0]['w1'][0]), len(st[0]['wo'])
+    hs = [(len(x['w1']), len(x['w2'])) for x in st]
+    npar = [sum(len(x[k]) * (len(x[k][0]) if isinstance(x[k][0], list) else 1) for k in ('w1', 'b1', 'w2', 'b2', 'wo', 'bo')) for x in st]
+    widths = ' / '.join(str(h1) for h1, _ in hs)
+    l0 = _row(t, 'distill2', '0')
+    res = []
+    for lv in ('3', '4', '5', 'X1'):
+        r = _row(t, 'distill2', lv)
+        if r is not None:
+            res.append(f'{"L" + lv if lv != "X1" else "X1"} {r["diff_vs_chain_v1"]:+.3f} [{r["diff_lo"]:+.3f}, {r["diff_hi"]:+.3f}]')
+    d = Diagram('PhotonDistill v2 (shipped): one small trained network per seed, taught by two simple teachers',
+                f'Inference runs only the students: {len(st)} seeds, widths {widths}, {" / ".join(f"{n:,}" for n in npar)} parameters, ensemble mean, answer if abstain >= tau {w["tau"]:.3f}. '
+                'Teachers are training-only.',
+                figsize=(13.5, 7.4))
+    yI, hI = 0.60, 0.25
+    d.tag(0.0, yI + hI + 0.02, 'Inference (in the browser, per 10 s window, 2 s hop; same front end as PhotonDistill)', GREY, fs=10)
+    d.box('rgb', 0.00, yI, 0.14, hI, 'Phone camera\nper-frame ROI mean\nR, G, B\n(30 Hz, flash on)', CREAM, ORANGE, fs=8.6)
+    d.box('feat', 0.17, yI, 0.19, hI, f'{n_in} causal window features\nrelative to the person\'s own\nlabel-free first minute:\n19 chain deltas (HR, RoR,\npulse shape), 15 signal-\nquality, 5 respiratory', CREAM, ORANGE, fs=8.0)
+    d.box('prep', 0.39, yI, 0.10, hI, 'impute,\nclip,\nstandardise\n(training\nstatistics)', '#F2F2F2', GREY, fs=8.0)
+    d.box('net', 0.52, yI, 0.17, hI, f'Student MLP (x{len(st)} seeds)\n{n_in} -> H ReLU -> H ReLU\n-> {n_out} heads\nH = {widths}', '#EEF4FA', BLUE, fs=9.0, bold=True)
+    d.box('heads', 0.72, yI, 0.28, hI, 'Heads (one network, trained jointly)\nP(SpO2 < 90)  (hypoxia logit)\nSpO2 estimate\nabstain logit = P(hypoxia head is right);\nanswer if sigmoid >= tau (nested)', '#EEF4FA', BLUE, fs=8.3)
+    for a, b in (('rgb', 'feat'), ('feat', 'prep'), ('prep', 'net'), ('net', 'heads')):
+        d.arrow(a, 'r', b, 'l')
+    yT, hT = 0.17, 0.27
+    d.tag(0.0, yT + hT + 0.02, 'Training only (inside each outer fold: five training people; the held-out person is never seen)', GREY, fs=10)
+    d.box('clean', 0.00, yT, 0.14, hT, 'Clean training\nrecordings', CREAM, ORANGE, fs=8.8)
+    d.box('aug', 0.17, yT, 0.19, hT, 'Physics-sampled\ndistant-flash copies\n(FlashGap prior: d_rho,\nleak, noise, AE gain;\nown RNG, disjoint from\nthe stress levels and X1)', LAV, PURPLE, fs=7.9)
+    d.box('tch', 0.39, yT, 0.21, hT, 'Teachers (fold-internal)\nlogistic chain v1 -> clean rows\nDC-colour LR -> degraded rows\n(a GBDT-augmented teacher was\noffered, never chosen: 0/18 folds;\nno physics teacher)', ROSE, VERM, fs=7.7, bold=False)
+    d.box('loss', 0.655, yT, 0.345, hT, 'Loss = BCE(label) + lam_kd T^2 BCE(student, teacher)\n+ Huber(SpO2) + BCE(abstain, head correct)\nNested two-stage grid (inner leave-one-person-out):\nteacher x lam_kd {8,16,32,pure KD} x T {2,4},\nthen width H {16,32,64} x weight decay; tau nested', ROSE, VERM, fs=7.7)
+    d.arrow('clean', 'r', 'aug', 'l')
+    d.arrow('aug', 'r', 'tch', 'l')
+    d.arrow('tch', 'r', 'loss', 'l')
+    d.tag(0.609, yT + hT / 2 + 0.045, 'soft\ntargets', '#444', fs=7.2)
+    lx = d.side('loss', 't')[0] - 0.08
+    nx = d.side('net', 'b')[0]
+    d.elbow([(lx, yT + hT), (lx, 0.515), (nx, 0.515), (nx, yI - 0.003)], VERM, ls='--', label='gradients (training only)', lpos=((lx + nx) / 2, 0.52), fs=8)
+    l0txt = (f'Clean L0 TM {l0["tm_bacc"]:.3f} [{l0["tm_lo"]:.3f}, {l0["tm_hi"]:.3f}]; vs chain_v1 paired {l0["diff_vs_chain_v1"]:+.3f} [{l0["diff_lo"]:+.3f}, {l0["diff_hi"]:+.3f}] '
+             f'({l0["verdict"]}, {int(l0["n_people_improved"])}/{int(l0["n_people_compared"])} people better). ' if l0 is not None else '')
+    d.tag(0.0, 0.075, l0txt, GREY, fs=8.5)
+    d.tag(0.0, 0.035, 'Simulated distant flash, paired vs chain_v1: ' + '; '.join(res) + '.', GREY, fs=8.5)
+    d.done('photon_architecture.png')
+
+
+ARCH = {'distill2': arch_distill2, 'distill': arch_distill, 'twin_gate': arch_twin_gate, 'twin_inverse': arch_twin_inverse, 'flashgap': arch_flashgap, 'oxytrack': arch_oxytrack}
 
 
 # --------------------------------------------------------------------------------------------------------------------------------- main
@@ -664,7 +729,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('figs', nargs='*', help='subset of: results stress architecture (default: all three)')
     ap.add_argument('--mark-winner', action='store_true', help='bold and label the --winner model in the results and stress figures (use only after the winner rule was applied)')
-    ap.add_argument('--winner', choices=sorted(ARCH), default='distill', help='model whose architecture is drawn and, with --mark-winner, highlighted (default distill, the shipped round-2 model; distill uses the round-2 layout)')
+    ap.add_argument('--winner', choices=sorted(ARCH), default='distill2', help='model whose architecture is drawn and, with --mark-winner, highlighted (default distill2, the shipped round-3 model; distill and distill2 use the grouped layout)')
     ap.add_argument('--all-variants', action='store_true', help='forest plot and stress curves also for every ablation, seed file and control')
     a = ap.parse_args(argv)
     todo = a.figs or ['results', 'stress', 'architecture']
@@ -672,7 +737,7 @@ def main(argv=None):
     if bad:
         ap.error(f'unknown figure(s): {bad}')
     mark = a.winner if a.mark_winner else None
-    r2 = a.winner == 'distill' and not a.all_variants             # round-2 layout
+    r2 = a.winner in SHIPPED_LAYOUT and not a.all_variants         # grouped round-2/3 layout
     if 'results' in todo:
         fig_results_r2(a.winner) if r2 else fig_results(mark, a.all_variants)
     if 'stress' in todo:

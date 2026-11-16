@@ -389,7 +389,8 @@ _PH_TOK_RE = re.compile(r'_(?:s\d+|seed\d+|gperm|perm\d*|shift\d*|d\d+|draw\d+)$
 PH_LABEL = {
     'chain_v1': 'Logistic chain v1 (best honest baseline)', 'chain_v1_nestedC': 'Logistic chain v1, C by nested CV', 'hybrid_final': 'Hybrid, per-person selected (nested)',
     'cnn_full': 'CNN alone (harness re-score, 3-seed mean)', 'ctl_dc_lr': 'Control: DC-colour LR (3 baseline-relative ln DC values)',
-    'distill': '**PhotonDistill (shipped)**', 'oxyseq': 'OxySeq', 'photonnet': 'PhotonNet', 'oxyssl': 'OxySSL',
+    'distill2': '**PhotonDistill v2 (shipped, round 3)**', 'multida': 'MultiDA (round 3)', 'photonnet_xl': 'PhotonNet-XL (round 3)',
+    'distill': 'PhotonDistill (round-2 winner, replaced)', 'oxyseq': 'OxySeq', 'photonnet': 'PhotonNet', 'oxyssl': 'OxySSL',
     'distill_v1': 'PhotonDistill v1 (before the post hoc grid)', 'distill_nokd': 'PhotonDistill without teachers (ablation)',
     'photonnet_nophys': 'PhotonNet without the physics layer (ablation)', 'oxyseq_notta': 'OxySeq without test-time adaptation (ablation)',
     'twin_gate': 'PhotonTwin gate (round-1 decision, post hoc gate)', 'oxytrack': 'OxyTrack (round 1; outer folds seen in development)',
@@ -485,23 +486,84 @@ def _ns_phnull(args, mod):
 
 
 
-def _ns_phw(args, mod):
-    """phw:<key>  from results/photon/distill_weights.json (the shipped PhotonDistill weights): params (per seed), seeds, n_in, hidden, tau (3 dp)."""
-    w = json.load(open(os.path.join(PHOTON, 'distill_weights.json')))
+def _ns_phw(args, mod, fname='distill_weights.json'):
+    """phw:<key>  from results/photon/distill_weights.json (round-2 PhotonDistill weights): params (per seed), seeds, n_in, hidden, tau (3 dp).
+    phw2:<key> the same keys from results/photon/distill2_weights.json (shipped PhotonDistill v2; widths differ per seed, so params and hidden list every seed
+    joined by ' / ')."""
+    w = json.load(open(os.path.join(PHOTON, fname)))
     st = w['students']
     k = args[0]
+    npar = lambda x: sum(len(x[y]) * (len(x[y][0]) if isinstance(x[y][0], list) else 1) for y in ('w1', 'b1', 'w2', 'b2', 'wo', 'bo'))
     if k == 'params':
-        n = sum(len(st[0][x]) * (len(st[0][x][0]) if isinstance(st[0][x][0], list) else 1) for x in ('w1', 'b1', 'w2', 'b2', 'wo', 'bo'))
-        return f'{n:,}'
+        v = sorted({npar(x) for x in st})
+        return f'{v[0]:,}' if len(v) == 1 else ' / '.join(f'{npar(x):,}' for x in st)
     if k == 'seeds':
         return str(len(st))
     if k == 'n_in':
         return str(len(w['cols']))
     if k == 'hidden':
-        return str(w['hidden'])
+        v = [len(x['w1']) for x in st]
+        return str(v[0]) if len(set(v)) == 1 else ' / '.join(str(x) for x in v)
     if k == 'tau':
         return f(w['tau'])
+    if k == 'recipe':                       # phw2:recipe:<seed>:<field>
+        r = w['recipe'][int(args[1])][args[2]]
+        return f'{r:g}' if isinstance(r, float) else str(r)
     raise KeyError(f'unknown phw key {k!r}')
+
+
+def _ns_phw2(args, mod):
+    return _ns_phw(args, mod, 'distill2_weights.json')
+
+
+def _ns_phd(args, mod):
+    """phd:<model>:<level>|mod  paired difference to the round-2 `distill` from results/photon/distill2_compare.csv (distill2 and its seeds; evalkit Boot, 2000 people
+    resamples). mods: (none) signed diff [lo, hi] | nb people better | lo lower bound (signed)."""
+    t = pd.read_csv(os.path.join(PHOTON, 'distill2_compare.csv'))
+    lv = args[1] if len(args) > 1 else 'L0'
+    lv = lv if lv.startswith(('L', 'X')) else f'L{lv}'
+    r = _row(t, model=args[0], level=lv)
+    if mod is None:
+        return dstr(r.d_distill, r.d_distill_lo, r.d_distill_hi)
+    if mod == 'nb':
+        return str(r.better_distill)
+    if mod == 'lo':
+        return sgn(r.d_distill_lo)
+    raise KeyError(f'unknown phd modifier {mod!r}')
+
+
+def _ns_w3(args, mod):
+    """w3:<model>:<field>  from results/photon/WINNER3.csv (python -m oxydrop_ml.photon.winner3; includes ens3, which landed after TABLE.csv).
+    fields: tm (with |full), d_chain / d_distill (paired [lo, hi]), nb_chain, g3_mean (signed), null_mean, null_draws, status, late."""
+    t = pd.read_csv(os.path.join(PHOTON, 'WINNER3.csv'))
+    r = _row(t, model=args[0])
+    k = args[1]
+    if k == 'tm':
+        return f'{f(r.tm)} {ci(r.tm_lo, r.tm_hi)}' if mod == 'full' else f(r.tm)
+    if k in ('d_chain', 'd_distill'):
+        return dstr(r[k], r[k + '_lo'], r[k + '_hi'])
+    if k == 'nb_chain':
+        return f'{int(r.nb_chain)}/{int(r.nc_chain)}'
+    if k == 'g3_mean':
+        return sgn(r.g3_mean)
+    if k == 'null_mean':
+        return f(r.null_mean)
+    if k in ('null_draws',):
+        return str(int(r[k]))
+    if k in ('status', 'late'):
+        return '' if pd.isna(r[k]) else str(r[k])
+    raise KeyError(f'unknown w3 field {k!r}')
+
+
+def _ns_d2fold(args, mod):
+    """d2fold:<field>:<value>  count of the 18 seed folds of distill2 (results/photon/distill2_fold_info.json, keys distill2_s0..s2) whose nested choice of <field>
+    (teacher, lam, T, H, wd, epochs) equals <value>; d2fold:n = number of seed folds."""
+    d = json.load(open(os.path.join(PHOTON, 'distill2_fold_info.json')))
+    folds = [x for k in ('distill2_s0', 'distill2_s1', 'distill2_s2') for x in d[k]]
+    if args[0] == 'n':
+        return str(len(folds))
+    fld, val = args[0], args[1]
+    return str(sum(1 for x in folds if str(x[fld]) == val or (isinstance(x[fld], (int, float)) and not isinstance(x[fld], bool) and val.replace('.', '', 1).isdigit() and float(x[fld]) == float(val))))
 
 
 def _ph_null_cell(m):
@@ -513,8 +575,9 @@ def _ph_null_cell(m):
 
 
 def block_photon_candidates() -> str:
-    """L0 table: baselines, the four round-2 trained candidates, their ablations, round-1 candidates and the DC-colour control."""
+    """L0 table: baselines, the round-3 and round-2 trained candidates, round-2 ablations, round-1 candidates and the DC-colour control."""
     groups = [('Baselines', ['chain_v1', 'hybrid_final', 'cnn_full']),
+              ('Round 3: trained candidates (Amendment 8; ssl3 has no score file, ens3 is listed below the table)', ['distill2', 'multida', 'photonnet_xl']),
               ('Round 2: trained end-to-end candidates (eligible)', ['distill', 'oxyseq', 'photonnet', 'oxyssl']),
               ('Round 2: ablations (not eligible)', ['distill_v1', 'distill_nokd', 'photonnet_nophys', 'oxyseq_notta']),
               ('Round 1 (Amendment 6) and controls', ['twin_gate', 'oxytrack', 'twin_inverse', 'flashgap', 'ctl_dc_lr'])]
@@ -525,7 +588,7 @@ def block_photon_candidates() -> str:
             r = ph(m, '0')
             d = 'reference' if m == 'chain_v1' else 'identical to chain v1 at L0 (gate)' if m == 'twin_gate' else (f'{dstr(r.diff_vs_chain_v1, r.diff_lo, r.diff_hi)} {r.verdict}' if _ok(r.diff_vs_chain_v1) else 'n/a')
             nb = '' if m in ('chain_v1', 'twin_gate') or not _ok(r.n_people_improved) else f'{int(r.n_people_improved)}/{int(r.n_people_compared)}'
-            nl = _ph_null_cell(m) if m in ('distill', 'oxyseq', 'photonnet', 'oxyssl', 'distill_v1') else ''
+            nl = _ph_null_cell(m) if m in ('distill2', 'multida', 'photonnet_xl', 'distill', 'oxyseq', 'photonnet', 'oxyssl', 'distill_v1') else ''
             rows.append([PH_LABEL.get(m, m), f'{f(r.tm_bacc)} {ci(r.tm_lo, r.tm_hi)}', d, nb, f(r.worst_person_tm), nl])
     return md_table(['Model (L0 = clean light)', 'TM bal. acc. [95% CI]', 'Paired diff vs chain v1 [95% CI]', 'People better', 'Worst person', 'Null mean (rule: at most 0.55)'], rows,
                     ['l', 'r', 'r', 'r', 'r', 'r'])
@@ -533,7 +596,7 @@ def block_photon_candidates() -> str:
 
 def block_photon_stress() -> str:
     """TM [CI] per stress level and paired difference to chain_v1 for the stress-curve models."""
-    ms = ['chain_v1', 'distill', 'ctl_dc_lr', 'photonnet', 'oxyssl', 'oxyseq']
+    ms = ['chain_v1', 'distill2', 'distill', 'multida', 'photonnet_xl', 'ctl_dc_lr', 'photonnet', 'oxyssl', 'oxyseq']
     levels = ['0', '3', '4', '5', 'X1']
     rows = []
     for m in ms:
@@ -552,7 +615,7 @@ def block_photon_stress() -> str:
 def block_photon_abstain() -> str:
     """Own abstention per level: coverage and answered accuracy, PhotonDistill next to chain_v1."""
     rows = []
-    for m in ('distill', 'chain_v1', 'oxyseq'):
+    for m in ('distill2', 'distill', 'chain_v1', 'oxyseq'):
         cells = []
         for l in PH_LEVELS:
             r = ph(m, l)
@@ -563,7 +626,7 @@ def block_photon_abstain() -> str:
 
 NS = {'b1': _ns_b1, 'b2': _ns_b2, 'b3': _ns_b3, 'ab': _ns_ab, 'hy': _ns_hy, 'hg': _ns_hg, 'pd1': _ns_pd1, 'cp': _ns_cp, 'hp': _ns_hp,
       'hpd': _ns_hpd, 'hr': _ns_hr, 'hs': _ns_hs, 'hgrid': _ns_hgrid, 'bn': _ns_bn, 'v': _ns_v, 'json': _ns_json,
-      'ph': _ns_ph, 'phnull': _ns_phnull, 'phw': _ns_phw}
+      'ph': _ns_ph, 'phnull': _ns_phnull, 'phw': _ns_phw, 'phw2': _ns_phw2, 'phd': _ns_phd, 'w3': _ns_w3, 'd2fold': _ns_d2fold}
 
 
 # ------------------------------------------------------------------------------------------------------------ custom scalars

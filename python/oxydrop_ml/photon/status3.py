@@ -98,6 +98,8 @@ def main(argv=None):
     ap.add_argument('--candidates', default=','.join(W3.ROUND3))
     ap.add_argument('--shippable', default='')
     ap.add_argument('--note', default='')
+    ap.add_argument('--lock', default='', help='planner ROUND3 LOCK model (recorded in the verdict, as in winner3)')
+    ap.add_argument('--lock-note', default='')
     a = ap.parse_args(argv)
     repo = E.REPO
     cands = [x for x in a.candidates.split(',') if x]
@@ -108,7 +110,7 @@ def main(argv=None):
     today = dt.datetime.now()
     rows = W3.evaluate(ev, models, names, set(x for x in a.shippable.split(',') if x), today, True)
     inc = next(c for c in rows if c['model'] == W3.INCUMBENT)
-    winner, vlines = W3.verdict(rows, inc, False)
+    winner, vlines = W3.verdict(rows, inc, False, dict(model=a.lock, note=a.lock_note) if a.lock else None)
     stamp = subprocess.run(['date', '+%a %b %d %H:%M:%S %Z %Y'], capture_output=True, text=True).stdout.strip()
     chain = ev.get(W3.REF, 0)
     inc_r = ev.get(W3.INCUMBENT, 0)
