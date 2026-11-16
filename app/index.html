@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b1220">
+<meta name="theme-color" content="#070c17" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f7fb" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="OxyDrop">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>OxyDrop: phone-camera oxygen-drop check</title>
 <meta name="description" content="Research prototype. Detects a drop in blood oxygen from your own baseline using only your phone camera. Not medical advice.">
 <link rel="manifest" href="manifest.webmanifest">
@@ -14,100 +16,277 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <!-- HOME -->
-  <section id="home" class="screen active">
+<a class="skip" href="#app">Skip to content</a>
+<div class="aurora" aria-hidden="true"></div>
+
+<main id="app" tabindex="-1">
+  <!-- ============================ HOME ============================ -->
+  <section id="home" class="screen active" aria-labelledby="home-title">
     <header class="hero">
-      <img src="icons/icon.svg" alt="" width="56" height="56">
-      <h1>OxyDrop</h1>
+      <span class="brandmark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="64" height="64" focusable="false">
+          <defs><linearGradient id="bm" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--brand-1)"/><stop offset="1" stop-color="var(--brand-2)"/>
+          </linearGradient></defs>
+          <path d="M32 5c9 11 15 19 15 27a15 15 0 0 1-30 0c0-8 6-16 15-27Z" fill="url(#bm)"/>
+          <path class="bm-trace" d="M18 38h6l3-7 4 14 4-9 2 2h9" fill="none" stroke="var(--brandmark-ink)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <h1 id="home-title">OxyDrop</h1>
       <p class="tag">Does your blood oxygen look lower than your own baseline? A phone-camera check, no extra hardware.</p>
+      <ul class="pills" role="list" aria-label="How this runs">
+        <li class="pill"><span class="pill-ico" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="14" height="14" focusable="false"><path d="M8 1.5 2.5 4v4.1c0 3.2 2.3 5.6 5.5 6.4 3.2-.8 5.5-3.2 5.5-6.4V4L8 1.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5.6 8.2 7.3 10l3.2-3.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>Runs on your phone</li>
+        <li class="pill"><span class="pill-ico" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="14" height="14" focusable="false"><path d="M2 8a6 6 0 0 1 12 0M2 8a6 6 0 0 0 12 0" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2v12M3 4.4h10M3 11.6h10" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+        </span>Video never uploaded</li>
+        <li class="pill"><span class="pill-ico" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="14" height="14" focusable="false"><path d="M8 3.2v9.6M4.4 6.8 8 3.2l3.6 3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 13.2h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </span>Works offline</li>
+      </ul>
     </header>
 
-    <div class="disclaimer" role="note">
-      <strong>This project is a prototype and is not medical advice.</strong>
+    <div class="callout danger" role="note">
+      <span class="callout-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" focusable="false"><path d="M12 3.2 1.8 20.8h20.4L12 3.2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9.2v5M12 17.6v.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </span>
+      <div class="callout-body">
+<strong>This project is a prototype and is not medical advice.</strong>
       <p>It is a research demo validated on only 6 people. It does not measure SpO₂, it is not a medical device, and it must never replace a pulse oximeter or a clinician. If you feel short of breath, confused, or unwell, get medical help now.</p>
+      </div>
     </div>
 
-    <div class="card">
-      <h2>What it does</h2>
-      <p>Rest for 60 seconds so it learns <em>your</em> normal. The first answer arrives at 70 seconds (the calibration plus the first 10-second window); after that, every 2 seconds, it shows one of three results: <b class="c-green">Normal vs your baseline</b>, <b class="c-red">Possible low oxygen: re-check with a pulse oximeter</b> (a drop toward SpO₂ below 90%), or <b class="c-amber">Unsure, re-measure</b>. It shows &ldquo;unsure&rdquo; and no heart-rate number whenever the signal is poor, you move, the camera stutters, or the pulse cannot be locked.</p>
+    <section class="card" aria-labelledby="wid-title">
+      <h2 id="wid-title">What it does</h2>
+<p>Rest for 60 seconds so it learns <em>your</em> normal. The first answer arrives at 70 seconds (the calibration plus the first 10-second window); after that, every 2 seconds, it shows one of three results: <b class="c-green">Normal vs your baseline</b>, <b class="c-red">Possible low oxygen: re-check with a pulse oximeter</b> (a drop toward SpO₂ below 90%), or <b class="c-amber">Unsure, re-measure</b>. It shows &ldquo;unsure&rdquo; and no heart-rate number whenever the signal is poor, you move, the camera stutters, or the pulse cannot be locked.</p>
       <ul class="facts">
         <li>Works only <b>seated at rest</b>. Exercise raises heart rate and causes false alarms.</li>
         <li>Detects a <b>drop from your own first minute</b>. It cannot tell if you are already low at the start.</li>
         <li>Validated on <b>only 6 people</b>, and it ties a much simpler logistic chain. It cannot follow a resting heart rate below about 51 bpm (it says &ldquo;unsure&rdquo;).</li>
         <li>Your camera video never leaves your phone. Everything runs in this page.</li>
       </ul>
+      <ul class="outcomes" role="list" aria-label="The three possible results">
+        <li class="outcome normal"><span class="outcome-ico" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" focusable="false"><path d="M4 10.6 8 14.5 16 5.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span><b>Normal</b><small>vs your baseline</small></li>
+        <li class="outcome low"><span class="outcome-ico" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" focusable="false"><path d="M10 3.5v11M5.4 10.2 10 14.8l4.6-4.6" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span><b>Possibly low</b><small>re-check with an oximeter</small></li>
+        <li class="outcome uns"><span class="outcome-ico" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" focusable="false"><path d="M7 7.3a3 3 0 1 1 3.6 3q-.6.2-.6.9v.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 16.2v.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </span><b>Can't tell</b><small>it says so instead of guessing</small></li>
+      </ul>
+    </section>
+
+    <label class="ack" for="ack">
+      <input type="checkbox" id="ack">
+      <span>I understand this is a research prototype, not medical advice.</span>
+    </label>
+
+    <div class="dock">
+      <button id="btn-live" class="btn primary" disabled>
+        <span class="btn-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" focusable="false"><rect x="2.4" y="6.2" width="19.2" height="13.6" rx="3.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="13" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.6 6.2 10 3.6h4l1.4 2.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+        Measure with my camera
+      </button>
+      <button id="btn-replay" class="btn ghost">
+        <span class="btn-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" focusable="false"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.4 16 12l-6 3.6V8.4Z" fill="currentColor"/></svg></span>
+        Watch a recorded demo (no camera)
+      </button>
+      <p class="fine" id="compat" role="status"></p>
     </div>
 
-    <label class="ack"><input type="checkbox" id="ack"> <span>I understand this is a research prototype, not medical advice.</span></label>
-    <div class="actions">
-      <button id="btn-live" class="primary" disabled>Measure with my camera</button>
-      <button id="btn-replay" class="secondary">Watch a recorded demo (no camera)</button>
-    </div>
-    <p class="fine" id="compat"></p>
-
-    <details class="card">
-      <summary>How it works</summary>
-      <!-- numbers in the next paragraph: results/photon/TABLE.csv (model distill2, rows level 0 and X1 against chain_v1), see results/photon/distill2_log.md; checked by scripts/check_claims.py check_app_text() -->
+    <details class="card disclosure">
+      <summary><span class="sum-text">How it works</span><span class="chev" aria-hidden="true"></span></summary>
+      <div class="disclosure-body">
+<!-- numbers in the next paragraph: results/photon/TABLE.csv (model distill2, rows level 0 and X1 against chain_v1), see results/photon/distill2_log.md; checked by scripts/check_claims.py check_app_text() -->
       <p>Default model (since build v3.6): PhotonDistill, a small trained neural network (39 inputs, two hidden layers of 32 or 64 units, three training seeds) that runs in this page. It reads 39 numbers per 10 s window computed from the average colour per frame, relative to <em>your</em> first minute (heart-rate and colour-ratio changes, signal quality, breathing), and gives three outputs: the probability of SpO&#8322; below 90%, an SpO&#8322; estimate (debug view only, not validated) and its own confidence. When its confidence is too low it says Unsure; otherwise a probability above 0.5 means Possible low oxygen. The page shows that output as it is. It was trained from two simple teacher models fitted on the same people. Held out on the 6 Hoffman people it scores a time-matched balanced accuracy of 0.784 (95% interval 0.596 to 0.834), a tie with the logistic chain (paired difference -0.012, interval -0.091 to 0.012), answering 69.0% of windows with 93.3% of those answers right. In a simulation of a phone whose flash sits farther from the lens (the hardest level, X1) it scores 0.682 against 0.508 for the chain, which was its purpose. Add <code>?engine=hybrid</code> to the address for the previous model described below.</p>
       <p>The previous model (<code>?engine=hybrid</code>) has three parts that all run in this page, with no server. (1) A physics chain: average colour per frame, a band-pass filter, beat detection (heart rate, variability, breathing, pulse strength), red/green/blue light-absorption ratios and the subtraction of <em>your</em> first-minute median, scored by two logistic regressions. (2) A small neural network (OxyNet, 167,588 parameters, three training seeds) that reads the same filtered signal together with the physics channels relative to your own first minute and learns a <em>correction</em> to the chain&rsquo;s score. (3) A meta-learner adds the two into one score and conformal thresholds turn it into Normal, Possible low oxygen or Unsure. The heart rate shown is the average of the network and a spectral estimate when they agree within 5 bpm, otherwise the network&rsquo;s. The quality checks (no pulse lock, movement, dropped frames, saturation) come first and are unchanged. The only data set with real SpO₂ below 90% and phone video that we found is UW Hoffman 2022 (6 people), so the low-oxygen part is trained on very little. Phone-camera low-oxygen detection is not new (Hoffman et al. 2022 and others); this is an on-device, personalised re-implementation, not a new sensing principle. Add <code>?engine=logistic</code> to the address to run the logistic chain alone (the baseline).</p>
       <p>Held-out results on those 6 people (each tested with models fitted on the other 5), for the exact previous model (the fixed residual hybrid): time-matched balanced accuracy is 0.809 (95% interval 0.644 to 0.863), against 0.796 (0.635 to 0.856) for the logistic chain alone. The 0.809 is optimistic, because this hybrid variant was picked after its scores on those same 6 people had been seen; the nested estimate for the whole selection procedure is 0.779 (0.638 to 0.831). A chain refit with the same tuning and no network scores 0.816, and at the default confidence level the chain alone answers 92.5% of windows at 90.3% accuracy, against 74.5% of windows at 89.5% accuracy for the hybrid. So the simpler chain has the higher point estimates and answers more windows. All the intervals overlap, so this is a tie and not a loss, and the network does not beat the chain at detecting low oxygen. At the default confidence level the hybrid answers 74.5% of windows, 89.5% of those answers are right, and 70.0% of the windows with low oxygen raise an alert; these confidence-level figures were also read off the hybrid variant chosen with those 6 people in view, so they are optimistic too.</p>
       <p>Heart rate is only an exploratory result. The hybrid heart-rate rule is within 5 bpm of the reference in 48.0% of windows on 100 people (BUT PPG and MTHS), against 41.9% for the spectral estimator. That rule was chosen after the pooled table had been seen, and the gain comes from BUT PPG (41.9% against 30.4%). On the Hoffman inner folds (pooled out-of-fold windows of the 6 Hoffman people that selected the rule, not an outer test result) the spectral estimator alone does better (88.3% against 82.6% for the rule), and on MTHS it is nominally better (63.3% against 59.4%). One person (resting heart rate 43 bpm) never locks, so every window for them is &ldquo;unsure&rdquo;. The app does not show an SpO₂ number: the network&rsquo;s SpO₂ output is only in the debug view, labelled experimental, because on a clinical contact sensor it ties the textbook ratio-of-ratios (mean error 2.94 against 3.07 points) and on phone data it shows no skill. Exercise falsely flags many windows.</p>
       <p>The app is built to work on any phone (it tests each lens, adapts exposure and checks signal quality), but it was trained on six people filmed with a few phones: untested Androids and other phones are a limitation. A generic weak-pulse guard answers &ldquo;unsure&rdquo; when the pulse is weaker than the weakest 0.1% of the training windows. Measured on two other studies&rsquo; phone videos it would refuse 6.7% (MTHS) and 8.8% (BUT PPG) of windows, against 0.1% of the training windows, so a phone with a weak flash will see more &ldquo;unsure&rdquo; answers; a refused window still shows a spectral heart rate. See the project page for the full audit.</p>
       <p><a id="repo" href="https://github.com/aravhawk/oxydrop" target="_blank" rel="noopener">Code, results and limitations on GitHub</a></p>
+      </div>
     </details>
+    <p class="fine foot">Prototype. Not medical advice. Not a medical device.</p>
   </section>
 
-  <!-- SETUP (live camera) -->
-  <section id="setup" class="screen">
-    <button class="back" data-go="home">← Back</button>
-    <h2>Set up your fingertip</h2>
-    <ol class="steps">
-      <li>Sit down and rest for 2 minutes. Rest the phone and your hand on a table. The first minute becomes your baseline, so only start if you feel well: the app cannot know whether your oxygen was already low at the start.</li>
+  <!-- ============================ SETUP ============================ -->
+  <section id="setup" class="screen" aria-labelledby="setup-title">
+    <div class="appbar">
+      <button class="btn-icon back" data-go="home">
+        <span aria-hidden="true"><svg viewBox="0 0 20 20" width="18" height="18" focusable="false"><path d="M11.6 4.6 6.2 10l5.4 5.4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        Back
+      </button>
+      <ol class="rail" role="list" aria-label="Steps">
+        <li class="rail-step on" aria-current="step"><span class="rail-n" aria-hidden="true">1</span><span class="sr-only">Step 1 of 3, Place, current.</span><span class="rail-t" aria-hidden="true">Place</span></li>
+        <li class="rail-step"><span class="rail-n" aria-hidden="true">2</span><span class="sr-only">Step 2 of 3, Calibrate, not started.</span><span class="rail-t" aria-hidden="true">Calibrate</span></li>
+        <li class="rail-step"><span class="rail-n" aria-hidden="true">3</span><span class="sr-only">Step 3 of 3, Result, not started.</span><span class="rail-t" aria-hidden="true">Result</span></li>
+      </ol>
+    </div>
+
+    <h1 id="setup-title" class="screen-h1">Place your fingertip</h1>
+    <p class="lede">One finger, flat across the camera bump, covering the lens <b>and</b> the flash. Light pressure, like resting it on a table.</p>
+
+    <figure class="guide">
+      <svg class="guide-svg" viewBox="0 0 220 200" role="img" aria-labelledby="guide-title guide-desc" focusable="false">
+        <title id="guide-title">How to hold your finger on the camera</title>
+        <desc id="guide-desc">The back of a phone with its camera bump at the top left. One fingertip lies flat across the bump so that it covers both the lens the app picks, marked one, and the flash below it, marked two. The flash glows red through the finger, which rests flat at point three.</desc>
+        <defs>
+          <radialGradient id="g-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stop-color="var(--guide-glow)" stop-opacity=".95"/>
+            <stop offset="1" stop-color="var(--guide-glow)" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="g-finger" x1="0" y1="0" x2="0.35" y2="1">
+            <stop offset="0" stop-color="var(--guide-finger-1)"/><stop offset="1" stop-color="var(--guide-finger-2)"/>
+          </linearGradient>
+        </defs>
+        <rect x="24" y="8" width="166" height="188" rx="30" fill="var(--guide-phone)" stroke="var(--guide-line)" stroke-width="2"/>
+        <rect x="44" y="26" width="96" height="96" rx="28" fill="var(--guide-plateau)" stroke="var(--guide-line)" stroke-width="2"/>
+        <circle cx="74" cy="56" r="16" fill="var(--guide-lens)" stroke="var(--guide-line)" stroke-width="2"/>
+        <circle cx="74" cy="56" r="6.5" fill="var(--guide-lens-in)"/>
+        <circle cx="74" cy="96" r="16" fill="var(--guide-lens)" stroke="var(--guide-line)" stroke-width="2"/>
+        <circle cx="74" cy="96" r="6.5" fill="var(--guide-lens-in)"/>
+        <circle cx="114" cy="56" r="16" fill="var(--guide-lens)" stroke="var(--guide-line)" stroke-width="2"/>
+        <circle cx="114" cy="56" r="6.5" fill="var(--guide-lens-in)"/>
+        <circle cx="114" cy="96" r="10" fill="var(--guide-flash)" stroke="var(--guide-line)" stroke-width="1.5"/>
+        <circle class="guide-pulse" cx="114" cy="78" r="60" fill="url(#g-glow)"/>
+        <!-- the finger is translucent on purpose: the lens and the flash it has to cover must stay visible -->
+        <rect class="guide-finger" x="88" y="12" width="52" height="188" rx="26" transform="rotate(-30 114 78)" fill="url(#g-finger)" stroke="var(--guide-line)" stroke-width="2"/>
+        <path class="guide-nail" d="M98 33c-8 6-11 15-10 24" fill="none" stroke="var(--guide-nail)" stroke-width="3.5" stroke-linecap="round"/>
+        <g class="guide-target">
+          <circle cx="114" cy="56" r="17.5"/>
+          <circle cx="114" cy="96" r="12"/>
+        </g>
+        <g class="guide-pin">
+          <circle cx="150" cy="36" r="13"/><text x="150" y="41" text-anchor="middle">1</text>
+          <circle cx="78" cy="132" r="13"/><text x="78" y="137" text-anchor="middle">2</text>
+          <circle cx="170" cy="162" r="13"/><text x="170" y="167" text-anchor="middle">3</text>
+        </g>
+        <g class="guide-lead">
+          <path d="M139 44 L126 50"/>
+          <path d="M89 126 L104 104"/>
+        </g>
+      </svg>
+      <ol class="guide-key" role="list">
+        <li><span class="guide-n" aria-hidden="true">1</span><span><b>Lens</b> the app picks the best one</span></li>
+        <li><span class="guide-n" aria-hidden="true">2</span><span><b>Flash</b> cover it with the same finger</span></li>
+        <li><span class="guide-n" aria-hidden="true">3</span><span><b>Light pressure</b> flat pad, do not press hard</span></li>
+      </ol>
+      <figcaption>If your flash sits a couple of centimetres from the lens, a flat finger over both still works: the glow is weaker but usable.</figcaption>
+    </figure>
+
+    <ol class="steps" role="list">
+<li>Sit down and rest for 2 minutes. Rest the phone and your hand on a table. The first minute becomes your baseline, so only start if you feel well: the app cannot know whether your oxygen was already low at the start.</li>
       <li>Lay your fingertip <b>flat across the whole camera plateau</b>, covering the <b>lens the app picks</b> and, if you can, the <b>flash</b> under the same finger. Light pressure, do not press hard. Phones differ: on newer iPhone Pro models the flash is 2-3 cm from the main lens, so a flat finger over both gives a weaker but usable glow.</li>
       <li>Keep still. Don&rsquo;t talk. Keep the screen on. After you tap the button the app tests every camera for about 3 seconds each and picks the one with the strongest pulse. If no back lens works it switches to the front camera with a white screen.</li>
     </ol>
-    <div class="status-line"><span id="cam-state">Camera off</span></div>
-    <button id="btn-cam" class="primary">Turn on camera</button>
-    <div id="probe" class="probe" hidden><b id="probe-text">Testing lenses…</b><pre id="probe-scores" class="dbg"></pre></div>
-    <div id="setup-live" hidden>
-      <div class="mode" role="radiogroup" aria-label="Light source">
-        <label><input type="radio" name="light" value="flash" checked> <span>Flash on <small>(recommended)</small></span></label>
-        <label><input type="radio" name="light" value="ambient"> <span>Ambient light <small>(no flash: face a lamp or window)</small></span></label>
-        <label><input type="radio" name="light" value="front"> <span>Front camera + white screen <small>(cover the front camera; the screen is the light)</small></span></label>
-      </div>
-      <label class="lens">Camera lens
-        <select id="lens" aria-label="Camera lens"></select>
-      </label>
-      <p class="fine" id="lens-help">The app picks the lens with the strongest pulse. You can override it here.</p>
-      <div class="ringrow"><div id="ring" class="ring" aria-hidden="true"></div><div><b id="ring-name">Camera: –</b><span id="ring-msg" class="fine">Live preview: ring is red and bright when the finger covers this lens.</span></div></div>
-      <div id="place" class="place warn"><b id="place-title">Looking for your fingertip…</b><span id="place-msg"></span></div>
-      <div class="meter"><div class="meter-fill" id="q-fill"></div></div>
-      <p id="q-text" class="fine">Signal quality</p>
-      <canvas id="wave-setup" class="wave" width="600" height="120" aria-label="Pulse waveform"></canvas>
-      <ul class="checks" id="checks"></ul>
-      <button id="btn-begin" class="primary" disabled>Start 60-second calibration</button>
-      <button id="btn-begin-anyway" class="link" hidden>Start anyway (readings will likely be &ldquo;unsure&rdquo;)</button>
+
+    <div class="statusline" role="status"><span class="dot" aria-hidden="true"></span><span id="cam-state">Camera off</span></div>
+
+    <div id="probe" class="probe" hidden>
+      <div class="probe-head"><span class="spinner" aria-hidden="true"></span><b id="probe-text">Testing lenses…</b></div>
+      <details class="probe-more"><summary>Per-lens scores</summary><pre id="probe-scores" class="dbg"></pre></details>
     </div>
-    <details class="card debug" id="debug-setup"><summary>Debug view (for troubleshooting)</summary><pre id="dbg-setup" class="dbg"></pre><canvas id="raw-setup" class="wave small" width="600" height="100"></canvas>
-      <div class="row"><button class="secondary" data-dl>Download raw trace (CSV)</button><button class="secondary" data-copy>Copy debug summary</button></div></details>
+
+    <div id="setup-live" hidden>
+      <div class="card">
+        <h2 class="card-h" id="light-h">Light source</h2>
+        <div class="mode" role="radiogroup" aria-labelledby="light-h">
+          <label class="opt"><input type="radio" name="light" value="flash" checked> <span class="opt-body"><b>Flash on</b> <small>(recommended)</small></span></label>
+          <label class="opt"><input type="radio" name="light" value="ambient"> <span class="opt-body"><b>Ambient light</b> <small>(no flash: face a lamp or window)</small></span></label>
+          <label class="opt"><input type="radio" name="light" value="front"> <span class="opt-body"><b>Front camera + white screen</b> <small>(cover the front camera; the screen is the light)</small></span></label>
+        </div>
+        <label class="lens" for="lens">Camera lens
+          <select id="lens" aria-label="Camera lens" aria-describedby="lens-help"></select>
+        </label>
+        <p class="fine" id="lens-help">The app picks the lens with the strongest pulse. You can override it here.</p>
+      </div>
+
+      <div class="ringrow">
+        <div id="ring" class="ring" aria-hidden="true"></div>
+        <div class="ringtext"><b id="ring-name">Camera: –</b><span id="ring-msg" class="fine">Live preview: ring is red and bright when the finger covers this lens.</span></div>
+      </div>
+
+      <div id="place" class="place warn">
+        <span class="place-ico" aria-hidden="true"></span>
+        <span class="place-body"><b id="place-title">Looking for your fingertip…</b><span id="place-msg"></span></span>
+      </div>
+      <span id="place-announce" class="sr-only" role="status" aria-live="polite"></span>
+
+      <div class="qual">
+        <div class="qual-head"><span>Signal quality</span></div>
+        <div class="meter" aria-hidden="true"><div class="meter-fill" id="q-fill"></div></div>
+        <p id="q-text" class="fine">Signal quality</p>
+        <canvas id="wave-setup" class="wave" width="600" height="120" role="img" aria-label="Pulse waveform"></canvas>
+      </div>
+
+      <details class="card disclosure">
+        <summary><span class="sum-text">Device checks</span><span class="chev" aria-hidden="true"></span></summary>
+        <ul class="checks" id="checks" role="list"></ul>
+      </details>
+
+    </div>
+
+    <details class="card disclosure debug" id="debug-setup">
+      <summary><span class="sum-text">Debug view (for troubleshooting)</span><span class="chev" aria-hidden="true"></span></summary>
+      <pre id="dbg-setup" class="dbg"></pre>
+      <canvas id="raw-setup" class="wave small" width="600" height="100" aria-hidden="true"></canvas>
+      <div class="row"><button class="btn small" data-dl>Download raw trace (CSV)</button><button class="btn small" data-copy>Copy debug summary</button></div>
+    </details>
+
+    <div class="dock dock-begin">
+      <button id="btn-begin" class="btn primary" disabled>Start 60-second calibration</button>
+      <button id="btn-begin-anyway" class="btn link" hidden>Start anyway (readings will likely be &ldquo;unsure&rdquo;)</button>
+    </div>
+
+    <div class="dock dock-cam">
+      <button id="btn-cam" class="btn primary">Turn on camera</button>
+    </div>
   </section>
 
-  <!-- MEASURE -->
-  <section id="measure" class="screen">
-    <div class="topbar">
-      <span id="phase">Calibrating</span>
-      <span id="clock" class="mono">0:00</span>
+  <!-- ============================ MEASURE ============================ -->
+  <section id="measure" class="screen" data-phase="cal" data-state="calibrating" aria-labelledby="measure-title">
+    <h1 id="measure-title" class="sr-only">Measurement</h1>
+    <div class="appbar">
+      <ol class="rail" role="list" aria-label="Steps">
+        <li class="rail-step done"><span class="rail-n" aria-hidden="true">1</span><span class="sr-only">Step 1 of 3, Place, done.</span><span class="rail-t" aria-hidden="true">Place</span></li>
+        <li class="rail-step on" id="rail-cal" aria-current="step"><span class="rail-n" aria-hidden="true">2</span><span class="sr-only" id="rail-cal-sr">Step 2 of 3, Calibrate, current.</span><span class="rail-t" aria-hidden="true">Calibrate</span></li>
+        <li class="rail-step" id="rail-res"><span class="rail-n" aria-hidden="true">3</span><span class="sr-only" id="rail-res-sr">Step 3 of 3, Result, not started.</span><span class="rail-t" aria-hidden="true">Result</span></li>
+      </ol>
+      <div class="appbar-end"><span id="phase" class="chip">Calibrating</span><span id="clock" class="mono clock">0:00</span></div>
     </div>
-    <div id="replay-note" class="replay-note" hidden></div>
-    <div id="status" class="status-card calibrating" aria-live="polite">
-      <div class="status-icon" id="status-icon">◔</div>
-      <div class="status-main" id="status-main">Calibrating</div>
-      <div class="status-sub" id="status-sub">Rest, keep still. Learning your normal.</div>
+
+    <div id="replay-note" class="callout info" hidden></div>
+
+    <div class="calpanel">
+      <div class="dial" id="dial" aria-hidden="true">
+        <svg viewBox="0 0 120 120" width="120" height="120" focusable="false">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="var(--track)" stroke-width="10"/>
+          <circle id="dial-arc" cx="60" cy="60" r="52" fill="none" stroke="var(--brand-1)" stroke-width="10" stroke-linecap="round"
+                  stroke-dasharray="326.7" stroke-dashoffset="326.7" transform="rotate(-90 60 60)"/>
+        </svg>
+        <span class="dial-val"><b id="dial-pct" class="mono">0%</b></span>
+      </div>
+      <div class="calpanel-text">
+        <h2 class="cal-h">Learning your normal</h2>
+        <p id="dial-a11y" class="cal-p"><span id="dial-sub">Rest for about 60 seconds.</span> Keep the finger flat and still, don't talk, keep the screen on.</p>
+      </div>
     </div>
     <div class="progress" id="cal-progress"><div id="cal-fill"></div></div>
+
+    <div id="status" class="status-card calibrating">
+      <span class="status-badge" aria-hidden="true"><span class="status-icon" id="status-icon">◔</span></span>
+      <span class="status-body">
+        <span class="status-kicker" id="status-kicker">Measuring, no answer yet</span>
+        <span class="status-live">
+          <span class="status-main" id="status-main">Calibrating</span>
+          <span class="status-sub" id="status-sub">Rest, keep still. Learning your normal.</span>
+        </span>
+      </span>
+    </div>
+    <span id="status-announce" class="sr-only" role="status" aria-live="polite"></span>
     <p class="fine engine-note" id="engine-note" role="status" hidden></p>
-    <p class="fine" id="baseline-note">Oxygen status at start unknown: every answer compares you with your own first minute, so it cannot tell whether you were already low when you began.</p>
 
     <div class="grid">
       <div class="tile"><span class="k">Heart rate</span><span class="v" id="hr">–</span><span class="u">bpm</span></div>
@@ -117,24 +296,94 @@
     </div>
     <div class="tile wide" id="ref-tile" hidden><span class="k">Study reference oximeter (replay only)</span><span class="v" id="ref">–</span><span class="u">SpO₂ %</span></div>
 
-    <canvas id="wave" class="wave" width="600" height="120" aria-label="Pulse waveform"></canvas>
-    <div class="strip-label">Last decisions <span class="legend"><i class="d-normal"></i>normal <i class="d-hyp"></i>possible low oxygen <i class="d-uns"></i>unsure <i class="d-pause"></i>unsure (moving)</span></div>
-    <div id="strip" class="strip" aria-hidden="true"></div>
-    <p class="fine" id="tally"></p>
-
-    <div class="actions">
-      <button id="btn-stop" class="secondary">Stop</button>
-      <button id="btn-restart" class="secondary" hidden>Restart calibration</button>
+    <div class="next" id="next">
+      <div class="next-card normal" data-for="normal">
+        <h2 class="next-h"><span class="next-ico" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" focusable="false"><path d="M4 10.6 8 14.5 16 5.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>What to do next</h2>
+        <ul>
+          <li>Nothing to act on from this reading. Keep resting if you want more windows.</li>
+          <li>This is not an SpO₂ number and it cannot rule low oxygen out. It only says this window does not look like a drop from your own first minute.</li>
+          <li>If you feel short of breath, confused or unwell, get medical help now whatever this screen says.</li>
+        </ul>
+      </div>
+      <div class="next-card hyp" data-for="hyp">
+        <h2 class="next-h"><span class="next-ico" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" focusable="false"><path d="M10 3.5v11M5.4 10.2 10 14.8l4.6-4.6" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>What to do next</h2>
+        <ul>
+          <li><b>Re-check with a real pulse oximeter.</b> This prototype cannot diagnose anything and is wrong often enough that it must never be the last word.</li>
+          <li>If you feel short of breath, confused or unwell, <b>get medical help now</b>. Do not wait for another reading.</li>
+          <li>If you feel fine, stay seated and let it take a few more windows before you read anything into one of them.</li>
+        </ul>
+      </div>
+      <div class="next-card uns" data-for="uns">
+        <h2 class="next-h"><span class="next-ico" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" focusable="false"><path d="M7 7.3a3 3 0 1 1 3.6 3q-.6.2-.6.9v.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 16.2v.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </span>Why it won't answer</h2>
+        <p class="next-lede">&ldquo;Unsure&rdquo; is a real answer, not a failure. The model only commits when it clears its own confidence level, so a window it is not sure about is reported as unsure instead of guessed.</p>
+        <ul>
+          <li>Fix what the line above asks for, then wait: a new reading arrives every 2 seconds.</li>
+          <li>Most common causes: the finger is not covering both the lens and the flash, pressing too hard, movement, or a pulse this version cannot follow.</li>
+          <li>No heart rate is shown while the signal is bad, on purpose.</li>
+        </ul>
+      </div>
+      <div class="next-card fail" data-for="fail">
+        <h2 class="next-h"><span class="next-ico" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" focusable="false"><path d="M10 2.6 1.6 17.4h16.8L10 2.6Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M10 8v4M10 14.6v.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>What to do next</h2>
+        <ul>
+          <li>The baseline minute did not pass its checks, so no result can be trusted from it.</li>
+          <li>Rest for a couple of minutes, re-seat your finger over the lens and the flash, then tap <b>Restart calibration</b>.</li>
+        </ul>
+      </div>
     </div>
-    <details class="card debug" id="debug-measure"><summary>Debug view (for troubleshooting)</summary><pre id="dbg-measure" class="dbg"></pre><canvas id="raw-measure" class="wave small" width="600" height="100"></canvas>
-      <div class="row"><button class="secondary" data-dl>Download raw trace (CSV)</button><button class="secondary" data-copy>Copy debug summary</button></div></details>
+
+    <div class="card conf">
+      <h2 class="card-h">How confident is this?</h2>
+      <p class="conf-line"><b id="conf-level">Answers are held to a fixed confidence level.</b></p>
+      <p class="fine">The model scores every 10-second window and compares that score with thresholds fixed in advance on held-out data. When one window is not clearly on either side of them, the app says <b>Unsure, re-measure</b> instead of picking the more likely answer. Signal quality, movement and frame drops are checked before the model is consulted at all.</p>
+      <p class="fine" id="baseline-note">Oxygen status at start unknown: every answer compares you with your own first minute, so it cannot tell whether you were already low when you began.</p>
+    </div>
+
+    <details class="card disclosure">
+      <summary><span class="sum-text">Signal and recent readings</span><span class="chev" aria-hidden="true"></span></summary>
+      <canvas id="wave" class="wave" width="600" height="120" role="img" aria-label="Pulse waveform"></canvas>
+      <div class="strip-label"><span>Last decisions</span></div>
+      <ul class="legend" role="list" aria-label="Key to the decision bars">
+        <li><i class="d-normal" aria-hidden="true"></i>normal</li>
+        <li><i class="d-hyp" aria-hidden="true"></i>possible low oxygen</li>
+        <li><i class="d-uns" aria-hidden="true"></i>unsure</li>
+        <li><i class="d-pause" aria-hidden="true"></i>unsure (moving)</li>
+      </ul>
+      <div id="strip" class="strip" aria-hidden="true"></div>
+      <p class="fine" id="tally"></p>
+    </details>
+
+    <details class="card disclosure debug" id="debug-measure">
+      <summary><span class="sum-text">Debug view (for troubleshooting)</span><span class="chev" aria-hidden="true"></span></summary>
+      <pre id="dbg-measure" class="dbg"></pre>
+      <canvas id="raw-measure" class="wave small" width="600" height="100" aria-hidden="true"></canvas>
+      <div class="row"><button class="btn small" data-dl>Download raw trace (CSV)</button><button class="btn small" data-copy>Copy debug summary</button></div>
+    </details>
+
     <p class="fine foot">Prototype. Not medical advice. Not a medical device.</p>
+
+    <div class="dock dock-bottom">
+      <button id="btn-stop" class="btn ghost">Stop</button>
+      <button id="btn-restart" class="btn primary" hidden>Restart calibration</button>
+    </div>
   </section>
 </main>
-<div id="white" class="white" hidden>
+
+<div id="white" class="white" role="dialog" aria-modal="true" aria-label="Front camera mode" tabindex="-1" hidden>
   <div class="white-top">Front camera mode. Cover the <b>front camera</b> (top of the screen, near the speaker) with your fingertip, light pressure. Turn the screen brightness to maximum.</div>
-  <div class="white-bar"><b id="wm-title"></b><span id="wm-msg"></span><div class="row"><button id="wm-begin" class="primary" hidden>Start 60-second calibration</button><button id="wm-stop" class="secondary">Stop</button></div></div>
+  <div class="white-bar">
+    <b id="wm-title"></b><span id="wm-msg"></span>
+    <div class="row"><button id="wm-begin" class="btn primary" hidden>Start 60-second calibration</button><button id="wm-stop" class="btn ghost">Stop</button></div>
+  </div>
 </div>
+<script type="module" src="js/ui.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

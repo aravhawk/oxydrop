@@ -193,7 +193,7 @@ function engineLine() {
 }
 function debugText() {
   const L = []; const st = cam ? cam.stats : null;
-  L.push('capture build oxydrop-v3.6-photon-distill2');
+  L.push('capture build oxydrop-v3.6.1-photon-distill2');
   L.push(`mode ${mode || '-'} / ${kind || '-'}   samples ${rawN}   t ${(rawN / FS).toFixed(1)} s`);
   L.push(engineLine());
   if (cam && st) {

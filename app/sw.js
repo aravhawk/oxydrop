@@ -1,8 +1,8 @@
-const V = 'oxydrop-v3.6-photon-distill2';
+const V = 'oxydrop-v3.6.1-photon-distill2';
 // everything the engines need offline: the page, the engines (the default engine slot with the PhotonDistill student and its feature front end, the hybrid
 // with its CNN worker and three CNN seed files behind ?engine=hybrid, the logistic chain), the model / physics-chain / meta / conformal parameters and the replay demo
 const ASSETS = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon.svg',
-  'js/app.js', 'js/decision.js', 'js/camera.js', 'js/resample.js', 'js/engine.js', 'js/engine_v1.js', 'js/hr.js', 'js/lensprobe.js', 'js/photon_engine.js', 'js/distill_engine.js', 'js/distill_features.js', 'js/nn_runtime.js',
+  'js/app.js', 'js/ui.js', 'js/decision.js', 'js/camera.js', 'js/resample.js', 'js/engine.js', 'js/engine_v1.js', 'js/hr.js', 'js/lensprobe.js', 'js/photon_engine.js', 'js/distill_engine.js', 'js/distill_features.js', 'js/nn_runtime.js',
   'js/hybrid_engine.js', 'js/hybrid_async.js', 'js/hybrid_worker.js', 'js/cnn.js', 'js/cnn_features.js',
   'data/weights.json', 'data/distill.json', 'data/hybrid_weights.json', 'data/conformal.json', 'data/hybrid_R_s0.json', 'data/hybrid_R_s1.json', 'data/hybrid_R_s2.json',
   'data/replay/100001L.json', 'data/replay/100001L.bin', 'data/replay/100004R.json', 'data/replay/100004R.bin'];
