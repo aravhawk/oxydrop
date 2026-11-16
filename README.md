@@ -5,7 +5,7 @@
 
 OxyDrop checks, with a phone camera, whether your blood oxygen has dropped from your own baseline. It needs no extra hardware and no install, and no video leaves the phone. OxyDrop is a research prototype, not a medical device.
 
-**Code:** [github.com/aravhawk/oxydrop](https://github.com/aravhawk/oxydrop) · **Video figures:** [docs/video/](docs/video/) · **Long write-up:** [WHITEPAPER.md](WHITEPAPER.md) ([PDF](WHITEPAPER.pdf)) · **Model card:** [MODEL.md](MODEL.md)
+**Code:** [github.com/aravhawk/oxydrop](https://github.com/aravhawk/oxydrop) · **Video figures:** [docs/video/](docs/video/) · **Paper:** [paper/OxyDrop_paper.pdf](paper/OxyDrop_paper.pdf) · **Model card:** [MODEL.md](MODEL.md)
 
 ## One-page write-up
 
@@ -121,7 +121,7 @@ The evaluation protocol was **pre-registered** (commit `3e708fe`, [PREREGISTRATI
 
 **P3 (pre-registered): absolute SpO2 on MTHS, MAE.** CNN 1.457 against 1.354 for predicting the training mean: no skill. MTHS is normoxic, so SpO2 is not headlined and not shown to users.
 
-What the experiments say about the network: **the OpenOximetry warm-up is the main source of its skill** (P1 0.739 with it, 0.577 without); a device-agnostic-augmentation benefit is **not supported**; physics channels change nothing measurable; test-time BatchNorm adaptation hurts. Every lever, kept or dropped, is in the ledger in [MODEL.md](MODEL.md) and [WHITEPAPER.md](WHITEPAPER.md).
+What the experiments say about the network: **the OpenOximetry warm-up is the main source of its skill** (P1 0.739 with it, 0.577 without); a device-agnostic-augmentation benefit is **not supported**; physics channels change nothing measurable; test-time BatchNorm adaptation hurts. Every lever, kept or dropped, is in the ledger in [MODEL.md](MODEL.md) and the [paper](paper/OxyDrop_paper.pdf).
 
 **Conformal three-state output (secondary, exploratory).** For the **deployed pipeline R** (the model the app runs; nested over people, thresholds from the five other people only) the declared level alpha = 0.10 gives 74.5% answered windows at 89.5% accuracy, 70.0% of all hypoxic windows alerted and 8.7% called Normal (target 10%). These rows are optimistic, because R was chosen with all six people in view; the nested per-person-selected hybrid gives 79.1%, 87.0% and 70.1%. **The chain-only control has the higher point estimates**: 92.5% answered at 90.3% accuracy, 84.3% alerted. At the coverage of the v1 band (84.4%) the deployed pipeline scores 88.0% against 93.9% (-5.9 [-17.1, +2.3] points, a tie by interval, not a win) and the chain control 92.0%. The coverage guarantee holds roughly pooled and fails per person (person 1: 51.3% of hypoxic windows called Normal).
 

@@ -5,7 +5,7 @@
 
 OxyDrop checks, with a phone camera, whether your blood oxygen has dropped from your own baseline. It needs no extra hardware and no install, and no video leaves the phone. OxyDrop is a research prototype, not a medical device.
 
-**Code:** [github.com/aravhawk/oxydrop](https://github.com/aravhawk/oxydrop) · **Video figures:** [docs/video/](docs/video/) · **Long write-up:** [WHITEPAPER.md](WHITEPAPER.md) ([PDF](WHITEPAPER.pdf)) · **Model card:** [MODEL.md](MODEL.md)
+**Code:** [github.com/aravhawk/oxydrop](https://github.com/aravhawk/oxydrop) · **Video figures:** [docs/video/](docs/video/) · **Paper:** [paper/OxyDrop_paper.pdf](paper/OxyDrop_paper.pdf) · **Model card:** [MODEL.md](MODEL.md)
 
 ## One-page write-up
 
@@ -107,7 +107,7 @@ The evaluation protocol was **pre-registered** (commit `{{v:prereg_commit}}`, [P
 
 **P3 (pre-registered): absolute SpO2 on MTHS, MAE.** CNN {{ab:full/p23:p3_mae}} against {{b3:train_mean:mae}} for predicting the training mean: no skill. MTHS is normoxic, so SpO2 is not headlined and not shown to users.
 
-What the experiments say about the network: **the OpenOximetry warm-up is the main source of its skill** (P1 {{ab:full/p23:p1_tm_bacc}} with it, {{ab:no_openox/p23k:p1_tm_bacc}} without); a device-agnostic-augmentation benefit is **not supported**; physics channels change nothing measurable; test-time BatchNorm adaptation hurts. Every lever, kept or dropped, is in the ledger in [MODEL.md](MODEL.md) and [WHITEPAPER.md](WHITEPAPER.md).
+What the experiments say about the network: **the OpenOximetry warm-up is the main source of its skill** (P1 {{ab:full/p23:p1_tm_bacc}} with it, {{ab:no_openox/p23k:p1_tm_bacc}} without); a device-agnostic-augmentation benefit is **not supported**; physics channels change nothing measurable; test-time BatchNorm adaptation hurts. Every lever, kept or dropped, is in the ledger in [MODEL.md](MODEL.md) and the [paper](paper/OxyDrop_paper.pdf).
 
 **Conformal three-state output (secondary, exploratory).** For the **deployed pipeline R** (the model the app runs; nested over people, thresholds from the five other people only) the declared level alpha = 0.10 gives {{cf:deployed_R/0.1:coverage|pct}} answered windows at {{cf:deployed_R/0.1:acc|pct}} accuracy, {{cf:deployed_R/0.1:alert_share_all|pct}} of all hypoxic windows alerted and {{cf:deployed_R/0.1:confident_miss|pct}} called Normal (target 10%). These rows are optimistic, because R was chosen with all six people in view; the nested per-person-selected hybrid gives {{cf:final/0.1:coverage|pct}}, {{cf:final/0.1:acc|pct}} and {{cf:final/0.1:alert_share_all|pct}}. **The chain-only control has the higher point estimates**: {{cf:chain_v1/0.1:coverage|pct}} answered at {{cf:chain_v1/0.1:acc|pct}} accuracy, {{cf:chain_v1/0.1:alert_share_all|pct}} alerted. At the coverage of the v1 band ({{v:v1_cov}}) the deployed pipeline scores {{cm:deployed_R/v1/conformal_mondrian:acc|pct}} against {{cm:deployed_R/v1/conformal_mondrian:reference_acc|pct}} ({{cm:deployed_R/v1/conformal_mondrian|d}} points, a tie by interval, not a win) and the chain control {{cm:chain_v1/v1/conformal_mondrian:acc|pct}}. The coverage guarantee holds roughly pooled and fails per person (person 1: {{cpp:deployed_R/0.1/hof_100001:confident_miss|pct}} of hypoxic windows called Normal).
 

@@ -2,8 +2,8 @@
 # OxyDrop: a phone-camera check for a drop in blood oxygen
 
 **Track:** Health
-**Team:** Arav Jain, [TEAMMATE 2 NAME], [TEAMMATE 3 NAME]  *(Arav: fill in or delete before submitting; see CHECKLIST.md)*
-**Paper:** [paper/OxyDrop_paper.pdf](https://github.com/aravhawk/oxydrop/blob/main/paper/OxyDrop_paper.pdf) · **Live app:** https://aravhawk.github.io/oxydrop/ · **Code:** https://github.com/aravhawk/oxydrop · **Video figures:** [docs/video/](video/) · **Long write-up:** [WHITEPAPER.md](../WHITEPAPER.md) · **Model card:** [MODEL.md](../MODEL.md)
+**Team:** Aarush Divakarla, Arav Jain, Heram Nagabhairu
+**Paper:** [paper/OxyDrop_paper.pdf](https://github.com/aravhawk/oxydrop/blob/main/paper/OxyDrop_paper.pdf) · **Live app:** https://aravhawk.github.io/oxydrop/ · **Code:** https://github.com/aravhawk/oxydrop · **Video figures:** [docs/video/](video/) · **Model card:** [MODEL.md](../MODEL.md)
 
 > **OxyDrop is a research prototype, not a medical device. This project is a prototype and is not medical advice.**
 

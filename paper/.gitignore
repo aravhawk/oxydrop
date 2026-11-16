@@ -1,3 +1,15 @@
 build/
 __pycache__/
 *.log
+*.aux
+*.out
+*.bbl
+*.blg
+*.synctex*
+*.fdb_latexmk
+*.fls
+*.toc
+# only OxyDrop_paper.pdf is tracked
+*.pdf
+!OxyDrop_paper.pdf
+*.tar.gz
