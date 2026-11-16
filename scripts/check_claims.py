@@ -321,6 +321,7 @@ ALLOW_DECIMALS = {
     '0.10',          # declared conformal miscoverage level alpha (Amendment 5, before any result)
     '11.6',          # million multiply-adds per window (python/oxydrop_ml/MODEL_SPEC.md, measured by model.py)
     '0.55',          # null-control ceiling of the round-2 rule (ROUND2.md rule 5, stated before any round-2 score)
+    '5.5',           # Claude Opus 5.5 / Sonnet 5.5 model versions (Credits sections of README and WRITEUP)
     '0.02',          # g2 margin of the round-3 replacement rule (ROUND3.md, stated 19:55 CT before any round-3 score)
 }
 TOKEN = re.compile(r'\{\{[^{}]+\}\}')
