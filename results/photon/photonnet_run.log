@@ -1,0 +1,59 @@
+    photonnet: 12/108 fits, 82 s
+    photonnet: 24/108 fits, 166 s
+    photonnet: 36/108 fits, 258 s
+    photonnet: 48/108 fits, 342 s
+    photonnet: 60/108 fits, 605 s
+    photonnet: 72/108 fits, 710 s
+    photonnet: 84/108 fits, 896 s
+    photonnet: 96/108 fits, 976 s
+    photonnet: 108/108 fits, 1054 s
+  photonnet: 108 fits in 1054 s
+photonnet: 0: TM 0.668 cov 0.35, 1: TM 0.678 cov 0.37, 2: TM 0.677 cov 0.37, 3: TM 0.689 cov 0.33, 4: TM 0.703 cov 0.32, 5: TM 0.720 cov 0.16, X1: TM 0.672 cov 0.34
+  seeds L0: 0.658, 0.669, 0.665
+main done in 1055 s
+    photonnet_null_d0: 12/36 fits, 38 s
+    photonnet_null_d0: 24/36 fits, 70 s
+    photonnet_null_d0: 36/36 fits, 103 s
+  photonnet_null_d0: 36 fits in 103 s
+photonnet_null draw 0: TM 0.614
+    photonnet_null_d1: 12/36 fits, 33 s
+    photonnet_null_d1: 24/36 fits, 66 s
+    photonnet_null_d1: 36/36 fits, 98 s
+  photonnet_null_d1: 36 fits in 98 s
+photonnet_null draw 1: TM 0.617
+    photonnet_null_d2: 12/36 fits, 33 s
+    photonnet_null_d2: 24/36 fits, 65 s
+    photonnet_null_d2: 36/36 fits, 97 s
+  photonnet_null_d2: 36 fits in 97 s
+photonnet_null draw 2: TM 0.624
+photonnet_null mean over 3 draws: 0.618
+null done in 298 s
+    photonnet_nophys: 12/108 fits, 12 s
+    photonnet_nophys: 24/108 fits, 22 s
+    photonnet_nophys: 36/108 fits, 32 s
+    photonnet_nophys: 48/108 fits, 42 s
+    photonnet_nophys: 60/108 fits, 53 s
+    photonnet_nophys: 72/108 fits, 63 s
+    photonnet_nophys: 84/108 fits, 74 s
+    photonnet_nophys: 96/108 fits, 84 s
+    photonnet_nophys: 108/108 fits, 94 s
+  photonnet_nophys: 108 fits in 94 s
+photonnet_nophys: 0: TM 0.642, 1: TM 0.650, 2: TM 0.648, 3: TM 0.650, 4: TM 0.657, 5: TM 0.662, X1: TM 0.663
+nophys done in 95 s
+    photonnet_nophys_null_d0: 12/36 fits, 23 s
+    photonnet_nophys_null_d0: 24/36 fits, 37 s
+    photonnet_nophys_null_d0: 36/36 fits, 51 s
+  photonnet_nophys_null_d0: 36 fits in 51 s
+photonnet_nophys_null draw 0: TM 0.510
+    photonnet_nophys_null_d1: 12/36 fits, 16 s
+    photonnet_nophys_null_d1: 24/36 fits, 31 s
+    photonnet_nophys_null_d1: 36/36 fits, 45 s
+  photonnet_nophys_null_d1: 36 fits in 45 s
+photonnet_nophys_null draw 1: TM 0.500
+    photonnet_nophys_null_d2: 12/36 fits, 16 s
+    photonnet_nophys_null_d2: 24/36 fits, 30 s
+    photonnet_nophys_null_d2: 36/36 fits, 44 s
+  photonnet_nophys_null_d2: 36 fits in 44 s
+photonnet_nophys_null draw 2: TM 0.473
+photonnet_nophys_null mean over 3 draws: 0.494
+null_nophys done in 141 s

@@ -1,6 +1,6 @@
 # Wiring a new engine (photon_engine.js) into the app: recon notes
 
-Written Sun Nov 15 2026, 17:05 CST, from a read of the tree on branch `ml/photon-twin` (base `cdbcbf3` plus uncommitted photon work). Nothing here was changed in `app/`; these notes are the plan for FEAT-006 and the doc plan for FEAT-007. Line numbers are those of the tree at the time of reading.
+Written Sun Nov 15 2026, 17:05 CST, from a read of the tree on branch `ml/photon-twin` (base `cdbcbf3` plus uncommitted photon work). Nothing here was changed in `app/`; these notes are the plan for FEAT-006 and the doc plan for FEAT-007. Line numbers are those of the tree at the time of reading. Sections 1 to 9 describe the tree before FEAT-006; section 10 says what FEAT-006 built (after the planner redirect of 18:25 CST) and how to wire the winner.
 
 ## 1. How engines are selected and called today
 
@@ -113,3 +113,45 @@ docs/templates/*.md.in    --scripts/render_docs.py-->  README.md, MODEL.md, WHIT
 * `flow.mjs` greps the exact hybrid debug string; the fake `Worker` in it is installed only when `FLOW_ENGINE !== 'logistic'` and returns `{calibrating: true}` for every window, so any new async engine needs its own stub or must run in-thread.
 * `app.js` falls back from the hybrid to the logistic chain, never to another engine. Keep that rule for the photon engine (a fallback to the CNN hybrid would silently change the model and its numbers).
 * Replay (`kind === 'replay'`) uses the in-thread engine and `data/replay/100001L` and `100004R`: both people are in the training set of any all-people refit, so the replay note must stay "demo only, not a test" for the photon engine.
+
+## 10. What FEAT-006 built (relaunch, 19:30 CST): PhotonDistill as the default engine
+
+Planner, 19:15 CST: the shipped model is the round-2 trained student `distill` (PhotonDistill, `python/oxydrop_ml/photon/distill_student.py`, results in `results/photon/distill_log.md`). The first FEAT-006 agent (OOM-killed 18:55 CST) had wired the PhotonTwin gate (`twin_gate`) into a generic engine slot. The relaunch keeps the slot plumbing, replaces the model and removes the twin-gate files that would have shipped unused (`app/js/photon_twin.js`, `app/data/photon_twin.json`, `tests/photon_parity.mjs`, `tests/fixtures/ref_photon.json`, `python/oxydrop_ml/photon/{export,make_photon_ref}.py`, `python/oxydrop_ml/tests/test_photon_export.py`; moved, not deleted, to `ml_cache/feat006_twin_gate_archive/` outside the repo).
+
+### 10.1 Files
+
+| File | Role |
+|---|---|
+| `python/oxydrop_ml/photon/distill_app_export.py` | Copies the final fit (`results/photon/distill_weights.json`: 3 students refit on all 6 Hoffman people with the modal nested recipe, teachers refit on all 6, written by `distill_export.py`) into `app/data/distill.json` (nn-runtime-v1 graphs + normaliser constants), checks it against the trained export's own reference (3.8e-9), regenerates or checks the stress fixture bit for bit, and writes `tests/fixtures/ref_distill.json` (features and outputs of every window of the 3 fixture recordings). Nothing is retrained. |
+| `app/data/distill.json` | Format `oxydrop-photon-distill-app-v1`, id `oxydrop-photon-distill-v1`: 39 feature names, `tau` (mean of the seed taus, 0.9458), per student `prep` (median, clip bounds, mean, sd) and an `nn-runtime-v1` graph (Linear 39-32, ReLU, Linear 32-32, ReLU, Linear 32-3). 98 kB, 2,435 parameters per student (7,305 in total). |
+| `app/js/distill_features.js` | Float64 port of `flashgap.rec_features`: 19 chain v1 deltas (via `engine_v1.js` `winFeats`, now exported), 15 quality features, 5 respiratory features relative to the first minute. Direct DFTs of the bins numpy's FFTs feed into the features. Streaming, causal. |
+| `app/js/distill_engine.js` | `DistillNet` (prep + 3 nn_runtime forwards, ensemble: mean sigmoid(hyp), mean 90 + 5 spo2, mean sigmoid(abstain) against tau) and `DistillCore` (slot runtime). |
+| `app/js/photon_engine.js` | The engine slot (unchanged contract): `DEFAULT_PHOTON_MODEL = 'distill'`, registers format `oxydrop-photon-distill-app-v1`, `finishPhoton` marks windows `ownQuality: true`, `PhotonEngine.ownQuality` is true until the model fails. |
+| `tests/distill_parity.mjs` | `npm run test:distill`: features 1e-6, probability 1e-5, SpO2 1e-4, abstain flags exact on 1,190 windows; causality; three-state mapping; engine slot end to end; latency. |
+| `python/oxydrop_ml/tests/test_photon_distill_app.py` | App file reproduces the trained export; fixture consistent with the app file; stress CSV exact. |
+
+### 10.2 Selection and failure paths (`app/js/app.js`)
+
+* `?engine=` absent or `distill`: the engine slot with `data/distill.json` (default). `hybrid`: the previous hybrid (CNN worker). `logistic`: the v2 logistic chain. `?model=<name>` still picks another slot model file of a registered format (debug).
+* A slot model that cannot be loaded, constructed or run falls back to the logistic chain with a visible notice (`PHOTON_FALLBACK_NOTICE`, `PHOTON_FAIL_NOTICE`), never to the hybrid. `tests/flow.mjs` runs: default (distill), `FLOW_DISTILL_FAIL=1` (503 for distill.json), `FLOW_ENGINE=distill`, `FLOW_ENGINE=hybrid`, `FLOW_ENGINE=hybrid FLOW_HYBRID_FAIL=1`, `FLOW_ENGINE=hybrid FLOW_WORKER_FAIL=1`, `FLOW_ENGINE=logistic`.
+* Debug view: `engine oxydrop-photon-distill-v1 (default engine slot, ?engine=distill, model file data/distill.json): PhotonDistill student MLP 39-32-32-3, 3 seeds (abstain head, tau 0.946), ... latency per 2 s window: last / median / p95`; per window `model oxydrop-photon-distill-v1: raw P(SpO2<90) <p>  abstain <flag> (abstain head <conf>)  label <label>  model latency <ms> ms  v2 pulse lock <flag>  | EXPERIMENTAL SpO2 estimate ...`.
+* Cache name `oxydrop-v3.5-photon-distill` in `app/sw.js` `const V` and the app.js build string; ASSETS lists every `app/js` file and `data/distill.json`.
+
+### 10.3 The model's own output, no extra masking
+
+* `label = abstain ? 'unsure' : p > 0.5 ? 'HYPOXIC' : 'normal'`, mapped by decide() to "Unsure, re-measure", "Possible low oxygen", "Normal vs your baseline". No averaging with another engine.
+* Removed for slot windows (they were signal gates on top of the model): decision.js `saturation` and `invalid` (pulse lock) reasons (`ownQuality`), the live weak-signal override of the answer (`weakNow`, `watchWeak`), and the pulse-based calibration checks of `checkCalibration()` (no pulse, pulse found in less than the required share, resting HR outside 51 to 110, unsteady HR).
+* Still applied (measurement process, not the signal the model reads): camera stalled, no finger, moving, fps below 20, frame gaps (decision.js), and in the calibration minute low frame rate, stalls, dropped frames, finger off, movement. The heart-rate tile still needs the v2 pulse lock and the saturation check (`hrToShow`); that only affects the HR number, not the oxygen answer.
+* `app/index.html` "How it works": a new first paragraph describes PhotonDistill with its LOSO numbers (from `results/photon/distill_eval/TABLE.csv`, hand-typed, not yet checked by `check_claims.py`); the hybrid paragraphs now say "previous model (?engine=hybrid)". FEAT-007 should move these numbers into the claims check.
+
+### 10.4 Parity and latency (`npm run test:distill`)
+
+* 1,190 model windows (100001L 511, 100004R 473, 100001L at stress level 4 206): largest feature error 1.2e-12, |p_js - p_py| 7.8e-14, SpO2 1.8e-12 points, abstain flags 0 mismatches. Answered windows: 422, 264, 42.
+* Node, this box, per 2 s window: distill core (features + 3 students) median about 5 to 6 ms, p95 about 6.5 to 10 ms; engine slot including the v2 quality chain median about 6 to 7 ms.
+
+### 10.5 cnn.js: what it can run
+
+* Format `oxynet-v1` written by `export_js.export_graph`. The graph is data-driven (an op list run in order), so depth, widths, kernel sizes, strides, dilations, padding (including causal), the plain or the shared stem and projection skips are all read from the file. Weights are float32 (base64), activations and sums float64, buffers allocated once at load.
+* Ops: `shared_stem_input` (channel-shared slot conv with a per-domain slot mask, ReLU), `conv1d` (BatchNorm folded at export, optional ReLU), `add_domain` (per-domain embedding add, ReLU), `add` (residual, optional ReLU), `pool` (global mean and max, concatenated), `dense` (concatenation of named inputs, optional ReLU), `sub`. ReLU is the only activation.
+* Fixed interface: inputs `x` [channels x T], `side`, `emb_base`, `domain`; outputs `hr_logits`, `spo2` (shift + scale), `spo2_logvar`, `lowox_logit`, `sqi_logit`, `emb` (loadModel requires `hr_logits` and `emb`). Not supported: LayerNorm, GRU / LSTM, attention, GELU / tanh / sigmoid inside the graph, per-time-step dense layers, upsampling. Those need nn_runtime.js or a new op.
+* Check, 18:50 CST (`cd python && python -m oxydrop_ml.photon.cnn_arch_check`): random-init OxyNets of three non-default configs exported with `export_graph`, cnn.js against PyTorch on random inputs, largest absolute difference over all six heads: joint stem, 2 stages, kernel 5, dilation cycle 3 (28,844 parameters) 3.6e-6; shared stem, causal, 3 stages (14,784) 4.2e-6; teacher size (1,891,788) 6.3e-6, each time on `spo2`, which carries the export's SPO2_SCALE. The shipped member's own parity is `tests/cnn_parity.mjs`.

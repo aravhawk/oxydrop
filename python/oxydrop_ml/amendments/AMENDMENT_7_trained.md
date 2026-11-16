@@ -1,0 +1,65 @@
+### Amendment 7 (Nov 15 2026, FEAT-008 to FEAT-012: round 2, trained end-to-end models only; written at about 18:28 CST, BEFORE any round-2 score was read)
+
+Time stamp. The text of sections A to F was written at 18:26 to 18:30 CST (`date` at the start of writing: Sun Nov 15 06:26:02 PM CST 2026). The requirement and the winner rule below were fixed at 18:23 to 18:25 CT by the planner (`.agents/tasks/task-oxydrop-photon-model/ROUND2.md`, copied verbatim in section D) before the round-2 candidates were launched. The git history shows this file committed before the outcome section was filled.
+
+Disclosure about files on disk. When this amendment was written, `ls results/photon/scores` showed no file named `photonnet*`, `distill*`, `oxyssl*` or `oxyseq*`. The author of this amendment has not opened any round-2 score and no number from a round-2 model is used below. Candidate authors can see their own development output; the rule fixes what counts as the result regardless of that.
+
+Nothing here changes P1, P2, P3 or Amendment 6. Amendment 6 stays as written, including its post hoc disclosures and its decision (no candidate beat logistic chain v1 at clean L0; `twin_gate` was shipped as the most novel tie). Round 2 is a **new comparison** made after that outcome was known and is a second look at the same six people.
+
+#### A. What had been seen before the round-2 candidates were designed
+
+**All of round 1.** Every number of Amendment 6, section A (the P1 table of `MODEL.md` section 8.1, the optics experiment, the baseline stress table, the red-team ideation) and every number of its Outcome section, which includes the outer-fold L0 to L5 and X1 scores of PhotonTwin-Inverse, FlashGap, OxyTrack, their ablations and controls, and the baselines. In particular, and all on the six held-out people:
+
+* chain_v1 (logistic, baseline) L0 TM 0.796 [0.636, 0.857]; L3 0.565, L4 0.598, L5 0.535, X1 0.508. It keeps answering at chance under the simulated distant flash.
+* twin_inverse 0.752 (loss), its physics-only path `twin_inverse_noresid` is flat under stress (0.719, 0.715, 0.647 at L3 to L5, 0.693 at X1), but `ctl_dc_lr` (logistic regression on three baseline-relative ln DC values) is about as robust (0.692, 0.658, 0.599, 0.646). The robust cue is baseline-relative DC colour.
+* oxytrack 0.809 tie (optimistic: four versions were scored on the outer folds), `oxytrack_nosnr` 0.840 tie. flashgap 0.740, which costs about 0.05 at L0 and gains under the simulated stress it was trained on.
+* cnn_full (OxyNet, 167 k parameters, 3 seeds) L0 0.753, hybrid 0.779.
+* The strongest single cues per person (time-partial Spearman against SpO2, optics experiment, all six people): heart rate -0.85, red DC -0.84, blue DC -0.83, ratio-of-ratios green/blue +0.72.
+* The shipped `twin_gate` (chain_v1 when measured red SNR >= 10 dB, else the physics-only path) is a stitched gate. The user rejected that kind of model at 18:23 CT (section C).
+
+**Consequence.** Every round-2 model is designed after the outer results of round 1 were seen, on the same six held-out people, using cues (heart rate, DC colour, baseline-relative inputs, the SNR idea) that were identified on all six. Every round-2 L0 number is therefore optimistic in the same way the Amendment 6 L0 numbers are and is not a blind test. The stress levels are simulations (Amendment 6, section C) and only break ties.
+
+**Not seen**: any score of PhotonNet, PhotonDistill, OxySSL or OxySeq (or any ablation, null or blank control, seed or stress file of them) on any held-out person.
+
+#### B. The candidates (all round-2 models are single trained networks; full LOSO by person, both hands together, every selection nested on the five training people)
+
+Common: the same harness (`results/photon/CONTRACT.md`): windows of 10 s, 2 s hop, t >= 60 s scored, the first 60 s of each recording is the person's label-free baseline. Score files `results/photon/scores/<model>__L0..L5.csv` and `<model>__X1.csv`, scored by `python -m oxydrop_ml.photon.evalkit`. TM comes from `pred` at full coverage, never from `answer`. Training uses clean training people plus the candidate's own declared augmentation prior, drawn from an independent RNG stream whose (level, seed) pairs are disjoint from the evaluation pairs; `stress.degrade_x` (X1) is never imported by training code. Hyperparameters, epochs, thresholds and abstention come from inner person-grouped CV on the five training people; nothing is early-stopped or selected on the held-out person. Models are not refit per level. Three seeds for the final configuration, reported as the seed mean and the ensemble. The shipped model must run in the browser: plain ops (Linear, Conv1d, ReLU/GELU/tanh/sigmoid, layer norm or folded BatchNorm, GRU at most) and a JSON weight file; `app/js/nn_runtime.js` (FEAT-012) is a float64 forward pass for exactly those ops with a torch parity test.
+
+1. **PhotonNet** (FEAT-008, `photon/photonnet.py`). One jointly trained network with a differentiable PhotonTwin physics layer inside it. A causal 1D-conv encoder over the 10 s window of per-frame baseline-relative log RGB predicts physical latents (saturation, blood volume, melanin, pulse swing, flash-lens distance rho) and a learned physiological embedding (pulse rate and shape, HRV, breathing, learned from the waveform, not a hand-coded dHR). The PhotonTwin layer (`optics.py`, with the Farrell sign fix) renders the window's observables for a reconstruction loss. Heads for P(SpO2 < 90), SpO2 (Gaussian NLL), heart rate (soft-bin cross entropy against the Hoffman reference pulse) and a quality/abstain output are trained jointly with distant-flash augmentation from a declared prior.
+2. **PhotonDistill** (FEAT-009, `photon/distill.py`). A single small student network trained per fold to match soft targets from teachers fit on that fold's training people only: chain_v1 logistic probabilities on clean windows, the PhotonTwin physics path and a `ctl_dc`-style DC-colour model on degraded copies drawn from a declared augmentation prior, plus the reference labels. Multi-task heads (hypoxia, SpO2, quality/abstain). Only the student is deployed; it must learn from the signal itself when to trust heart-rate cues and when DC colour.
+3. **OxySSL** (FEAT-010, `photon/oxyssl.py`). Self-supervised PPG pretraining on BUT PPG, OpenOximetry and the existing 299,754-window pretraining corpus (`ssl_full.pt`, `stageB_full.pt`), then LOSO fine-tuning of an OxyNet-shaped network with multi-task heads (hypoxia, SpO2, HR, quality/abstain) and distant-flash augmentation, so it exports through `app/js/cnn.js`. Hyperparameter sweep on Daytona or Kaggle GPU if feasible, else a small CPU sweep. Disclosure: the pretraining corpus does not contain Hoffman labels; whether any pretraining recording is a Hoffman person is checked and stated by the author in the log.
+4. **OxySeq** (FEAT-011, `photon/oxyseq.py`). An end-to-end trained causal sequence model (GRU or causal TCN) over the window stream of a recording, using per-window learned or causal features from per-frame RGB relative to the label-free first minute, with per-person test-time adaptation (label-free, first minute and clearly-normal windows only, learned adaptation rate), multi-task heads (hypoxia, SpO2, quality/abstain) and distant-flash augmentation. OxyTrack was a hand-built Kalman tracker (0.809, tie); this learns the dynamics and the emission end to end.
+
+Ablations and controls (each reported as a separate model, none promotable): whatever the authors declare in their logs, for example a no-physics-layer variant of PhotonNet, a no-teacher student, a no-pretraining OxySSL, a no-adaptation OxySeq.
+
+#### C. The user requirement (18:23 CT)
+
+The shipped model must be a genuinely trained, end-to-end learned model with real training and real in-browser inference. No gates, wrappers or stitched heuristics. Ratio-of-ratios and colour-only math appear only as baselines. Nothing app-side masks or inflates accuracy: the app shows exactly the model output, abstention included. Close the clean-light gap to logistic chain v1 (0.796). Zero leakage. Consequently `twin_gate`, `flashgap_gate` and any averaging with chain_v1 at inference are not eligible and no round-2 candidate may contain such a gate.
+
+#### D. The winner rule for round 2 (verbatim from ROUND2.md, stated 18:25 CT before any round-2 score; the binding rules of section B and ROUND2.md "Binding rules for every round-2 candidate" apply)
+
+> Only round-2 trained models are eligible. Primary: L0 TM bal. acc. (3-seed ensemble) paired vs chain_v1. "Beats chain" = paired CI excluding 0, >= 5/6 people improved, worst person not below chain's, nulls passed. If none beats chain: the eligible model with the highest L0 point estimate whose paired CI includes 0 (a tie), breaking near-ties (within 0.01) by mean paired diff over L3..L5 and X1, then by answered accuracy at its own coverage under stress. All round-2 models are designed after round-1 outer results were seen; this is disclosed as Amendment 7.
+
+Operational reading, fixed here and implemented mechanically in `python/oxydrop_ml/photon/winner2.py` (output `results/photon/WINNER2.md`, side-by-side `results/photon/SIDE_BY_SIDE.md`):
+
+* Eligible = the primary files of the four round-2 models (`photonnet`, `distill`, `oxyssl`, `oxyseq`). Seed files (`<model>_s1`, `<model>_s2` or `_seed<k>`), ablations, nulls and controls are shown but are not eligible. If an author declares the 3-seed ensemble under a different primary file name, the author states the name in the log and the table uses that name; no ablation or single seed can be promoted after the fact.
+* "Beats chain" requires all of: (a) the paired person-bootstrap 95 % CI of the L0 TM difference to chain_v1 excludes 0 on the positive side; (b) at least 5 of 6 people improved; (c) the worst person's TM is not below chain_v1's worst person (0.458); (d) the null control (`<model>_null__L0`, and `<model>_blank__L0` for temporal models) averages <= 0.55 over its draws.
+* If more than one model beats chain, the highest L0 point estimate wins. If none beats chain, the winner is the eligible model with the highest L0 point estimate whose paired CI includes 0 (a tie). Models within 0.01 of that point estimate are near-ties and are ordered by the mean paired difference to chain_v1 over L3, L4, L5 and X1, then by answered accuracy at their own coverage over L3 to L5 and X1. A model whose paired CI lies entirely below 0 is a loss and cannot win by the tie rule.
+* A model with a missing level file is shown with the missing levels marked and is ranked on L0 only for the primary criterion; the verdict states which levels were missing. A model whose null control is missing or above 0.55 is reported as "nulls not passed" and cannot be called a winner or a tie winner; the verdict says so.
+* Choices not fixed by ROUND2.md and made here before any score: the 3-seed ensemble means the primary file; the seed mean of the three files is reported next to it (not used for the rule); the near-tie band is 0.01 as written; stress levels L1 and L2 are shown but not used in the tie-break (as in ROUND2.md, which names L3 to L5 and X1); answered accuracy is compared with random abstention at the same coverage in the report.
+
+#### E. Declared guards
+
+* Shifted-label or global-permutation null control `<model>_null__L0` for every candidate, at least 3 draws, report the mean; `<model>_blank__L0` for temporal models; both must average <= 0.55. A single draw above 0.55 is not unusual for a chain-like model (chain_v1 refit on 50 permutations: mean 0.506, SD 0.070, 30 % of draws above 0.55), which is why the mean over at least 3 draws is the criterion.
+* Fold-internal fitting of every scaler, prior, teacher, hull and pretraining checkpoint choice; held-out person absence asserted in code. Teachers of PhotonDistill are fit on the training people of the fold only.
+* Augmentation seeds disjoint from the evaluation (level, seed) pairs; X1 is not sampled by any training path.
+* TM from `pred` at full coverage; abstention analysed separately (answered accuracy against random abstention at the same coverage).
+* Every number of WINNER2.md and SIDE_BY_SIDE.md is read from score files by `winner2.py` (it calls the same evalkit functions as `TABLE.csv`); no number is typed by hand.
+
+#### F. Limits stated now
+
+Six people, 12 recordings of Nexus 6P phones, one dark-skinned person (n = 1, no skin-tone claim), a staircase hypoxia protocol. All stress levels are simulations and the real iPhone behaviour is untested. Round 2 re-uses the same six people after the round-1 outer results were seen, so a round-2 L0 tie or win is optimistic and not a blind test. Time-matched balanced accuracy scores only the desaturation transitions. Nothing here is a medical-device claim.
+
+## Outcome (filled after scoring)
+
+(empty; to be filled by the planner after the round-2 candidates have been scored on the outer folds and `python -m oxydrop_ml.photon.winner2` has been run)
