@@ -92,7 +92,8 @@ CONTACT_FWHM = np.array([25.0, 40.0, 1.0])          # LED emission widths
 class OpticsCfg:
     learn_bands: bool = True       # learn the camera band centres / widths
     learn_scales: bool = True      # learn the scalar corrections to the published spectra
-    n_quad: int = 0                # 0 = use the full 5 nm grid; >0 = sub-sample for speed
+    n_quad: int = 0                # 0 = use the full 5 nm grid; >0 = sub-sample for speed (about n_quad evenly spaced grid points)
+    lam_max: float = 0.0           # 0 = keep the whole grid; >0 = drop wavelengths above lam_max nm (phone-only use: the IR-cut filter ends near 700 nm)
     clamp_lnR: float = -400.0
 
     def to_dict(self):
@@ -103,6 +104,16 @@ def _t(x, dtype=torch.float64):
     return torch.as_tensor(np.asarray(x), dtype=dtype)
 
 
+def lam_index(cfg):
+    """Indices into spectra.LAM used by a renderer with this config (`lam_max` crop, then `n_quad` even sub-sampling)."""
+    idx = np.arange(SP.N_LAM)
+    if cfg.lam_max and cfg.lam_max > 0:
+        idx = idx[SP.LAM[idx] <= cfg.lam_max + 1e-9]
+    if cfg.n_quad and 0 < cfg.n_quad < len(idx):
+        idx = idx[np.unique(np.round(np.linspace(0, len(idx) - 1, int(cfg.n_quad))).astype(int))]
+    return idx
+
+
 class PhotonTwin(nn.Module):
     """The renderer. All public methods take and return torch tensors with a leading batch dimension."""
 
@@ -110,14 +121,15 @@ class PhotonTwin(nn.Module):
         super().__init__()
         self.cfg = cfg = cfg or OpticsCfg()
         self.dt = dtype
-        lam = SP.LAM
+        idx = lam_index(cfg)
+        lam = SP.LAM[idx]
         self.register_buffer('lam', _t(lam, dtype))
-        self.register_buffer('eps_hbo2', _t(SP.EPS_HBO2, dtype))
-        self.register_buffer('eps_hb', _t(SP.EPS_HB, dtype))
-        self.register_buffer('musp0', _t(SP.mu_s_prime(), dtype))
-        self.register_buffer('mu_mel0', _t(SP.mu_a_melanin(), dtype))
-        self.register_buffer('mu_base0', _t(SP.mu_a_baseline(), dtype))
-        self.register_buffer('spd', _t(SP.led_flash_spd(), dtype))
+        self.register_buffer('eps_hbo2', _t(SP.EPS_HBO2[idx], dtype))
+        self.register_buffer('eps_hb', _t(SP.EPS_HB[idx], dtype))
+        self.register_buffer('musp0', _t(SP.mu_s_prime()[idx], dtype))
+        self.register_buffer('mu_mel0', _t(SP.mu_a_melanin()[idx], dtype))
+        self.register_buffer('mu_base0', _t(SP.mu_a_baseline()[idx], dtype))
+        self.register_buffer('spd', _t(SP.led_flash_spd()[idx], dtype))
         self.register_buffer('c_haem', torch.tensor(SP.C_HAEM_M, dtype=dtype))
         # learned scalar corrections to the published spectra (shared by every person and device)
         z = lambda: nn.Parameter(torch.zeros((), dtype=dtype), requires_grad=cfg.learn_scales)
@@ -156,11 +168,11 @@ class PhotonTwin(nn.Module):
         r2 = torch.sqrt(r * r + (z0 + 2.0 * zb) ** 2)
         ln1 = torch.log(z0) + torch.log(mueff + 1.0 / r1) - mueff * r1 - 2.0 * torch.log(r1)
         ln2 = torch.log(z0 + 2.0 * zb) + torch.log(mueff + 1.0 / r2) - mueff * r2 - 2.0 * torch.log(r2)
-        # the two dipole terms carry opposite sign in the Farrell form; the second is the image source and is
-        # subtracted. Keep the physical difference but guard the log: R > 0 always holds for rho > 0.
-        t1, t2 = torch.exp(ln1 - ln1.detach().clamp(min=-700.0)), torch.exp(ln2 - ln1.detach().clamp(min=-700.0))
-        ln_sum = ln1.detach().clamp(min=-700.0) + torch.log(torch.clamp(t1 - t2, min=1e-30))
-        ln_r = torch.log(a_p) - np.log(4.0 * np.pi) + ln_sum
+        # Farrell et al. 1992 (Eq. 10, the diffuse reflectance as the surface flux) ADDS the real-source and the image-source
+        # terms: the image source has negative strength but its z-gradient at the surface has the same sign. The earlier
+        # draft subtracted them, which made R(rho) decay 10-20 orders of magnitude too fast and could hit the 1e-30 guard.
+        # logaddexp keeps the sum exact in log space down to ln R of order -700.
+        ln_r = torch.log(a_p) - np.log(4.0 * np.pi) + torch.logaddexp(ln1, ln2)
         return torch.clamp(ln_r, min=self.cfg.clamp_lnR)
 
     # ------------------------------------------------------------------ device bands
