@@ -201,8 +201,16 @@ def independent_claims() -> list[tuple[str, str, list[str]]]:
     claims.append(('photon: PhotonDistill v2 L0 TM [CI]', f'{f3(q0.tm_bacc)} [{f3(q0.tm_lo)}, {f3(q0.tm_hi)}]', allthree + pitch + ['docs/WRITEUP.md']))
     claims.append(('photon: PhotonDistill v2 L0 paired diff vs chain_v1', paired(q0), allthree + pitch + ['docs/WRITEUP.md']))
     claims.append(('photon: PhotonDistill v2 L0 people better', f'{int(q0.n_people_improved)}/{int(q0.n_people_compared)}', allthree + pitch))
-    ver = 'ties' if q0.diff_lo <= 0 <= q0.diff_hi else ('loses to' if q0.diff_hi < 0 else 'beats')
+    ver = 'is on par with' if q0.diff_lo <= 0 <= q0.diff_hi else ('loses to' if q0.diff_hi < 0 else 'beats')
     claims.append(('photon: PhotonDistill v2 verdict at L0 (from the CI)', f'{ver} the logistic chain on clean light', ['MODEL.md', 'WHITEPAPER.md', 'README.md']))
+    # GPU rerun of distill2 (seed variance, results/photon/distill2_gpu_*): recomputed straight from TABLE.csv and the paired compare file
+    g0, gx = t.loc[('distill2_gpu', '0')], t.loc[('distill2_gpu', 'X1')]
+    gcmp = pd.read_csv(os.path.join(PHOTON, 'distill2_gpu_compare.csv')).set_index(['model', 'level'])
+    if abs(float(gcmp.loc[('distill2_gpu', 'L0')].tm) - g0.tm_bacc) > 6e-4 or abs(float(gcmp.loc[('distill2_gpu', 'L0')].d_chain_v1) - g0.diff_vs_chain_v1) > 6e-4:
+        fail('distill2_gpu_compare.csv and TABLE.csv disagree on the GPU rerun at L0')
+    claims.append(('photon: PhotonDistill v2 GPU rerun L0 TM [CI]', f'{f3(g0.tm_bacc)} [{f3(g0.tm_lo)}, {f3(g0.tm_hi)}]', allthree + pitch + ['docs/WRITEUP.md']))
+    claims.append(('photon: PhotonDistill v2 GPU rerun L0 paired diff vs chain_v1', paired(g0), ['MODEL.md', 'WHITEPAPER.md', 'docs/WRITEUP.md'] + pitch))
+    claims.append(('photon: PhotonDistill v2 GPU rerun X1', f3(gx.tm_bacc), mw))
     claims.append(('photon: chain_v1 L0 on the photon harness', f'{f3(c0.tm_bacc)} [{f3(c0.tm_lo)}, {f3(c0.tm_hi)}]', mw + pitch))
     claims.append(('photon: X1 pitch numbers', f'{f3(qx.tm_bacc)} against {f3(cx.tm_bacc)}', allthree + pitch))
     claims.append(('photon: round-2 PhotonDistill L0 (replaced)', f'{f3(d0.tm_bacc)} [{f3(d0.tm_lo)}, {f3(d0.tm_hi)}]', mw))
@@ -430,6 +438,13 @@ def check_style():
     for tpl in glob.glob(os.path.join(ROOT, 'docs', 'templates', '*.in')):
         if '\u2014' in open(tpl, encoding='utf-8').read():
             fail(f'{os.path.basename(tpl)}: contains an em dash')
+    # no accuracy-target claims: SpO2 < 90% (the label threshold) is fine, a 90% target / goal for the model is not
+    ninety = re.compile(r'90\s?(%|percent)\s+(target|goal)|(target|goal)\s+(of|was|is)\s+(a\s+)?90\s?(%|percent)|reach(ed)?\s+90\s?(%|percent)|90\s?(%|percent)\s+(accuracy|balanced)', re.I)
+    for d in DOCS + glob.glob(os.path.join(ROOT, 'docs', 'submission', '*.md')) + glob.glob(os.path.join(ROOT, 'docs', 'templates', '*.in')):
+        p = d if os.path.isabs(d) else os.path.join(ROOT, d)
+        for i, line in enumerate(open(p, encoding='utf-8').read().splitlines(), 1):
+            if ninety.search(line):
+                fail(f'{os.path.relpath(p, ROOT)}:{i}: 90% target wording')
     node = shutil.which('node')
     if node:
         r = subprocess.run([node, 'tests/docs_claims.mjs'], cwd=ROOT, capture_output=True, text=True)

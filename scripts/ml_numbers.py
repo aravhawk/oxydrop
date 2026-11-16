@@ -389,7 +389,7 @@ _PH_TOK_RE = re.compile(r'_(?:s\d+|seed\d+|gperm|perm\d*|shift\d*|d\d+|draw\d+)$
 PH_LABEL = {
     'chain_v1': 'Logistic chain v1 (best honest baseline)', 'chain_v1_nestedC': 'Logistic chain v1, C by nested CV', 'hybrid_final': 'Hybrid, per-person selected (nested)',
     'cnn_full': 'CNN alone (harness re-score, 3-seed mean)', 'ctl_dc_lr': 'Control: DC-colour LR (3 baseline-relative ln DC values)',
-    'distill2': '**PhotonDistill v2 (shipped, round 3)**', 'multida': 'MultiDA (round 3)', 'photonnet_xl': 'PhotonNet-XL (round 3)',
+    'distill2': '**PhotonDistill v2 (shipped, round 3)**', 'distill2_gpu': 'PhotonDistill v2, GPU rerun (seed variance; not shipped)', 'multida': 'MultiDA (round 3)', 'photonnet_xl': 'PhotonNet-XL (round 3)',
     'distill': 'PhotonDistill (round-2 winner, replaced)', 'oxyseq': 'OxySeq', 'photonnet': 'PhotonNet', 'oxyssl': 'OxySSL',
     'distill_v1': 'PhotonDistill v1 (before the post hoc grid)', 'distill_nokd': 'PhotonDistill without teachers (ablation)',
     'photonnet_nophys': 'PhotonNet without the physics layer (ablation)', 'oxyseq_notta': 'OxySeq without test-time adaptation (ablation)',
@@ -577,7 +577,7 @@ def _ph_null_cell(m):
 def block_photon_candidates() -> str:
     """L0 table: baselines, the round-3 and round-2 trained candidates, round-2 ablations, round-1 candidates and the DC-colour control."""
     groups = [('Baselines', ['chain_v1', 'hybrid_final', 'cnn_full']),
-              ('Round 3: trained candidates (Amendment 8; ssl3 has no score file, ens3 is listed below the table)', ['distill2', 'multida', 'photonnet_xl']),
+              ('Round 3: trained candidates (Amendment 8; ssl3 has no score file, ens3 is listed below the table)', ['distill2', 'distill2_gpu', 'multida', 'photonnet_xl']),
               ('Round 2: trained end-to-end candidates (eligible)', ['distill', 'oxyseq', 'photonnet', 'oxyssl']),
               ('Round 2: ablations (not eligible)', ['distill_v1', 'distill_nokd', 'photonnet_nophys', 'oxyseq_notta']),
               ('Round 1 (Amendment 6) and controls', ['twin_gate', 'oxytrack', 'twin_inverse', 'flashgap', 'ctl_dc_lr'])]
@@ -588,7 +588,7 @@ def block_photon_candidates() -> str:
             r = ph(m, '0')
             d = 'reference' if m == 'chain_v1' else 'identical to chain v1 at L0 (gate)' if m == 'twin_gate' else (f'{dstr(r.diff_vs_chain_v1, r.diff_lo, r.diff_hi)} {r.verdict}' if _ok(r.diff_vs_chain_v1) else 'n/a')
             nb = '' if m in ('chain_v1', 'twin_gate') or not _ok(r.n_people_improved) else f'{int(r.n_people_improved)}/{int(r.n_people_compared)}'
-            nl = _ph_null_cell(m) if m in ('distill2', 'multida', 'photonnet_xl', 'distill', 'oxyseq', 'photonnet', 'oxyssl', 'distill_v1') else ''
+            nl = _ph_null_cell(m) if m in ('distill2', 'distill2_gpu', 'multida', 'photonnet_xl', 'distill', 'oxyseq', 'photonnet', 'oxyssl', 'distill_v1') else ''
             rows.append([PH_LABEL.get(m, m), f'{f(r.tm_bacc)} {ci(r.tm_lo, r.tm_hi)}', d, nb, f(r.worst_person_tm), nl])
     return md_table(['Model (L0 = clean light)', 'TM bal. acc. [95% CI]', 'Paired diff vs chain v1 [95% CI]', 'People better', 'Worst person', 'Null mean (rule: at most 0.55)'], rows,
                     ['l', 'r', 'r', 'r', 'r', 'r'])
