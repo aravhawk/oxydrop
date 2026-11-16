@@ -18,6 +18,9 @@ README.md,ph:distill2:X1,0.682
 README.md,ph:chain_v1:X1,0.508
 README.md,ph:distill2:X1|d,"+0.174 [0.044, 0.284]"
 README.md,ph:distill:0,0.758
+README.md,ph:distill2_gpu:0|full,"0.761 [0.561, 0.830]"
+README.md,ph:distill2_gpu:0|d,"-0.035 [-0.127, -0.006]"
+README.md,ph:distill2:0,0.784
 README.md,phw2:seeds,3
 README.md,phw2:hidden,32 / 32 / 64
 README.md,phw2:params,"2,435 / 2,435 / 6,915"
@@ -83,6 +86,8 @@ MODEL.md,ph:chain_v1:0,0.796
 MODEL.md,ph:distill2:0|d,"-0.012 [-0.091, 0.012]"
 MODEL.md,ph:distill2:X1,0.682
 MODEL.md,ph:chain_v1:X1,0.508
+MODEL.md,ph:distill2_gpu:0,0.761
+MODEL.md,ph:distill2:0,0.784
 MODEL.md,phw2:n_in,39
 MODEL.md,phw2:n_in,39
 MODEL.md,phw2:hidden,32 / 32 / 64
@@ -105,7 +110,7 @@ MODEL.md,b1:chain_v1:tm_bacc|full,"0.796 [0.635, 0.856]"
 MODEL.md,hy:default_R:tm_bacc|full,"0.809 [0.644, 0.863]"
 MODEL.md,ab:full/p23:p1_tm_bacc|full,"0.739 [0.574, 0.811]"
 MODEL.md,ph:cnn_full:0,0.753
-MODEL.md,@photon_candidates,<block 2715 chars>
+MODEL.md,@photon_candidates,<block 2862 chars>
 MODEL.md,w3:ens3:tm|full,"0.789 [0.621, 0.842]"
 MODEL.md,w3:ens3:d_chain,"-0.007 [-0.092, 0.043]"
 MODEL.md,w3:ens3:nb_chain,4/6
@@ -115,7 +120,18 @@ MODEL.md,ph:distill2:0|worst,0.500
 MODEL.md,ph:chain_v1:0|worst,0.458
 MODEL.md,ph:distill:0|dabs,0.038
 MODEL.md,ph:distill:0|d,"-0.038 [-0.103, -0.001]"
-MODEL.md,ph:distill2:0,0.784
+MODEL.md,ph:distill2:0|full,"0.784 [0.596, 0.834]"
+MODEL.md,ph:distill2:0|d,"-0.012 [-0.091, 0.012]"
+MODEL.md,ph:distill2_gpu:0|full,"0.761 [0.561, 0.830]"
+MODEL.md,ph:distill2_gpu:0|d,"-0.035 [-0.127, -0.006]"
+MODEL.md,ph:distill2_gpu:0|nb,3/6
+MODEL.md,ph:distill2_gpu:0|worst,0.480
+MODEL.md,ph:distill2_gpu_s0:0,0.771
+MODEL.md,ph:distill2_gpu_s1:0,0.760
+MODEL.md,ph:distill2_gpu_s2:0,0.750
+MODEL.md,ph:distill2_gpu:0|d,"-0.035 [-0.127, -0.006]"
+MODEL.md,ph:distill2_gpu:X1,0.685
+MODEL.md,ph:distill2:X1,0.682
 MODEL.md,ph:distill2:3|d,"+0.133 [0.001, 0.248]"
 MODEL.md,ph:distill2:4|d,"+0.097 [0.011, 0.195]"
 MODEL.md,ph:distill2:4|nb,6/6
@@ -128,6 +144,8 @@ MODEL.md,ph:ctl_dc_lr:X1,0.646
 MODEL.md,phnull:distill2|draws,"0.525, 0.444, 0.543"
 MODEL.md,phnull:distill2,0.504
 MODEL.md,phnull:distill2|n,3
+MODEL.md,phnull:distill2_gpu|draws,"0.556, 0.509, 0.458"
+MODEL.md,phnull:distill2_gpu,0.508
 MODEL.md,ph:multida:0|d,"-0.053 [-0.142, -0.010]"
 MODEL.md,ph:photonnet_xl:0|d,"-0.136 [-0.210, -0.033]"
 MODEL.md,phnull:photonnet,0.618
@@ -360,12 +378,10 @@ WHITEPAPER.md,ph:distill2:5|d,"+0.170 [0.027, 0.249]"
 WHITEPAPER.md,ph:distill2:X1|d,"+0.174 [0.044, 0.284]"
 WHITEPAPER.md,ph:distill2:X1|nb,6/6
 WHITEPAPER.md,ph:distill2:X1|cov,0.40
+WHITEPAPER.md,ph:distill2_gpu:0|full,"0.761 [0.561, 0.830]"
+WHITEPAPER.md,ph:distill2_gpu:0|d,"-0.035 [-0.127, -0.006]"
+WHITEPAPER.md,ph:distill2:0,0.784
 WHITEPAPER.md,ph:ctl_dc_lr:X1,0.646
-WHITEPAPER.md,ph:multida:0,0.744
-WHITEPAPER.md,ph:photonnet_xl:0,0.660
-WHITEPAPER.md,ph:oxyseq:0,0.708
-WHITEPAPER.md,ph:photonnet:0,0.668
-WHITEPAPER.md,ph:oxyssl:0,0.667
 WHITEPAPER.md,@openox,<block 2442 chars>
 WHITEPAPER.md,@skin_hoffman,<block 113 chars>
 WHITEPAPER.md,v:guard_mths,6.7%
@@ -390,6 +406,9 @@ docs/WRITEUP.md,ph:distill2:X1,0.682
 docs/WRITEUP.md,ph:chain_v1:X1,0.508
 docs/WRITEUP.md,ph:distill2:X1|d,"+0.174 [0.044, 0.284]"
 docs/WRITEUP.md,ph:distill:0,0.758
+docs/WRITEUP.md,ph:distill2_gpu:0|full,"0.761 [0.561, 0.830]"
+docs/WRITEUP.md,ph:distill2_gpu:0|d,"-0.035 [-0.127, -0.006]"
+docs/WRITEUP.md,ph:distill2:0,0.784
 docs/WRITEUP.md,v:params,"167,588"
 docs/WRITEUP.md,v:ssl_rows,"299,754"
 docs/WRITEUP.md,v:prereg_commit,3e708fe

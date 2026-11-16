@@ -1,0 +1,94 @@
+[{"stream_name":"stdout","time":9.992697332,"data":"DEVICE {'device': 'Tesla T4', 'n_gpu': 2, 'torch': '2.11.0+cu130', 'cuda': '13.0', 'cpus': 4}\n"}
+,{"stream_name":"stderr","time":10.193246492,"data":"/kaggle/src/script.py:14: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.\n"}
+,{"stream_name":"stderr","time":10.193277436,"data":"  tarfile.open(tg[0]).extractall(REPO)\n"}
+,{"stream_name":"stdout","time":515.160818632,"data":"distill2_gpu_null fold 100003: gbdt lam pure T 4.0 H 64 wd 0.0001 ep 30; inner crit 0.505 (clean 0.505, aug 0.506); tau 0.591 cert False cov 0.20; 502.6 s\n"}
+,{"stream_name":"stdout","time":517.11983601,"data":"distill2_gpu_null fold 100001: base lam 8.0 T 4.0 H 32 wd 0.0001 ep 15; inner crit 0.506 (clean 0.510, aug 0.502); tau 0.610 cert False cov 0.20; 504.6 s\n"}
+,{"stream_name":"stdout","time":520.382742383,"data":"DONE {'model': 'distill2_gpu_null', 'fold': 0, 'rc': 0, 's': 510.1} elapsed 519\n"}
+,{"stream_name":"stdout","time":520.383105434,"data":"DONE {'model': 'distill2_gpu_null', 'fold': 2, 'rc': 0, 's': 510.1} elapsed 519\n"}
+,{"stream_name":"stdout","time":527.610822468,"data":"distill2_gpu_null fold 100004: gbdt lam 16.0 T 4.0 H 32 wd 0.0001 ep 15; inner crit 0.508 (clean 0.510, aug 0.507); tau 0.644 cert False cov 0.20; 515.1 s\n"}
+,{"stream_name":"stdout","time":529.350388759,"data":"distill2_gpu_null fold 100002: gbdt lam 8.0 T 4.0 H 32 wd 0.0001 ep 30; inner crit 0.519 (clean 0.526, aug 0.512); tau 0.699 cert False cov 0.20; 516.8 s\n"}
+,{"stream_name":"stdout","time":529.38600866,"data":"DONE {'model': 'distill2_gpu_null', 'fold': 3, 'rc': 0, 's': 519.1} elapsed 528\n"}
+,{"stream_name":"stdout","time":531.387448967,"data":"DONE {'model': 'distill2_gpu_null', 'fold': 1, 'rc': 0, 's': 521.1} elapsed 530\n"}
+,{"stream_name":"stdout","time":1006.522139103,"data":"distill2_gpu_d1_null fold 100002: gbdt lam pure T 4.0 H 32 wd 0.01 ep 15; inner crit 0.499 (clean 0.503, aug 0.495); tau 0.563 cert False cov 0.20; 473.2 s\n"}
+,{"stream_name":"stdout","time":1008.49744531,"data":"DONE {'model': 'distill2_gpu_d1_null', 'fold': 1, 'rc': 0, 's': 476.1} elapsed 1008\n"}
+,{"stream_name":"stdout","time":1014.134001848,"data":"distill2_gpu_d1_null fold 100001: base lam 16.0 T 2.0 H 32 wd 0.0001 ep 30; inner crit 0.503 (clean 0.511, aug 0.496); tau 0.564 cert False cov 0.20; 482.8 s\n"}
+,{"stream_name":"stdout","time":1015.502384188,"data":"DONE {'model': 'distill2_gpu_d1_null', 'fold': 0, 'rc': 0, 's': 485.1} elapsed 1015\n"}
+,{"stream_name":"stdout","time":1023.690992242,"data":"distill2_gpu_null fold 100006: gbdt lam pure T 4.0 H 64 wd 0.0001 ep 15; inner crit 0.514 (clean 0.516, aug 0.512); tau 0.587 cert False cov 0.20; 501.4 s\n"}
+,{"stream_name":"stdout","time":1025.506096972,"data":"DONE {'model': 'distill2_gpu_null', 'fold': 5, 'rc': 0, 's': 504.1} elapsed 1025\n"}
+,{"stream_name":"stdout","time":1029.747718264,"data":"distill2_gpu_null fold 100005: gbdt lam 8.0 T 2.0 H 32 wd 0.0001 ep 30; inner crit 0.511 (clean 0.512, aug 0.509); tau 0.636 cert False cov 0.20; 507.4 s\n"}
+,{"stream_name":"stdout","time":1031.513406625,"data":"DONE {'model': 'distill2_gpu_null', 'fold': 4, 'rc': 0, 's': 510.1} elapsed 1031\n"}
+,{"stream_name":"stdout","time":1493.708724724,"data":"distill2_gpu_d1_null fold 100003: gbdt lam 32.0 T 2.0 H 32 wd 0.0001 ep 15; inner crit 0.506 (clean 0.509, aug 0.504); tau 0.587 cert False cov 0.20; 483.4 s\n"}
+,{"stream_name":"stdout","time":1495.611020389,"data":"DONE {'model': 'distill2_gpu_d1_null', 'fold': 2, 'rc': 0, 's': 486.1} elapsed 1495\n"}
+,{"stream_name":"stdout","time":1499.371477373,"data":"distill2_gpu_d1_null fold 100004: base lam pure T 4.0 H 32 wd 0.0001 ep 30; inner crit 0.512 (clean 0.520, aug 0.504); tau 0.580 cert False cov 0.20; 482.0 s\n"}
+,{"stream_name":"stdout","time":1501.622117604,"data":"DONE {'model': 'distill2_gpu_d1_null', 'fold': 3, 'rc': 0, 's': 485.1} elapsed 1501\n"}
+,{"stream_name":"stdout","time":1530.639167235,"data":"distill2_gpu_d1_null fold 100005: base lam 32.0 T 2.0 H 32 wd 0.0001 ep 30; inner crit 0.511 (clean 0.517, aug 0.505); tau 0.593 cert False cov 0.20; 503.3 s\n"}
+,{"stream_name":"stdout","time":1532.627086423,"data":"DONE {'model': 'distill2_gpu_d1_null', 'fold': 4, 'rc': 0, 's': 506.1} elapsed 1532\n"}
+,{"stream_name":"stdout","time":1533.309888364,"data":"distill2_gpu_d1_null fold 100006: base lam pure T 2.0 H 32 wd 0.0001 ep 30; inner crit 0.507 (clean 0.511, aug 0.502); tau 0.611 cert False cov 0.20; 499.9 s\n"}
+,{"stream_name":"stdout","time":1534.6283036,"data":"DONE {'model': 'distill2_gpu_d1_null', 'fold': 5, 'rc': 0, 's': 502.1} elapsed 1534\n"}
+,{"stream_name":"stdout","time":1971.741766725,"data":"distill2_gpu_d2_null fold 100001: base lam pure T 4.0 H 32 wd 0.0001 ep 30; inner crit 0.512 (clean 0.515, aug 0.508); tau 0.568 cert False cov 0.20; 474.3 s\n"}
+,{"stream_name":"stdout","time":1973.720792556,"data":"DONE {'model': 'distill2_gpu_d2_null', 'fold': 0, 'rc': 0, 's': 477.1} elapsed 1973\n"}
+,{"stream_name":"stdout","time":1980.620425955,"data":"distill2_gpu_d2_null fold 100002: gbdt lam 16.0 T 4.0 H 32 wd 0.0001 ep 15; inner crit 0.497 (clean 0.495, aug 0.499); tau 0.672 cert False cov 0.20; 477.1 s\n"}
+,{"stream_name":"stdout","time":1982.726285105,"data":"DONE {'model': 'distill2_gpu_d2_null', 'fold': 1, 'rc': 0, 's': 480.1} elapsed 1982\n"}
+,{"stream_name":"stdout","time":2024.810414572,"data":"distill2_gpu_d2_null fold 100003: gbdt lam 16.0 T 4.0 H 64 wd 0.0001 ep 30; inner crit 0.503 (clean 0.501, aug 0.504); tau 0.835 cert False cov 0.20; 490.3 s\n"}
+,{"stream_name":"stdout","time":2026.739028845,"data":"DONE {'model': 'distill2_gpu_d2_null', 'fold': 2, 'rc': 0, 's': 493.1} elapsed 2026\n"}
+,{"stream_name":"stdout","time":2030.583750967,"data":"distill2_gpu_d2_null fold 100004: gbdt lam 32.0 T 4.0 H 32 wd 0.0001 ep 30; inner crit 0.514 (clean 0.517, aug 0.511); tau 0.625 cert False cov 0.20; 494.1 s\n"}
+,{"stream_name":"stdout","time":2031.741303924,"data":"DONE {'model': 'distill2_gpu_d2_null', 'fold': 3, 'rc': 0, 's': 496.1} elapsed 2031\n"}
+,{"stream_name":"stdout","time":2337.655657853,"data":"distill2_gpu_d2_null fold 100006: base lam pure T 2.0 H 32 wd 0.0001 ep 15; inner crit 0.504 (clean 0.506, aug 0.501); tau 0.566 cert False cov 0.20; 353.1 s\n"}
+,{"stream_name":"stdout","time":2338.782908615,"data":"DONE {'model': 'distill2_gpu_d2_null', 'fold': 5, 'rc': 0, 's': 355.1} elapsed 2338\n"}
+,{"stream_name":"stdout","time":2345.054456975,"data":"distill2_gpu_d2_null fold 100005: base lam 32.0 T 4.0 H 32 wd 0.01 ep 15; inner crit 0.510 (clean 0.514, aug 0.506); tau 0.520 cert False cov 0.20; 369.5 s\n"}
+,{"stream_name":"stdout","time":2346.784110329,"data":"DONE {'model': 'distill2_gpu_d2_null', 'fold': 4, 'rc': 0, 's': 372.1} elapsed 2346\n"}
+,{"stream_name":"stdout","time":2349.851329878,"data":"  distill2_gpu_null 0: TM 0.458, answered 0.19\n"}
+,{"stream_name":"stdout","time":2349.899262758,"data":"  distill2_gpu_d1_null 0: TM 0.556, answered 0.36\n"}
+,{"stream_name":"stdout","time":2349.947196867,"data":"  distill2_gpu_d2_null 0: TM 0.509, answered 0.28\n"}
+,{"stream_name":"stdout","time":2349.952314882,"data":"{\n"}
+,{"stream_name":"stdout","time":2349.952332668,"data":" \"distill2_gpu_null__L0.csv\": {\n"}
+,{"stream_name":"stdout","time":2349.952338169,"data":"  \"model\": \"distill2_gpu_null\",\n"}
+,{"stream_name":"stdout","time":2349.952343444,"data":"  \"devices\": [\n"}
+,{"stream_name":"stdout","time":2349.952348315,"data":"   \"Tesla T4\"\n"}
+,{"stream_name":"stdout","time":2349.952353264,"data":"  ],\n"}
+,{"stream_name":"stdout","time":2349.952379336,"data":"  \"fold_wall_s\": [\n"}
+,{"stream_name":"stdout","time":2349.952383223,"data":"   505.1,\n"}
+,{"stream_name":"stdout","time":2349.952386313,"data":"   517.3,\n"}
+,{"stream_name":"stdout","time":2349.9523896,"data":"   503.2,\n"}
+,{"stream_name":"stdout","time":2349.952393424,"data":"   515.6,\n"}
+,{"stream_name":"stdout","time":2349.952396518,"data":"   507.7,\n"}
+,{"stream_name":"stdout","time":2349.95239966,"data":"   501.6\n"}
+,{"stream_name":"stdout","time":2349.952403161,"data":"  ]\n"}
+,{"stream_name":"stdout","time":2349.952406442,"data":" },\n"}
+,{"stream_name":"stdout","time":2349.952410237,"data":" \"distill2_gpu_d1_null__L0.csv\": {\n"}
+,{"stream_name":"stdout","time":2349.952413875,"data":"  \"model\": \"distill2_gpu_d1_null\",\n"}
+,{"stream_name":"stdout","time":2349.952417491,"data":"  \"devices\": [\n"}
+,{"stream_name":"stdout","time":2349.952420632,"data":"   \"Tesla T4\"\n"}
+,{"stream_name":"stdout","time":2349.952423873,"data":"  ],\n"}
+,{"stream_name":"stdout","time":2349.95242768,"data":"  \"fold_wall_s\": [\n"}
+,{"stream_name":"stdout","time":2349.952431392,"data":"   483.0,\n"}
+,{"stream_name":"stdout","time":2349.95243489,"data":"   473.4,\n"}
+,{"stream_name":"stdout","time":2349.952438389,"data":"   483.5,\n"}
+,{"stream_name":"stdout","time":2349.952441715,"data":"   482.2,\n"}
+,{"stream_name":"stdout","time":2349.952445338,"data":"   503.5,\n"}
+,{"stream_name":"stdout","time":2349.952448594,"data":"   500.1\n"}
+,{"stream_name":"stdout","time":2349.952451876,"data":"  ]\n"}
+,{"stream_name":"stdout","time":2349.952455837,"data":" },\n"}
+,{"stream_name":"stdout","time":2349.952459329,"data":" \"distill2_gpu_d2_null__L0.csv\": {\n"}
+,{"stream_name":"stdout","time":2349.952462826,"data":"  \"model\": \"distill2_gpu_d2_null\",\n"}
+,{"stream_name":"stdout","time":2349.952466253,"data":"  \"devices\": [\n"}
+,{"stream_name":"stdout","time":2349.952469806,"data":"   \"Tesla T4\"\n"}
+,{"stream_name":"stdout","time":2349.952473199,"data":"  ],\n"}
+,{"stream_name":"stdout","time":2349.952476616,"data":"  \"fold_wall_s\": [\n"}
+,{"stream_name":"stdout","time":2349.952480249,"data":"   474.5,\n"}
+,{"stream_name":"stdout","time":2349.952483587,"data":"   477.3,\n"}
+,{"stream_name":"stdout","time":2349.95248702,"data":"   490.5,\n"}
+,{"stream_name":"stdout","time":2349.95249046,"data":"   494.3,\n"}
+,{"stream_name":"stdout","time":2349.952493922,"data":"   369.7,\n"}
+,{"stream_name":"stdout","time":2349.952497462,"data":"   353.2\n"}
+,{"stream_name":"stdout","time":2349.952501384,"data":"  ]\n"}
+,{"stream_name":"stdout","time":2349.952504857,"data":" }\n"}
+,{"stream_name":"stdout","time":2349.952508266,"data":"}\n"}
+,{"stream_name":"stdout","time":2350.350686524,"data":"WALL 2349.4\n"}
+,{"stream_name":"stderr","time":2353.08506626,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":2353.085093226,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":2353.386373328,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":2353.386398633,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":2354.265654281,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":2355.32144955,"data":"[NbConvertApp] Writing 290925 bytes to __results__.html\n"}
+]
