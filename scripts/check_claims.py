@@ -191,18 +191,49 @@ def independent_claims() -> list[tuple[str, str, list[str]]]:
         claims.append(('parameter count from the model code', f'{n:,}', allthree))
     except Exception as e:  # torch missing: skip, not a failure
         warns.append(f'parameter count not re-derived ({type(e).__name__})')
-    # ---- photon harness (round-2 shipped model PhotonDistill), straight from results/photon/TABLE.csv with own code
+    # ---- photon harness: round-3 shipped model PhotonDistill v2 (distill2) and the round-2 model it replaced, straight from results/photon with own code
     t = pd.read_csv(os.path.join(PHOTON, 'TABLE.csv'), dtype={'level': str}).set_index(['model', 'level'])
     sd = lambda x: f'{x:+.3f}'
-    d0, c0, dx, cx = t.loc[('distill', '0')], t.loc[('chain_v1', '0')], t.loc[('distill', 'X1')], t.loc[('chain_v1', 'X1')]
-    claims.append(('photon: PhotonDistill L0 TM [CI]', f'{f3(d0.tm_bacc)} [{f3(d0.tm_lo)}, {f3(d0.tm_hi)}]', ['MODEL.md', 'WHITEPAPER.md']))
-    claims.append(('photon: PhotonDistill L0 paired diff vs chain_v1', f'{sd(d0.diff_vs_chain_v1)} [{f3(d0.diff_lo)}, {f3(d0.diff_hi)}]', ['MODEL.md', 'WHITEPAPER.md']))
-    claims.append(('photon: PhotonDistill loses by', f'loses to the logistic chain on clean light by {f3(abs(d0.diff_vs_chain_v1))}', ['MODEL.md', 'WHITEPAPER.md']))
-    claims.append(('photon: chain_v1 L0 on the photon harness', f'{f3(c0.tm_bacc)} [{f3(c0.tm_lo)}, {f3(c0.tm_hi)}]', ['MODEL.md', 'WHITEPAPER.md']))
-    claims.append(('photon: X1 pitch numbers', f'{f3(dx.tm_bacc)} against {f3(cx.tm_bacc)}', ['MODEL.md', 'WHITEPAPER.md']))
-    for lv in ('4', '5', 'X1'):
-        r = t.loc[('distill', lv)]
-        claims.append((f'photon: PhotonDistill {lv} paired diff', f'{sd(r.diff_vs_chain_v1)} [{f3(r.diff_lo)}, {f3(r.diff_hi)}]', ['MODEL.md', 'WHITEPAPER.md']))
+    mw = ['MODEL.md', 'WHITEPAPER.md']
+    pitch = ['docs/submission/PITCH.md']
+    q0, c0, qx, cx, d0 = t.loc[('distill2', '0')], t.loc[('chain_v1', '0')], t.loc[('distill2', 'X1')], t.loc[('chain_v1', 'X1')], t.loc[('distill', '0')]
+    paired = lambda r: f'{sd(r.diff_vs_chain_v1)} [{f3(r.diff_lo)}, {f3(r.diff_hi)}]'
+    claims.append(('photon: PhotonDistill v2 L0 TM [CI]', f'{f3(q0.tm_bacc)} [{f3(q0.tm_lo)}, {f3(q0.tm_hi)}]', allthree + pitch + ['docs/WRITEUP.md']))
+    claims.append(('photon: PhotonDistill v2 L0 paired diff vs chain_v1', paired(q0), allthree + pitch + ['docs/WRITEUP.md']))
+    claims.append(('photon: PhotonDistill v2 L0 people better', f'{int(q0.n_people_improved)}/{int(q0.n_people_compared)}', allthree + pitch))
+    ver = 'ties' if q0.diff_lo <= 0 <= q0.diff_hi else ('loses to' if q0.diff_hi < 0 else 'beats')
+    claims.append(('photon: PhotonDistill v2 verdict at L0 (from the CI)', f'{ver} the logistic chain on clean light', ['MODEL.md', 'WHITEPAPER.md', 'README.md']))
+    claims.append(('photon: chain_v1 L0 on the photon harness', f'{f3(c0.tm_bacc)} [{f3(c0.tm_lo)}, {f3(c0.tm_hi)}]', mw + pitch))
+    claims.append(('photon: X1 pitch numbers', f'{f3(qx.tm_bacc)} against {f3(cx.tm_bacc)}', allthree + pitch))
+    claims.append(('photon: round-2 PhotonDistill L0 (replaced)', f'{f3(d0.tm_bacc)} [{f3(d0.tm_lo)}, {f3(d0.tm_hi)}]', mw))
+    claims.append(('photon: round-2 PhotonDistill paired diff vs chain_v1', paired(d0), ['MODEL.md']))
+    for lv in ('3', '4', '5', 'X1'):
+        r = t.loc[('distill2', lv)]
+        claims.append((f'photon: PhotonDistill v2 {lv} paired diff', paired(r), mw + pitch))
+    cmp_ = pd.read_csv(os.path.join(PHOTON, 'distill2_compare.csv')).set_index(['model', 'level'])
+    r = cmp_.loc[('distill2', 'L0')]
+    claims.append(('photon: PhotonDistill v2 minus PhotonDistill at L0', f'{sd(r.d_distill)} [{f3(r.d_distill_lo)}, {f3(r.d_distill_hi)}]', mw + pitch))
+    w3 = pd.read_csv(os.path.join(PHOTON, 'WINNER3.csv')).set_index('model')
+    claims.append(('photon: round-3 stress mean vs chain (g3)', sd(w3.loc['distill2'].g3_mean), mw + pitch))
+    claims.append(('photon: WINNER3 winner is distill2', 'distill2', []))
+    if int(w3.loc['distill2'].winner) != 1:
+        fail('results/photon/WINNER3.csv does not mark distill2 as the winner (rerun winner3 with --lock distill2)')
+    e = w3.loc['ens3']
+    if pd.notna(e.tm):
+        claims.append(('photon: ens3 (late candidate) L0', f'{f3(e.tm)} [{f3(e.tm_lo)}, {f3(e.tm_hi)}]', ['MODEL.md'] + pitch))
+    nl = [float(t.loc[(m, '0')].tm_bacc) for m in ('distill2_null', 'distill2_d1_null', 'distill2_d2_null')]
+    claims.append(('photon: PhotonDistill v2 null mean (3 draws)', f3(np.mean(nl)), mw + pitch))
+    wq = json.load(open(os.path.join(PHOTON, 'distill2_weights.json')))
+    widths = ' / '.join(str(len(x['w1'])) for x in wq['students'])
+    npar = ' / '.join(f"{sum(len(x[k]) * (len(x[k][0]) if isinstance(x[k][0], list) else 1) for k in ('w1', 'b1', 'w2', 'b2', 'wo', 'bo')):,}" for x in wq['students'])
+    claims.append(('photon: PhotonDistill v2 widths from the weights file', widths, allthree + pitch))
+    claims.append(('photon: PhotonDistill v2 parameters from the weights file', npar, allthree + pitch))
+    fi = json.load(open(os.path.join(PHOTON, 'distill2_fold_info.json')))
+    folds = [x for k in ('distill2_s0', 'distill2_s1', 'distill2_s2') for x in fi[k]]
+    nbase = sum(1 for x in folds if x['teacher'] == 'base')
+    claims.append(('photon: base teacher chosen in every seed fold', f'{nbase} of {len(folds)}', ['WHITEPAPER.md'] + pitch))
+    if nbase != len(folds):
+        fail(f'distill2_fold_info.json: the GBDT teacher was chosen in {len(folds) - nbase} folds, but the documents say it was never chosen')
     return claims
 
 
@@ -251,6 +282,19 @@ def check_app_text():
     for e in expect:
         if e not in txt:
             fail(f'app/index.html: expected text not found (a number drifted from results/ml): "{e}"')
+    # default-model paragraph (PhotonDistill2, results/photon/TABLE.csv): L0 and X1 rows of distill2, X1 row of chain_v1
+    import pandas as pd
+    pt = pd.read_csv(os.path.join(ROOT, 'results/photon/TABLE.csv'), dtype={'level': str})
+    row = lambda m, lv: pt[(pt.model == m) & (pt.level == lv)].iloc[0]
+    d0, dx, cx = row('distill2', '0'), row('distill2', 'X1'), row('chain_v1', 'X1')
+    for e in [
+        f'time-matched balanced accuracy of {d0.tm_bacc:.3f} (95% interval {d0.tm_lo:.3f} to {d0.tm_hi:.3f}), a tie with the logistic chain (paired difference {d0.diff_vs_chain_v1:.3f}, interval {d0.diff_lo:.3f} to {d0.diff_hi:.3f}), answering {100 * d0.coverage:.1f}% of windows with {100 * d0.acc_ans:.1f}% of those answers right',
+        f'(the hardest level, X1) it scores {dx.tm_bacc:.3f} against {cx.tm_bacc:.3f} for the chain',
+    ]:
+        if e not in txt:
+            fail(f'app/index.html: default-model paragraph drifted from results/photon/TABLE.csv: "{e}"')
+    if d0.verdict != 'tie':
+        fail(f'app/index.html says the default model ties the chain at L0, TABLE.csv verdict is {d0.verdict}')
     # the shipped model is the fixed pipeline R: its numbers must be the ones in conformal.json's own metadata
     meta = json.load(open(os.path.join(ROOT, 'app/data/conformal.json'))).get('nested_evaluation') or {}
     for key, row in (('deployed_pipeline_R', d), ('chain_only_control', c), ('per_person_selected_hybrid', fnl)):
@@ -269,6 +313,7 @@ ALLOW_DECIMALS = {
     '0.10',          # declared conformal miscoverage level alpha (Amendment 5, before any result)
     '11.6',          # million multiply-adds per window (python/oxydrop_ml/MODEL_SPEC.md, measured by model.py)
     '0.55',          # null-control ceiling of the round-2 rule (ROUND2.md rule 5, stated before any round-2 score)
+    '0.02',          # g2 margin of the round-3 replacement rule (ROUND3.md, stated 19:55 CT before any round-3 score)
 }
 TOKEN = re.compile(r'\{\{[^{}]+\}\}')
 CODE = re.compile(r'```.*?```|`[^`\n]+`', re.S)

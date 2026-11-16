@@ -1,0 +1,4 @@
+fold 100002 draw 2 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 89.8 s on Tesla T4
+fold 100002 draw 2 distill2 s0 {'teacher': 'gbdt', 'lam': 8.0, 'T': 2.0, 'H': 64, 'wd': 0.01, 'epochs': 15}: 44.9 s on Tesla T4
+fold 100002 draw 2 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 21.0 s on Tesla T4
+saved fold 1 draw 2: 156 s on Tesla T4

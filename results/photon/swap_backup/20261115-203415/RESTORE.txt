@@ -1,0 +1,5 @@
+swap of /home/aravhawk/.t3/scratch/veritas/submission/oxydrop/results/photon/distill2_weights.json at 20261115-203415; restore with:
+cp -p results/photon/swap_backup/20261115-203415/app_data_distill.json app/data/distill.json
+cp -p results/photon/swap_backup/20261115-203415/tests_fixtures_ref_distill.json tests/fixtures/ref_distill.json
+cp -p results/photon/swap_backup/20261115-203415/app_sw.js app/sw.js
+cp -p results/photon/swap_backup/20261115-203415/app_js_app.js app/js/app.js

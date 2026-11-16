@@ -22,7 +22,7 @@ from . import evalkit as E
 from . import winner2 as W
 from . import winner3 as W3
 
-LEAK_RE = re.compile(r'assert_no_leak|held[- ]?out[^\n]{0,60}(never|excluded|not (seen|used|in))|(excluded|never)[^\n]{0,60}held[- ]?out|loso[^\n]{0,40}assert|assert[^\n]{0,60}(held|test|sid|person)', re.I)
+LEAK_RE = re.compile(r'assert_no_leak|assert_\w*disjoint|held[- ]?out[^\n]{0,60}(never|excluded|not (seen|used|in))|(excluded|never)[^\n]{0,60}held[- ]?out|loso[^\n]{0,40}assert|assert[^\n]{0,60}(held|test|sid|person)', re.I)
 RAW_ROWS = 5644
 
 
@@ -81,6 +81,31 @@ def leak_probe(model, repo):
         try:
             for i, line in enumerate(f.read_text(errors='replace').splitlines(), 1):
                 if LEAK_RE.search(line):
+                    hits.append((f.relative_to(repo), i, line.strip()[:160]))
+        except Exception:
+            pass
+    return files, hits
+
+
+GPU_RE = re.compile(r'get_device_name|Tesla|NVIDIA|\bP100\b|\bT4\b|\bV100\b|\bA100\b')
+
+
+def gpu_probe(model, repo):
+    """GPU addendum (user, 20:40 CT): every result must log torch.cuda.get_device_name() and wall time. Grep the model's own logs / run json (also one level inside its directories)."""
+    RES = repo / 'results' / 'photon'
+    cand = [f for f in RES.glob(f'{model}_*')] + [f for f in RES.glob(f'{model}.*')]
+    files = []
+    for f in cand:
+        if f.is_dir():
+            files += [g for g in sorted(f.glob('*'))[:300] if g.is_file()]
+        else:
+            files.append(f)
+    files = [f for f in files if f.suffix in ('.md', '.log', '.json', '.txt') and f.stat().st_size < 3_000_000]
+    hits = []
+    for f in files:
+        try:
+            for i, line in enumerate(f.read_text(errors='replace').splitlines(), 1):
+                if GPU_RE.search(line):
                     hits.append((f.relative_to(repo), i, line.strip()[:160]))
         except Exception:
             pass
@@ -177,10 +202,20 @@ def main(argv=None):
         if not ok_e and c['seeds']:
             problems.append(f'{m}: primary L0 score is not the plain mean of its seed files ({det_e}); may use another ensembling rule, ask its author')
         files, hits = leak_probe(m, repo)
+        if m.endswith('_gpu'):                               # code of ssl3_gpu is ssl3.py etc.
+            f2, h2 = leak_probe(m[:-4], repo)
+            files, hits = files + f2, hits + h2
         out += [f'Leakage probe (grep of {len(files)} own log/code/result files): ' + (f'{len(hits)} matching line(s)' if hits else '**no held-out exclusion assertion found**')]
         for f, i, line in hits[:5]:
             out.append(f'* `{f}:{i}`: {line}')
         out.append('')
+        gfiles, ghits = gpu_probe(m, repo)
+        out += [f'GPU-log probe (grep of {len(gfiles)} own log/run files for torch.cuda.get_device_name / a GPU name): ' + (f'{len(ghits)} matching line(s)' if ghits else '**no GPU device log found (does not count under the 20:40 CT GPU addendum)**')]
+        for f, i, line in ghits[:4]:
+            out.append(f'* `{f}:{i}`: {line}')
+        out.append('')
+        if not ghits:
+            problems.append(f'{m}: no GPU device log found (GPU addendum 20:40 CT: a run without a GPU log does not count)')
         if not hits:
             problems.append(f'{m}: no held-out exclusion assertion found in its logs/code ({len(files)} files searched)')
         if c['r0'] is not None and not c['nulls']['ok']:

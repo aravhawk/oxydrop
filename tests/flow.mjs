@@ -189,7 +189,7 @@ if (LOGISTIC_REQ) {
   assert.equal($('status-main').textContent, 'Calibrating', 'the measurement itself still runs on the fallback chain');
   ok('default engine with data/distill.json failing to load (HTTP 503): the logistic chain runs and the screen shows a visible, device-agnostic notice');
 } else if (DISTILL_REQ) {
-  assert.match($('dbg-measure').textContent, /engine oxydrop-photon-distill-v1 \(default engine slot, \?engine=distill, model file data\/distill\.json\): PhotonDistill student MLP 39-32-32-3, 3 seeds.*runs in the page thread; output shown as the model gives it/, 'the default engine runs PhotonDistill in the page thread');
+  assert.match($('dbg-measure').textContent, /engine oxydrop-photon-distill2-v1 \(default engine slot, \?engine=distill, model file data\/distill\.json\): PhotonDistill student MLP 39-h-h \(h = 32\/32\/64\)-3, 3 seeds.*runs in the page thread; output shown as the model gives it/, 'the default engine runs PhotonDistill in the page thread');
   assert.doesNotMatch($('dbg-measure').textContent, /oxydrop-hybrid-v1/, 'no hybrid engine in this mode');
   assert.equal(globalThis.__fakeWorker, undefined, 'the default engine starts no CNN worker');
   assert.equal($('engine-note').hidden, true, 'no fallback notice while the model runs');

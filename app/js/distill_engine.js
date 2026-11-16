@@ -2,7 +2,7 @@
 // (format 'oxydrop-photon-distill-app-v1', written by python/oxydrop_ml/photon/distill_app_export.py from results/photon/distill_weights.json).
 // Pure ES module (no DOM), shared by the app (through the engine slot of photon_engine.js) and the Node tests.
 //   30 Hz R,G,B -> distill_features.js (39 causal features relative to the label-free first minute)
-//               -> per student: median-impute, clip, standardise (the student's own training constants) -> nn_runtime.js MLP 39-32-32-3
+//               -> per student: median-impute, clip, standardise (the student's own training constants) -> nn_runtime.js MLP 39-h-h-3
 //               -> 3-student ensemble: p = mean sigmoid(hyp), spo2 = mean (90 + 5 spo2 head), conf = mean sigmoid(abstain), answer = conf >= tau
 // The model's own abstain head decides Unsure; nothing else is added. Parity: tests/distill_parity.mjs against tests/fixtures/ref_distill.json.
 
@@ -47,7 +47,8 @@ export class DistillCore {
   constructor(model) { this.net = new DistillNet(model); this.fe = new DistillFeatures(); this.M = model; }
   get info() {
     const pp = this.net.params;
-    return { id: this.M.id, model: `PhotonDistill student MLP 39-32-32-3, ${pp.length} seeds (abstain head, tau ${this.net.tau.toFixed(3)})`, params: pp[0], paramsTotal: pp.reduce((a, b) => a + b, 0), seeds: pp.length };
+    const hid = this.M.students.map((s) => s.graph.tensors.w1.shape[0]);   // hidden width of each student (the round-3 model mixes 32 and 64)
+    return { id: this.M.id, model: `PhotonDistill student MLP 39-${hid.length && hid.every((h) => h === hid[0]) ? `${hid[0]}-${hid[0]}` : `h-h (h = ${hid.join('/')})`}-3, ${pp.length} seeds (abstain head, tau ${this.net.tau.toFixed(3)})`, params: pp[0], perSeed: pp, paramsTotal: pp.reduce((a, b) => a + b, 0), seeds: pp.length };
   }
   push(r, g, b) {
     const t0 = performance.now(), f = this.fe.push(r, g, b);

@@ -64,3 +64,11 @@ Scores: results/photon/scores/multida__L0..L5,X1, multida_s{0,1,2}__*, multida_h
 Fold pickles + aux feature pack (derived MTHS/BUT features, not committed): ml_cache/photon_multida/. Remote logs: ml_cache/dt/R3M/x/runs/.
 Cloud: Daytona sandbox R3M deleted. Kaggle: private dataset aravhawk/oxy-r3multi-data (code + Hoffman pack + MTHS/BUT cached series; created while
 Daytona was full, never used because Kaggle CPU/GPU session limits were full); no Kaggle kernel was pushed.
+
+## GPU relaunch `multida_gpu` (21:00 CT deadline): no result
+Torch/CUDA port written (python/oxydrop_ml/photon/multida_gpu.py: same 39 features, per-domain Prep, GRL 0.1 domain head, distill KD loss; all 24 grid
+configs of an inner fit trained as one stacked batch; grid lam {8, 16, 32} x wd {1e-4, 1e-2} x w_aux {0.3, 1} x epochs {15, 30}). Kaggle refused every push
+from 20:45 to 21:02 CT (account limit: 2 batch GPU sessions, both held by other agents' kernels). The one run that started (aravhawk/oxy-r3mgpu-a, Tesla T4,
+21:02 CT) crashed after 18 s, before any training: the module called multida._sig, which the older multida.py in the Kaggle dataset does not have. Fixed
+locally; the re-push was refused again (same limit) until 21:07 CT and then abandoned. No multida_gpu score files exist; the CPU multida numbers above
+do not count under the GPU addendum. Details: results/photon/multida_gpu_run.json.

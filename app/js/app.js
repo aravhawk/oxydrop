@@ -185,7 +185,7 @@ document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('clic
 function engineLine() {
   const inf = chain && chain.info, lat = chain && chain.latency ? chain.latency() : null, f1 = (v) => (Number.isFinite(v) ? v.toFixed(0) : '-'), f2l = (v) => (Number.isFinite(v) ? v.toFixed(1) : '-');
   const latTxt = lat && lat.n ? `last ${f1(lat.last)} ms, median ${f1(lat.median)} ms, p95 ${f1(lat.p95)} ms` + (lat.async ? ` (model ${f1(lat.coreMedian)} ms in the worker, quality chain ${f1(lat.v2Median)} ms on the page)` : '') : 'no window yet';
-  if (engineUsed === 'photon' && inf && chain instanceof PhotonEngine) return `engine ${inf.id} (default engine slot, ?engine=distill, model file data/${PHOTON_MODEL}.json): ${inf.model}, ${inf.params.toLocaleString('en-US')} parameters per seed (${inf.paramsTotal.toLocaleString('en-US')} in total), runs in the page thread; output shown as the model gives it (its own abstention = Unsure); latency per 2 s window: ${lat && lat.n ? `last ${f2l(lat.last)} ms, median ${f2l(lat.median)} ms, p95 ${f2l(lat.p95)} ms` : 'no window yet'}${engineNote ? '  ' + engineNote : ''}`;
+  if (engineUsed === 'photon' && inf && chain instanceof PhotonEngine) return `engine ${inf.id} (default engine slot, ?engine=distill, model file data/${PHOTON_MODEL}.json): ${inf.model}, ${(inf.perSeed || [inf.params]).map((v) => v.toLocaleString('en-US')).join(' / ')} parameters per seed (${inf.paramsTotal.toLocaleString('en-US')} in total), runs in the page thread; output shown as the model gives it (its own abstention = Unsure); latency per 2 s window: ${lat && lat.n ? `last ${f2l(lat.last)} ms, median ${f2l(lat.median)} ms, p95 ${f2l(lat.p95)} ms` : 'no window yet'}${engineNote ? '  ' + engineNote : ''}`;
   if (engineUsed === 'photon') return `engine slot (default, ?engine=distill, model file data/${PHOTON_MODEL}.json; only the quality chain runs during setup, the model starts with the calibration minute)${engineNote ? '  ' + engineNote : ''}`;
   if (engineUsed !== 'hybrid' || !inf) return `engine ${engineUsed === 'hybrid' ? 'hybrid (only the quality chain runs during setup; the CNN starts with the calibration minute)' : 'logistic chain v2 (baseline / fallback)'}${ENGINE_REQ === 'logistic' ? ' (?engine=logistic)' : ''}${engineNote ? '  ' + engineNote : ''}`;
   const th = inf.thresholds;
@@ -193,7 +193,7 @@ function engineLine() {
 }
 function debugText() {
   const L = []; const st = cam ? cam.stats : null;
-  L.push('capture build oxydrop-v3.5-photon-distill');
+  L.push('capture build oxydrop-v3.6-photon-distill2');
   L.push(`mode ${mode || '-'} / ${kind || '-'}   samples ${rawN}   t ${(rawN / FS).toFixed(1)} s`);
   L.push(engineLine());
   if (cam && st) {

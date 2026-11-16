@@ -1,0 +1,229 @@
+[{"stream_name":"stdout","time":1.497836372,"data":"inputs ['/kaggle/input/ens3-r3-data/up.tgz']\n"}
+,{"stream_name":"stderr","time":2.60941105,"data":"/kaggle/src/script.py:8: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.\n"}
+,{"stream_name":"stderr","time":2.609446213,"data":"  t.extractall(W)\n"}
+,{"stream_name":"stderr","time":2.746650573,"data":"/kaggle/src/script.py:10: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.\n"}
+,{"stream_name":"stderr","time":2.746676624,"data":"  t.extractall(W)\n"}
+,{"stream_name":"stdout","time":11.868603156,"data":"device Tesla T4 2.11.0+cu130\n"}
+,{"stream_name":"stdout","time":764.1576307,"data":"--- log0\n"}
+,{"stream_name":"stdout","time":764.157684732,"data":"fold 100001 draw real distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 127.0 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157691765,"data":"fold 100001 draw real distill s1 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 95.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.15769655,"data":"fold 100001 draw real distill s2 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 92.7 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157702847,"data":"fold 100001 draw real distill2 s0 {'teacher': 'base', 'lam': 16.0, 'T': 4.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 93.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157711442,"data":"fold 100001 draw real distill2 s1 {'teacher': 'base', 'lam': 32.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 94.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157715235,"data":"fold 100001 draw real distill2 s2 {'teacher': 'base', 'lam': 16.0, 'T': 2.0, 'H': 64, 'wd': 0.0001, 'epochs': 15}: 49.6 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157718455,"data":"fold 100001 draw real distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 71.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157721551,"data":"saved fold 0 draw real: 625 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157745268,"data":"\n"}
+,{"stream_name":"stdout","time":764.157750231,"data":"--- log1\n"}
+,{"stream_name":"stdout","time":764.157800757,"data":"fold 100002 draw real distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 123.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157822056,"data":"fold 100002 draw real distill s1 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 91.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.15782865,"data":"fold 100002 draw real distill s2 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 89.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157834014,"data":"fold 100002 draw real distill2 s0 {'teacher': 'base', 'lam': 16.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 89.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157838508,"data":"fold 100002 draw real distill2 s1 {'teacher': 'base', 'lam': 32.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 15}: 47.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157844104,"data":"fold 100002 draw real distill2 s2 {'teacher': 'base', 'lam': 32.0, 'T': 4.0, 'H': 16, 'wd': 0.0001, 'epochs': 30}: 91.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.15784913,"data":"fold 100002 draw real distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 39.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157870721,"data":"saved fold 1 draw real: 573 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.15787497,"data":"\n"}
+,{"stream_name":"stdout","time":764.157878272,"data":"--- log2\n"}
+,{"stream_name":"stdout","time":764.157934478,"data":"fold 100003 draw real distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 125.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157943859,"data":"fold 100003 draw real distill s1 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 94.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.15794838,"data":"fold 100003 draw real distill s2 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 15}: 48.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157952849,"data":"fold 100003 draw real distill2 s0 {'teacher': 'base', 'lam': 32.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 15}: 46.0 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157956787,"data":"fold 100003 draw real distill2 s1 {'teacher': 'base', 'lam': 16.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 90.4 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157960917,"data":"fold 100003 draw real distill2 s2 {'teacher': 'base', 'lam': 32.0, 'T': 4.0, 'H': 64, 'wd': 0.0001, 'epochs': 30}: 93.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157965711,"data":"fold 100003 draw real distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 79.4 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157981457,"data":"saved fold 2 draw real: 579 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.15798594,"data":"\n"}
+,{"stream_name":"stdout","time":764.157989479,"data":"--- log3\n"}
+,{"stream_name":"stdout","time":764.157993144,"data":"fold 100004 draw real distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 128.4 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.157997117,"data":"fold 100004 draw real distill s1 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 97.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158001627,"data":"fold 100004 draw real distill s2 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 93.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158005437,"data":"fold 100004 draw real distill2 s0 {'teacher': 'base', 'lam': 32.0, 'T': 2.0, 'H': 64, 'wd': 0.0001, 'epochs': 30}: 94.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158009469,"data":"fold 100004 draw real distill2 s1 {'teacher': 'base', 'lam': 8.0, 'T': 4.0, 'H': 64, 'wd': 0.01, 'epochs': 30}: 95.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158013083,"data":"fold 100004 draw real distill2 s2 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 64, 'wd': 0.0001, 'epochs': 30}: 93.6 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158017305,"data":"fold 100004 draw real distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 57.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158021477,"data":"saved fold 3 draw real: 661 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158025289,"data":"\n"}
+,{"stream_name":"stdout","time":764.158028732,"data":"--- log4\n"}
+,{"stream_name":"stdout","time":764.158037977,"data":"fold 100005 draw real distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 128.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158042311,"data":"fold 100005 draw real distill s1 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 96.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158046434,"data":"fold 100005 draw real distill s2 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 15}: 48.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158060029,"data":"fold 100005 draw real distill2 s0 {'teacher': 'base', 'lam': 16.0, 'T': 4.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 91.0 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.1580638,"data":"fold 100005 draw real distill2 s1 {'teacher': 'base', 'lam': 32.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 95.7 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158067431,"data":"fold 100005 draw real distill2 s2 {'teacher': 'base', 'lam': 32.0, 'T': 4.0, 'H': 64, 'wd': 0.0001, 'epochs': 30}: 95.7 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158071067,"data":"fold 100005 draw real distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 39.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158093485,"data":"saved fold 4 draw real: 596 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158097641,"data":"\n"}
+,{"stream_name":"stdout","time":764.158101357,"data":"--- log5\n"}
+,{"stream_name":"stdout","time":764.158107197,"data":"fold 100006 draw real distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 129.0 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158111017,"data":"fold 100006 draw real distill s1 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 96.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158114621,"data":"fold 100006 draw real distill s2 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 94.0 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158118173,"data":"fold 100006 draw real distill2 s0 {'teacher': 'base', 'lam': 16.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 96.4 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158121873,"data":"fold 100006 draw real distill2 s1 {'teacher': 'base', 'lam': 16.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 96.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158125414,"data":"fold 100006 draw real distill2 s2 {'teacher': 'base', 'lam': 32.0, 'T': 4.0, 'H': 64, 'wd': 0.0001, 'epochs': 30}: 92.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158129049,"data":"fold 100006 draw real distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 32.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158132521,"data":"saved fold 5 draw real: 638 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158135859,"data":"\n"}
+,{"stream_name":"stdout","time":764.158139061,"data":"--- log6\n"}
+,{"stream_name":"stdout","time":764.158259991,"data":"fold 100001 draw 0 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 124.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158274773,"data":"fold 100001 draw 0 distill2 s0 {'teacher': 'base', 'lam': 'pure', 'T': 4.0, 'H': 16, 'wd': 0.01, 'epochs': 30}: 82.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158279168,"data":"fold 100001 draw 0 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 79.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158283284,"data":"saved fold 0 draw 0: 288 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158287503,"data":"\n"}
+,{"stream_name":"stdout","time":764.158291431,"data":"--- log7\n"}
+,{"stream_name":"stdout","time":764.158294601,"data":"fold 100002 draw 0 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 125.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158298631,"data":"fold 100002 draw 0 distill2 s0 {'teacher': 'gbdt', 'lam': 8.0, 'T': 4.0, 'H': 32, 'wd': 0.0001, 'epochs': 15}: 84.6 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158311323,"data":"fold 100002 draw 0 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 41.7 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158315345,"data":"saved fold 1 draw 0: 252 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158318799,"data":"\n"}
+,{"stream_name":"stdout","time":764.158322061,"data":"--- log8\n"}
+,{"stream_name":"stdout","time":764.158328251,"data":"fold 100003 draw 0 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 124.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.15833222,"data":"fold 100003 draw 0 distill2 s0 {'teacher': 'base', 'lam': 32.0, 'T': 4.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 92.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158336744,"data":"fold 100003 draw 0 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 79.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158340771,"data":"saved fold 2 draw 0: 297 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158348923,"data":"\n"}
+,{"stream_name":"stdout","time":764.158352795,"data":"--- log9\n"}
+,{"stream_name":"stdout","time":764.158378704,"data":"fold 100004 draw 0 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 127.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158386173,"data":"fold 100004 draw 0 distill2 s0 {'teacher': 'base', 'lam': 'pure', 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 82.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158390182,"data":"fold 100004 draw 0 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 80.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158394588,"data":"saved fold 3 draw 0: 291 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158398423,"data":"\n"}
+,{"stream_name":"stdout","time":764.158402516,"data":"--- log10\n"}
+,{"stream_name":"stdout","time":764.158456146,"data":"fold 100005 draw 0 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 128.0 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158462226,"data":"fold 100005 draw 0 distill2 s0 {'teacher': 'gbdt', 'lam': 'pure', 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 134.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158466723,"data":"fold 100005 draw 0 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 41.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158470709,"data":"saved fold 4 draw 0: 304 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158476664,"data":"\n"}
+,{"stream_name":"stdout","time":764.158479862,"data":"--- log11\n"}
+,{"stream_name":"stdout","time":764.158506778,"data":"fold 100006 draw 0 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 133.6 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158513941,"data":"fold 100006 draw 0 distill2 s0 {'teacher': 'gbdt', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 135.7 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158518484,"data":"fold 100006 draw 0 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 42.6 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158522593,"data":"saved fold 5 draw 0: 313 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158525923,"data":"\n"}
+,{"stream_name":"stdout","time":764.158529131,"data":"--- log12\n"}
+,{"stream_name":"stdout","time":764.158580851,"data":"fold 100001 draw 1 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 113.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158594941,"data":"fold 100001 draw 1 distill2 s0 {'teacher': 'base', 'lam': 16.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 93.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158598865,"data":"fold 100001 draw 1 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 80.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158603716,"data":"saved fold 0 draw 1: 288 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158607476,"data":"\n"}
+,{"stream_name":"stdout","time":764.158610818,"data":"--- log13\n"}
+,{"stream_name":"stdout","time":764.158661138,"data":"fold 100002 draw 1 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 114.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158670984,"data":"fold 100002 draw 1 distill2 s0 {'teacher': 'gbdt', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 126.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158675231,"data":"fold 100002 draw 1 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 42.0 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158679395,"data":"saved fold 1 draw 1: 284 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158683528,"data":"\n"}
+,{"stream_name":"stdout","time":764.158689396,"data":"--- log14\n"}
+,{"stream_name":"stdout","time":764.158711791,"data":"fold 100003 draw 1 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 114.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158729282,"data":"fold 100003 draw 1 distill2 s0 {'teacher': 'base', 'lam': 'pure', 'T': 4.0, 'H': 16, 'wd': 0.01, 'epochs': 15}: 41.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158733468,"data":"fold 100003 draw 1 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 81.6 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158737789,"data":"saved fold 2 draw 1: 239 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158741438,"data":"\n"}
+,{"stream_name":"stdout","time":764.158744722,"data":"--- log15\n"}
+,{"stream_name":"stdout","time":764.158776599,"data":"fold 100004 draw 1 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 114.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158783193,"data":"fold 100004 draw 1 distill2 s0 {'teacher': 'gbdt', 'lam': 32.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 130.7 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158787036,"data":"fold 100004 draw 1 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 69.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158791015,"data":"saved fold 3 draw 1: 315 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158794728,"data":"\n"}
+,{"stream_name":"stdout","time":764.158798178,"data":"--- log16\n"}
+,{"stream_name":"stdout","time":764.158854493,"data":"fold 100005 draw 1 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 117.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158860899,"data":"fold 100005 draw 1 distill2 s0 {'teacher': 'base', 'lam': 32.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 96.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158865051,"data":"fold 100005 draw 1 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 42.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158868957,"data":"saved fold 4 draw 1: 256 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158872315,"data":"\n"}
+,{"stream_name":"stdout","time":764.158882522,"data":"--- log17\n"}
+,{"stream_name":"stdout","time":764.158906265,"data":"fold 100006 draw 1 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 117.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.1589256,"data":"fold 100006 draw 1 distill2 s0 {'teacher': 'base', 'lam': 'pure', 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 85.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158930274,"data":"fold 100006 draw 1 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 43.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158934006,"data":"saved fold 5 draw 1: 247 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158937374,"data":"\n"}
+,{"stream_name":"stdout","time":764.158940491,"data":"--- log18\n"}
+,{"stream_name":"stdout","time":764.158971698,"data":"fold 100001 draw 2 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 96.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158978345,"data":"fold 100001 draw 2 distill2 s0 {'teacher': 'base', 'lam': 'pure', 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 40.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158982665,"data":"fold 100001 draw 2 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 36.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158986264,"data":"saved fold 0 draw 2: 175 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.158989656,"data":"\n"}
+,{"stream_name":"stdout","time":764.158992788,"data":"--- log19\n"}
+,{"stream_name":"stdout","time":764.159031558,"data":"fold 100002 draw 2 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 89.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159037846,"data":"fold 100002 draw 2 distill2 s0 {'teacher': 'gbdt', 'lam': 8.0, 'T': 2.0, 'H': 64, 'wd': 0.01, 'epochs': 15}: 44.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159042242,"data":"fold 100002 draw 2 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 21.0 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159046688,"data":"saved fold 1 draw 2: 156 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159050154,"data":"\n"}
+,{"stream_name":"stdout","time":764.159053389,"data":"--- log20\n"}
+,{"stream_name":"stdout","time":764.159105333,"data":"fold 100003 draw 2 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 83.5 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159109939,"data":"fold 100003 draw 2 distill2 s0 {'teacher': 'gbdt', 'lam': 16.0, 'T': 4.0, 'H': 64, 'wd': 0.0001, 'epochs': 30}: 61.0 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159113546,"data":"fold 100003 draw 2 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 23.4 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.15911725,"data":"saved fold 2 draw 2: 169 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159120544,"data":"\n"}
+,{"stream_name":"stdout","time":764.159125424,"data":"--- log21\n"}
+,{"stream_name":"stdout","time":764.159198327,"data":"fold 100004 draw 2 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 85.6 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159210759,"data":"fold 100004 draw 2 distill2 s0 {'teacher': 'gbdt', 'lam': 8.0, 'T': 4.0, 'H': 32, 'wd': 0.0001, 'epochs': 15}: 41.2 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159215069,"data":"fold 100004 draw 2 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 31.8 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.15923447,"data":"saved fold 3 draw 2: 159 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159255375,"data":"\n"}
+,{"stream_name":"stdout","time":764.159259163,"data":"--- log22\n"}
+,{"stream_name":"stdout","time":764.159290221,"data":"fold 100005 draw 2 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 84.3 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159298037,"data":"fold 100005 draw 2 distill2 s0 {'teacher': 'gbdt', 'lam': 16.0, 'T': 4.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 65.6 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159302883,"data":"fold 100005 draw 2 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 12.6 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159307117,"data":"saved fold 4 draw 2: 163 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159310628,"data":"\n"}
+,{"stream_name":"stdout","time":764.159313977,"data":"--- log23\n"}
+,{"stream_name":"stdout","time":764.159362689,"data":"fold 100006 draw 2 distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 80.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159369487,"data":"fold 100006 draw 2 distill2 s0 {'teacher': 'gbdt', 'lam': 'pure', 'T': 4.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 55.9 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159374222,"data":"fold 100006 draw 2 distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 15}: 14.1 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159378151,"data":"saved fold 5 draw 2: 151 s on Tesla T4\n"}
+,{"stream_name":"stdout","time":764.159381705,"data":"\n"}
+,{"stream_name":"stdout","time":771.172028212,"data":"onf': -0.9339, 'distill_nokd:logit': -0.0921, 'distill_nokd:conf': 1.4781}\n"}
+,{"stream_name":"stdout","time":771.1720632,"data":"real fold 100004: members ['distill', 'distill2', 'distill_nokd'] C 1.0 inner LOPO TM 0.797 tau 0.223 coef {'distill:logit': -0.0452, 'distill:conf': 0.4164, 'distill2:logit': 2.3369, 'distill2:conf': -1.0533, 'distill_nokd:logit': -0.1018, 'distill_nokd:conf': 0.1857}\n"}
+,{"stream_name":"stdout","time":771.17206849,"data":"real fold 100005: members ['distill2', 'distill', 'distill_nokd'] C 1.0 inner LOPO TM 0.706 tau 0.290 coef {'distill2:logit': 3.9418, 'distill2:conf': -0.0713, 'distill:logit': -2.2887, 'distill:conf': -0.7248, 'distill_nokd:logit': 0.1786, 'distill_nokd:conf': 1.4817}\n"}
+,{"stream_name":"stdout","time":771.172071772,"data":"real fold 100006: members ['distill2', 'distill', 'distill_nokd'] C 1.0 inner LOPO TM 0.728 tau 0.282 coef {'distill2:logit': 0.7123, 'distill2:conf': -0.1832, 'distill:logit': 1.6884, 'distill:conf': -0.1185, 'distill_nokd:logit': -0.2472, 'distill_nokd:conf': 1.2269}\n"}
+,{"stream_name":"stdout","time":771.172074753,"data":"  ens3_gpu L0: TM 0.823 answered 0.69\n"}
+,{"stream_name":"stdout","time":771.172077238,"data":"  ens3_gpu L1: TM 0.723 answered 0.73\n"}
+,{"stream_name":"stdout","time":771.17207992,"data":"  ens3_gpu L2: TM 0.707 answered 0.71\n"}
+,{"stream_name":"stdout","time":771.172082355,"data":"  ens3_gpu L3: TM 0.723 answered 0.72\n"}
+,{"stream_name":"stdout","time":771.1720847,"data":"  ens3_gpu L4: TM 0.713 answered 0.71\n"}
+,{"stream_name":"stdout","time":771.172087121,"data":"  ens3_gpu L5: TM 0.689 answered 0.66\n"}
+,{"stream_name":"stdout","time":771.172089459,"data":"  ens3_gpu X1: TM 0.742 answered 0.65\n"}
+,{"stream_name":"stdout","time":771.172091832,"data":"real fold 100001: members ['distill2', 'distill', 'distill_nokd'] C 0.01 inner LOPO TM 0.714 tau 0.205 coef {'distill2:logit': 0.5477, 'distill2:conf': -0.0344, 'distill:logit': 0.4741, 'distill:conf': -0.0283, 'distill_nokd:logit': 0.0804, 'distill_nokd:conf': 0.1306}\n"}
+,{"stream_name":"stdout","time":771.172103715,"data":"real fold 100002: members ['distill2', 'distill', 'distill_nokd'] C 0.1 inner LOPO TM 0.720 tau 0.274 coef {'distill2:logit': 0.7178, 'distill2:conf': -0.2754, 'distill:logit': 0.6576, 'distill:conf': 0.1356, 'distill_nokd:logit': 0.0599, 'distill_nokd:conf': 0.5574}\n"}
+,{"stream_name":"stdout","time":771.172107587,"data":"real fold 100003: members ['distill2', 'distill', 'distill_nokd'] C 1.0 inner LOPO TM 0.737 tau 0.495 coef {'distill2:logit': 1.4811, 'distill2:conf': -0.179, 'distill:logit': 0.2444, 'distill:conf': -0.12, 'distill_nokd:logit': -0.0752, 'distill_nokd:conf': 1.2865}\n"}
+,{"stream_name":"stdout","time":771.172111507,"data":"real fold 100004: members ['distill2', 'distill', 'distill_nokd'] C 1.0 inner LOPO TM 0.748 tau 0.468 coef {'distill2:logit': 1.0569, 'distill2:conf': -0.3939, 'distill:logit': 0.2251, 'distill:conf': 0.4138, 'distill_nokd:logit': 0.064, 'distill_nokd:conf': 0.0135}\n"}
+,{"stream_name":"stdout","time":771.172114424,"data":"real fold 100005: members ['distill2', 'distill', 'distill_nokd'] C 1.0 inner LOPO TM 0.695 tau 0.323 coef {'distill2:logit': 1.6584, 'distill2:conf': -0.0127, 'distill:logit': 0.2411, 'distill:conf': -0.3246, 'distill_nokd:logit': 0.0329, 'distill_nokd:conf': 1.2645}\n"}
+,{"stream_name":"stdout","time":771.172117294,"data":"real fold 100006: members ['distill2', 'distill', 'distill_nokd'] C 1.0 inner LOPO TM 0.714 tau 0.411 coef {'distill2:logit': 0.6083, 'distill2:conf': -0.1017, 'distill:logit': 1.1403, 'distill:conf': -0.0406, 'distill_nokd:logit': -0.0944, 'distill_nokd:conf': 1.0594}\n"}
+,{"stream_name":"stdout","time":771.172120136,"data":"  ens3_gpu_s0 L0: TM 0.761 answered 0.59\n"}
+,{"stream_name":"stdout","time":771.172122594,"data":"  ens3_gpu_s0 L1: TM 0.705 answered 0.58\n"}
+,{"stream_name":"stdout","time":771.172124978,"data":"  ens3_gpu_s0 L2: TM 0.709 answered 0.57\n"}
+,{"stream_name":"stdout","time":771.172127428,"data":"  ens3_gpu_s0 L3: TM 0.690 answered 0.57\n"}
+,{"stream_name":"stdout","time":771.172129888,"data":"  ens3_gpu_s0 L4: TM 0.702 answered 0.55\n"}
+,{"stream_name":"stdout","time":771.172132252,"data":"  ens3_gpu_s0 L5: TM 0.683 answered 0.45\n"}
+,{"stream_name":"stdout","time":771.172134622,"data":"  ens3_gpu_s0 X1: TM 0.680 answered 0.48\n"}
+,{"stream_name":"stdout","time":771.172137024,"data":"0 fold 100001: members ['distill2', 'distill_nokd', 'distill'] C 0.1 inner LOPO TM 0.500 tau 0.070 coef {'distill2:logit': 29.2324, 'distill2:conf': -0.2984, 'distill_nokd:logit': 0.3324, 'distill_nokd:conf': -0.313, 'distill:logit': -2.6851, 'distill:conf': 0.5578}\n"}
+,{"stream_name":"stdout","time":771.172140181,"data":"0 fold 100002: members ['distill', 'distill2', 'distill_nokd'] C 0.01 inner LOPO TM 0.527 tau 0.039 coef {'distill:logit': 1.0863, 'distill:conf': 0.0482, 'distill2:logit': -0.0137, 'distill2:conf': -0.0345, 'distill_nokd:logit': -0.3128, 'distill_nokd:conf': -0.0034}\n"}
+,{"stream_name":"stdout","time":771.172143024,"data":"0 fold 100003: members ['distill', 'distill_nokd', 'distill2'] C 0.1 inner LOPO TM 0.503 tau 0.101 coef {'distill:logit': -0.7393, 'distill:conf': 0.1877, 'distill_nokd:logit': 2.7639, 'distill_nokd:conf': -0.1675, 'distill2:logit': 0.6516, 'distill2:conf': -0.2896}\n"}
+,{"stream_name":"stdout","time":771.172146105,"data":"0 fold 100004: members ['distill2', 'distill', 'distill_nokd'] C 0.01 inner LOPO TM 0.514 tau 0.018 coef {'distill2:logit': -1.5782, 'distill2:conf': 0.1127, 'distill:logit': 0.1569, 'distill:conf': 0.1079, 'distill_nokd:logit': -0.1478, 'distill_nokd:conf': 0.061}\n"}
+,{"stream_name":"stdout","time":771.172148985,"data":"0 fold 100005: members ['distill_nokd', 'distill2', 'distill'] C 0.01 inner LOPO TM 0.505 tau 0.031 coef {'distill_nokd:logit': 14.5585, 'distill_nokd:conf': -3.5289, 'distill2:logit': 0.2103, 'distill2:conf': -0.02, 'distill:logit': 0.7866, 'distill:conf': -0.0374}\n"}
+,{"stream_name":"stdout","time":771.172154133,"data":"0 fold 100006: members ['distill2', 'distill_nokd', 'distill'] C 1.0 inner LOPO TM 0.499 tau 0.115 coef {'distill2:logit': 0.0625, 'distill2:conf': -0.0539, 'distill_nokd:logit': -5.5437, 'distill_nokd:conf': 2.0564, 'distill:logit': -0.1539, 'distill:conf': 0.0475}\n"}
+,{"stream_name":"stdout","time":771.172157032,"data":"  ens3_gpu_null L0: TM 0.572 answered 0.19\n"}
+,{"stream_name":"stdout","time":771.172159492,"data":"1 fold 100001: members ['distill_nokd', 'distill', 'distill2'] C 0.01 inner LOPO TM 0.513 tau 0.045 coef {'distill_nokd:logit': 0.1119, 'distill_nokd:conf': -0.0691, 'distill:logit': 0.282, 'distill:conf': 0.0677, 'distill2:logit': -0.455, 'distill2:conf': 0.1636}\n"}
+,{"stream_name":"stdout","time":771.172162278,"data":"1 fold 100002: members ['distill', 'distill2', 'distill_nokd'] C 1.0 inner LOPO TM 0.506 tau 0.097 coef {'distill:logit': -2.5361, 'distill:conf': 0.261, 'distill2:logit': -0.179, 'distill2:conf': 0.0256, 'distill_nokd:logit': 51.175, 'distill_nokd:conf': 0.5521}\n"}
+,{"stream_name":"stdout","time":771.1721967,"data":"1 fold 100003: members ['distill2', 'distill', 'distill_nokd'] C 0.01 inner LOPO TM 0.509 tau 0.356 coef {'distill2:logit': 6.8552, 'distill2:conf': 0.0766, 'distill:logit': -0.7871, 'distill:conf': 0.1517, 'distill_nokd:logit': -1.7176, 'distill_nokd:conf': -0.4637}\n"}
+,{"stream_name":"stdout","time":771.172204848,"data":"1 fold 100004: members ['distill_nokd', 'distill2', 'distill'] C 1.0 inner LOPO TM 0.501 tau 0.034 coef {'distill_nokd:logit': -0.0197, 'distill_nokd:conf': 0.212, 'distill2:logit': 0.7733, 'distill2:conf': -0.3377, 'distill:logit': -1.7072, 'distill:conf': 0.1616}\n"}
+,{"stream_name":"stdout","time":771.172209661,"data":"1 fold 100005: members ['distill2', 'distill', 'distill_nokd'] C 1.0 inner LOPO TM 0.508 tau 0.044 coef {'distill2:logit': 2.2476, 'distill2:conf': -0.2017, 'distill:logit': -0.9218, 'distill:conf': 0.1098, 'distill_nokd:logit': 0.6556, 'distill_nokd:conf': 1.6979}\n"}
+,{"stream_name":"stdout","time":771.172214864,"data":"1 fold 100006: members ['distill2', 'distill_nokd', 'distill'] C 0.01 inner LOPO TM 0.488 tau 0.043 coef {'distill2:logit': -0.3994, 'distill2:conf': 0.1046, 'distill_nokd:logit': -0.1898, 'distill_nokd:conf': 0.1436, 'distill:logit': 0.1546, 'distill:conf': -0.059}\n"}
+,{"stream_name":"stdout","time":771.172219606,"data":"  ens3_gpu_nulld1_null L0: TM 0.477 answered 0.27\n"}
+,{"stream_name":"stdout","time":771.172223453,"data":"2 fold 100001: members ['distill', 'distill_nokd', 'distill2'] C 0.01 inner LOPO TM 0.495 tau 0.020 coef {'distill:logit': -2.0345, 'distill:conf': 0.5733, 'distill_nokd:logit': -0.0207, 'distill_nokd:conf': 0.0559, 'distill2:logit': 1.2335, 'distill2:conf': -0.0443}\n"}
+,{"stream_name":"stdout","time":771.172234039,"data":"2 fold 100002: members ['distill_nokd', 'distill', 'distill2'] C 0.01 inner LOPO TM 0.520 tau 0.034 coef {'distill_nokd:logit': 10.2871, 'distill_nokd:conf': -0.9178, 'distill:logit': -0.5652, 'distill:conf': -0.0299, 'distill2:logit': 0.8985, 'distill2:conf': -0.0101}\n"}
+,{"stream_name":"stdout","time":771.172238401,"data":"2 fold 100003: members ['distill_nokd', 'distill2', 'distill'] C 0.01 inner LOPO TM 0.491 tau 0.031 coef {'distill_nokd:logit': 5.6302, 'distill_nokd:conf': -0.8404, 'distill2:logit': 0.1234, 'distill2:conf': 0.0465, 'distill:logit': -0.1719, 'distill:conf': -0.0368}\n"}
+,{"stream_name":"stdout","time":771.172242704,"data":"2 fold 100004: members ['distill2', 'distill_nokd', 'distill'] C 1.0 inner LOPO TM 0.500 tau 0.039 coef {'distill2:logit': -0.1386, 'distill2:conf': 0.4478, 'distill_nokd:logit': -0.4047, 'distill_nokd:conf': 0.2567, 'distill:logit': 1.1151, 'distill:conf': -0.3314}\n"}
+,{"stream_name":"stdout","time":771.172256751,"data":"2 fold 100005: members ['distill2', 'distill_nokd', 'distill'] C 0.01 inner LOPO TM 0.497 tau 0.021 coef {'distill2:logit': -0.4251, 'distill2:conf': -0.0074, 'distill_nokd:logit': -0.7241, 'distill_nokd:conf': 0.4187, 'distill:logit': 0.5051, 'distill:conf': 0.0677}\n"}
+,{"stream_name":"stdout","time":771.172259791,"data":"2 fold 100006: members ['distill_nokd', 'distill2', 'distill'] C 0.1 inner LOPO TM 0.500 tau 0.048 coef {'distill_nokd:logit': -23.8193, 'distill_nokd:conf': 1.7506, 'distill2:logit': -0.3975, 'distill2:conf': 0.8442, 'distill:logit': -1.1261, 'distill:conf': 0.2209}\n"}
+,{"stream_name":"stdout","time":771.172262553,"data":"  ens3_gpu_nulld2_null L0: TM 0.447 answered 0.10\n"}
+,{"stream_name":"stdout","time":771.172264976,"data":" \n"}
+,{"stream_name":"stdout","time":771.172423926,"data":"{'kind': 'all', 'device': 'Tesla T4', 'n_gpu': 2, 'torch': '2.11.0+cu130', 'train_wall_s': 763.3, 'total_wall_s': 770.3, 'jobs': ['--fold 0 --draw real', '--fold 1 --draw real', '--fold 2 --draw real', '--fold 3 --draw real', '--fold 4 --draw real', '--fold 5 --draw real', '--fold 0 --draw 0', '--fold 1 --draw 0', '--fold 2 --draw 0', '--fold 3 --draw 0', '--fold 4 --draw 0', '--fold 5 --draw 0', '--fold 0 --draw 1', '--fold 1 --draw 1', '--fold 2 --draw 1', '--fold 3 --draw 1', '--fold 4 --draw 1', '--fold 5 --draw 1', '--fold 0 --draw 2', '--fold 1 --draw 2', '--fold 2 --draw 2', '--fold 3 --draw 2', '--fold 4 --draw 2', '--fold 5 --draw 2']}\n"}
+,{"stream_name":"stdout","time":772.900802172,"data":"packed\n"}
+,{"stream_name":"stderr","time":775.698739404,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":775.698766183,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":776.030643568,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":776.030669026,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":776.958766267,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":778.051496419,"data":"[NbConvertApp] Writing 380532 bytes to __results__.html\n"}
+]

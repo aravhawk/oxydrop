@@ -54,12 +54,12 @@ console.log(`features ${worstX.toExponential(2)} (tol ${TOL_X}), probability ${w
 
 // trained export's own 2-window reference (distill_export.py) through the app file
 {
-  const src = JSON.parse(fs.readFileSync(new URL('results/photon/distill_weights.json', root)));
+  const src = JSON.parse(fs.readFileSync(new URL(model.source.split(' ')[0], root)));
   const net = new DistillNet(model);
   src.reference.X.forEach((x, i) => {
     const o = net.predict(x);
-    check(Math.abs(o.p - src.reference.score[i]) < 1e-6, `distill_weights.json reference window ${i}: p ${o.p} vs ${src.reference.score[i]}`);
-    check(o.answer === src.reference.answer[i], `distill_weights.json reference window ${i}: answer differs`);
+    check(Math.abs(o.p - src.reference.score[i]) < 1e-6, `weights-file reference window ${i}: p ${o.p} vs ${src.reference.score[i]}`);
+    check(o.answer === src.reference.answer[i], `weights-file reference window ${i}: answer differs`);
   });
 }
 
@@ -88,7 +88,7 @@ console.log(`features ${worstX.toExponential(2)} (tol ${TOL_X}), probability ${w
   const want = R.t.map((t, i) => i).filter((i) => R.eval[i]);
   check(got.length === want.length && got.every((d, k) => Math.abs(d.modelP - R.p[want[k]]) < TOL_P && d.modelAbstain === !R.answer[want[k]]), 'engine slot windows differ from the reference');
   check(got.every((d) => d.label === (d.modelAbstain ? 'unsure' : d.modelP > 0.5 ? 'HYPOXIC' : 'normal')), 'engine slot label is not the model output');
-  check(e.info.id === 'oxydrop-photon-distill-v1', `engine id ${e.info.id}`);
+  check(e.info.id === 'oxydrop-photon-distill2-v1', `engine id ${e.info.id}`);
   const L = e.latency(); console.log(`engine slot (v2 quality chain + distill) per 2 s window: median ${L.median.toFixed(2)} ms, p95 ${L.p95.toFixed(2)} ms`);
 }
 

@@ -130,7 +130,7 @@ def evaluate(ev, models, names, shippable, today, check_deadline):
     inc0 = ev.get(INCUMBENT, 0)
     rows = []
     for m in names:
-        c = dict(model=m, round=3 if m in ROUND3 else 2)
+        c = dict(model=m, round=2 if m in ROUND2 else 3)
         c['have'] = [l for l in ALL_LEVELS if ev.get(m, l) is not None]
         c['missing'] = [W.lname(l) for l in ALL_LEVELS if l not in c['have']]
         c['seeds'] = sorted(n for n in models if classify(n, [m])[:2] == ('seed', m) and ev.get(n, 0) is not None)

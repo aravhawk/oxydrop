@@ -1,0 +1,37 @@
+{
+ "opset": 17,
+ "files": [
+  "distill_student0.onnx",
+  "distill_student1.onnx",
+  "distill_student2.onnx"
+ ],
+ "n_windows": 1280,
+ "recordings": {
+  "100001L": 541,
+  "100004R": 503,
+  "100001L_L4": 236
+ },
+ "tau": 0.9458259173022209,
+ "versions": {
+  "torch": "2.15.0+cpu",
+  "onnx": "1.23.2",
+  "onnxruntime": "1.32.0"
+ },
+ "max_abs_logit_ort_vs_torch32": 3.814697265625e-06,
+ "max_abs_logit_ort_vs_torch64": 6.477261118575939e-06,
+ "max_abs_p_ort_vs_torch32": 3.810745041743502e-08,
+ "max_abs_p_ort_vs_torch64": 1.5366208372391554e-07,
+ "max_abs_p_ort_vs_app_reference": 1.5366208372391554e-07,
+ "max_abs_spo2_ort_vs_torch64": 5.5978618860308416e-06,
+ "max_abs_conf_ort_vs_torch64": 2.9461030215394146e-07,
+ "abstain_mismatch_ort_vs_torch64": 0,
+ "abstain_mismatch_ort_vs_app_reference": 0,
+ "abstain_mismatch_torch32_vs_torch64": 0,
+ "min_abs_conf_minus_tau": 0.00019719412498353517,
+ "n_nan_inputs": 0,
+ "nonfinite_test": {
+  "n_windows": 200,
+  "n_nonfinite_entries": 529,
+  "max_abs_logit_ort_vs_torch64": 4.101694850100479e-06
+ }
+}

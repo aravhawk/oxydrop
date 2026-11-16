@@ -1,4 +1,4 @@
-const V = 'oxydrop-v3.5-photon-distill';
+const V = 'oxydrop-v3.6-photon-distill2';
 // everything the engines need offline: the page, the engines (the default engine slot with the PhotonDistill student and its feature front end, the hybrid
 // with its CNN worker and three CNN seed files behind ?engine=hybrid, the logistic chain), the model / physics-chain / meta / conformal parameters and the replay demo
 const ASSETS = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon.svg',

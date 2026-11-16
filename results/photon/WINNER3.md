@@ -1,6 +1,6 @@
 # Round 3 winner (mechanical application of ROUND3.md, Amendment 8)
 
-Written by `python -m oxydrop_ml.photon.winner3` (Sun Nov 15 20:37:00 CST 2026) from the score files that existed at that moment. Rule, verbatim from `.agents/tasks/task-oxydrop-photon-model/ROUND3.md` (stated 19:55 CT, before any round-3 score):
+Written by `python -m oxydrop_ml.photon.winner3` (Sun Nov 15 21:01:16 CST 2026) from the score files that existed at that moment. Rule, verbatim from `.agents/tasks/task-oxydrop-photon-model/ROUND3.md` (stated 19:55 CT, before any round-3 score):
 
 > Eligible: trained models from rounds 2 and 3 that pass nulls and rule 3. Replace `distill` only if a candidate's L0 3-seed ensemble TM point estimate exceeds distill's (0.758) AND its paired difference vs distill has a lower CI bound > -0.02 AND its stress mean paired diff vs chain_v1 over L3-L5 and X1 is >= 0. "Beats chain" still requires the paired CI vs chain_v1 excluding 0, >= 5/6 people better, worst person not below chain's. All round-3 models are designed after rounds 1-2 outer results were seen (Amendment 8).
 
@@ -15,6 +15,10 @@ Written by `python -m oxydrop_ml.photon.winner3` (Sun Nov 15 20:37:00 CST 2026) 
 * `ssl3`: no L0 score file yet.
 * `photonnet_xl` does NOT replace distill: g1 fails: L0 0.660 does not exceed distill 0.758; g2 fails: paired CI lower bound vs distill -0.161 <= -0.02.
 * `ens3` does NOT replace distill: nulls: NOT PASSED (missing null control).
+* `distill2_gpu`: no L0 score file yet.
+* `ssl3_gpu` does NOT replace distill: g1 fails: L0 0.596 does not exceed distill 0.758; g2 fails: paired CI lower bound vs distill -0.232 <= -0.02.
+* `multida_gpu`: no L0 score file yet.
+* `ens3_gpu`: no L0 score file yet.
 * **REPLACE `distill` with `distill2`** by the planner's ROUND3 LOCK: planner ROUND3 LOCK, 20:22 CT (task.json): winner = distill2; its files landed 20:16 CT per its author log, one minute after the 20:15 CT cutoff, and the planner accepted that with disclosure (file mtime on this box 20:18, copied after the sandbox run). Rule 3 is author-confirmed (same 39-feature front end and an nn-runtime-v1 MLP), not verified by R3-EVAL. `distill2` passes every numeric condition (L0 0.784 > 0.758; paired vs distill CI lower bound -0.010 > -0.02; stress mean vs chain_v1 +0.144 >= 0; nulls passed); the mtime flag above marks it late (distill2_d1_null, distill2_d2_null, distill2_null, distill2__L0), and the lock waives that by disclosure, not silently.
 * At L0 `distill2` TIES the logistic chain_v1: paired -0.012 [-0.091, +0.012], 4/6 people better, worst person 0.500. It does not beat chain_v1.
 
@@ -37,6 +41,10 @@ Reference `chain_v1`: L0 TM 0.796 [0.636, 0.857], worst person 0.458.
 | ssl3 | 3 | no L0 score file yet |  |  |  |  |  |  | no null files yet | L0, L1, L2, L3, L4, L5, X1 |
 | photonnet_xl | 3 | 0.660 [0.545, 0.762] | -0.098 [-0.161, -0.011] | no | no | yes (+0.139) | -0.136 [-0.210, -0.033] 2/6 | no | passed: null mean 0.412 over 3 distinct draw(s) | none |
 | ens3 | 3 | 0.789 [0.621, 0.842] | +0.031 [-0.012, +0.078] | yes | yes | yes (+0.143) | -0.007 [-0.092, +0.043] 4/6 | no | NOT PASSED (missing null control) | none |
+| distill2_gpu | 3 | no L0 score file yet |  |  |  |  |  |  | no null files yet | L0, L1, L2, L3, L4, L5, X1 |
+| ssl3_gpu | 3 | 0.596 [0.514, 0.665] | -0.162 [-0.232, -0.085] | no | no | yes (+0.079) | -0.201 [-0.286, -0.099] 2/6 | no | passed: null mean 0.476 over 3 distinct draw(s) | none |
+| multida_gpu | 3 | no L0 score file yet |  |  |  |  |  |  | no null files yet | L0, L1, L2, L3, L4, L5, X1 |
+| ens3_gpu | 3 | no L0 score file yet |  |  |  |  |  |  | no null files yet | L0, L1, L2, L3, L4, L5, X1 |
 
 ## Stress: paired difference to chain_v1 [95 % CI] people better
 
@@ -50,6 +58,7 @@ Reference `chain_v1`: L0 TM 0.796 [0.636, 0.857], worst person 0.458.
 | multida | +0.115 [+0.003, +0.216] 4/6 | +0.093 [+0.002, +0.189] 6/6 | +0.161 [+0.026, +0.232] 5/6 | +0.170 [+0.027, +0.328] 6/6 | 0.135 |
 | photonnet_xl | +0.115 [-0.028, +0.229] 3/6 | +0.086 [-0.020, +0.207] 5/6 | +0.169 [+0.018, +0.269] 5/6 | +0.184 [+0.072, +0.290] 6/6 | 0.139 |
 | ens3 | +0.149 [-0.007, +0.255] 4/6 | +0.085 [+0.003, +0.193] 6/6 | +0.141 [+0.043, +0.248] 5/6 | +0.197 [+0.074, +0.280] 6/6 | 0.143 |
+| ssl3_gpu | +0.038 [-0.056, +0.137] 2/6 | +0.033 [-0.030, +0.126] 4/6 | +0.112 [-0.001, +0.165] 4/6 | +0.132 [+0.006, +0.236] 6/6 | 0.079 |
 
 ## Seeds, timeline, rule 3
 
@@ -64,6 +73,10 @@ Reference `chain_v1`: L0 TM 0.796 [0.636, 0.857], worst person 0.458.
 | ssl3 | 0 | none | none | unconfirmed (manual) |
 | photonnet_xl | 3 | photonnet_xl_seed0, photonnet_xl_seed1, photonnet_xl_seed2 | none | unconfirmed (manual) |
 | ens3 | 0 | none | ens3__L0 | unconfirmed (manual) |
+| distill2_gpu | 0 | none | none | unconfirmed (manual) |
+| ssl3_gpu | 3 | ssl3_gpu_s0, ssl3_gpu_s1, ssl3_gpu_s2 | ssl3_gpu_d1_null, ssl3_gpu_d2_null, ssl3_gpu_null, ssl3_gpu__L0, ssl3_gpu__L3, ssl3_gpu__L4, ssl3_gpu__L5, ssl3_gpu__X1 | unconfirmed (manual) |
+| multida_gpu | 0 | none | none | unconfirmed (manual) |
+| ens3_gpu | 0 | none | none | unconfirmed (manual) |
 
 ## Skipped files
 

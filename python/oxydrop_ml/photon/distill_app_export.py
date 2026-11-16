@@ -1,7 +1,8 @@
 """App export of the PhotonDistill student (FEAT-006): app/data/distill.json (nn-runtime-v1 graphs + feature normaliser) and the parity fixture
 tests/fixtures/ref_distill.json (39 features and model outputs of every window of the fixture recordings, computed by the Python reference).
 
-    cd python && python -m oxydrop_ml.photon.distill_app_export
+    cd python && python -m oxydrop_ml.photon.distill_app_export [--src results/photon/<model>_weights.json] [--engine-id ID]
+    (--src: weights file in the distill_export.py format, same 39-feature front end; default results/photon/distill_weights.json. scripts/swap_engine_model.sh wraps this.)
 
 Source of the weights: results/photon/distill_weights.json, written by distill_export.py: the 3 students refit on all 6 Hoffman people with the modal
 nested recipe (teachers refit on all 6 as well). The numbers quoted for this model are the leave-one-person-out ones (results/photon/distill_log.md),
@@ -66,11 +67,11 @@ def graph(st, n_in):
     }
 
 
-def app_json(src):
+def app_json(src, src_path=SRC, engine_id=ENGINE_ID):
     n = len(src['cols'])
-    return dict(format=FORMAT, id=ENGINE_ID, model='distill', cols=src['cols'], tau=src['tau'], recipe=src['recipe'],
+    return dict(format=FORMAT, id=engine_id, model='distill', cols=src['cols'], tau=src['tau'], recipe=src['recipe'],
                 heads=dict(hyp='logit of P(SpO2 < 90)', spo2='(SpO2 - 90) / 5', abstain='logit of P(hyp head correct); answer = mean sigmoid >= tau'),
-                source='results/photon/distill_weights.json (python/oxydrop_ml/photon/distill_export.py); app export python/oxydrop_ml/photon/distill_app_export.py',
+                source=f'{src_path.relative_to(REPO.resolve()) if REPO.resolve() in src_path.parents else src_path} (python/oxydrop_ml/photon/distill_export.py); app export python/oxydrop_ml/photon/distill_app_export.py',
                 note='Trained on the Hoffman 2022 dataset (6 people, all used in this refit); research prototype, not a medical device.',
                 students=[dict(prep=st['prep'], graph=graph(st, n)) for st in src['students']])
 
@@ -90,19 +91,25 @@ def forward(app, X):
     return sc, sp, cf, cf >= float(app['tau'])
 
 
-def main():
+def main(argv=None):
+    import argparse
     import warnings
     warnings.filterwarnings('ignore')
-    src = json.loads(SRC.read_text())
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--engine-id', default=ENGINE_ID, help=f'engine id written to the app file and the fixture (default {ENGINE_ID})')
+    ap.add_argument('--src', default=str(SRC), help='weights JSON in the distill_export.py format (default results/photon/distill_weights.json)')
+    args = ap.parse_args(argv)
+    src_path = Path(args.src).resolve()
+    src = json.loads(src_path.read_text())
     assert src['cols'] == F.COLS
-    app = app_json(src)
+    app = app_json(src, src_path, args.engine_id)
     OUT_APP.write_text(json.dumps(app))
     app = json.loads(OUT_APP.read_text())
     # the trained export's own 2-window reference must be reproduced from the app file
     Xr = np.asarray(src['reference']['X'], np.float64)
     sc, sp, cf, an = forward(app, Xr)
     d = float(np.max(np.abs(sc - np.asarray(src['reference']['score']))))
-    print(f'app file vs distill_weights.json reference: max |dp| = {d:.2e}')
+    print(f'app file vs the weights-file reference: max |dp| = {d:.2e}')
     assert d < 1e-6 and list(an) == src['reference']['answer']
     stress_csv()
     recs = {}
@@ -114,7 +121,7 @@ def main():
         recs[name] = dict(csv=rel, n_samples=int(len(rgb)), t=t.astype(int).tolist(), X=[[None if not np.isfinite(v) else float(v) for v in row] for row in X],
                           p=sc.tolist(), spo2=sp.tolist(), conf=cf.tolist(), answer=[bool(v) for v in an], eval=[bool(v) for v in ev])
         print(f'{name}: {len(t)} windows, eval {int(ev.sum())}, answered {int(an[ev].sum())}, p>0.5 among answered {int((sc[ev & an] > 0.5).sum())}')
-    OUT_REF.write_text(json.dumps(dict(engine=ENGINE_ID, model_file='app/data/distill.json', cols=F.COLS, tau=app['tau'], cal=CAL,
+    OUT_REF.write_text(json.dumps(dict(engine=args.engine_id, model_file='app/data/distill.json', cols=F.COLS, tau=app['tau'], cal=CAL,
                                        generator='python/oxydrop_ml/photon/distill_app_export.py', recordings=recs)))
     print('wrote', OUT_APP, OUT_REF)
 

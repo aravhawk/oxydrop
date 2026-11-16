@@ -13,7 +13,7 @@ const hw = JSON.parse(fs.readFileSync(path.join(APP, 'data/hybrid_weights.json')
 for (const m of hw.members) check(list.includes('data/' + m.weights), `${m.weights} is not precached`);
 for (const f of ['data/distill.json', 'data/hybrid_weights.json', 'data/conformal.json', 'data/weights.json']) check(list.includes(f), `${f} is not precached`);
 check(/const V = 'oxydrop-v3/.test(src), 'cache version must be bumped so the deployed PWA picks up the new files');
-check(/const V = 'oxydrop-v3\.5-photon-distill'/.test(src), 'cache version must name the PhotonDistill build (oxydrop-v3.5-photon-distill) so installed PWAs drop the old cache');
+check(/const V = 'oxydrop-v3\.6-photon-distill2'/.test(src), 'cache version must name the PhotonDistill build (oxydrop-v3.6-photon-distill2) so installed PWAs drop the old cache');
 const photonModel = fs.readFileSync(path.join(APP, 'js/photon_engine.js'), 'utf8').match(/DEFAULT_PHOTON_MODEL = '([^']+)'/)[1];
 check(list.includes(`data/${photonModel}.json`), `the photon slot's default model file data/${photonModel}.json is not precached`);
 const appJs = fs.readFileSync(path.join(APP, 'js/app.js'), 'utf8'), V = src.match(/^const V = '([^']*)'/)[1];
