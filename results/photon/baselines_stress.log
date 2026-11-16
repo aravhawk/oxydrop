@@ -1,0 +1,20 @@
+5644 windows, 6 people, chain features from raw Hoffman CSVs
+features for 7 levels done (22s)
+  chain_v1: folds done (23s), hp per fold: [(0.01, 0.1), (0.01, 0.1), (0.01, 0.1), (0.01, 0.1), (0.01, 0.1), (0.01, 0.1)]
+  chain_v1 L0: TM bal. acc. 0.796, answered 0.84
+  chain_v1 L1: TM bal. acc. 0.805, answered 0.84
+  chain_v1 L2: TM bal. acc. 0.742, answered 0.88
+  chain_v1 L3: TM bal. acc. 0.565, answered 0.92
+  chain_v1 L4: TM bal. acc. 0.598, answered 0.86
+  chain_v1 L5: TM bal. acc. 0.535, answered 0.91
+  chain_v1 X1: TM bal. acc. 0.508, answered 0.92
+  chain_v1_nestedC: folds done (36s), hp per fold: [(1.0, 0.01), (10.0, 0.01), (1.0, 0.01), (0.01, 0.01), (0.1, 0.01), (10.0, 0.1)]
+  chain_v1_nestedC L0: TM bal. acc. 0.786, answered 0.82
+  chain_v1_nestedC L1: TM bal. acc. 0.791, answered 0.81
+  chain_v1_nestedC L2: TM bal. acc. 0.746, answered 0.85
+  chain_v1_nestedC L3: TM bal. acc. 0.541, answered 0.91
+  chain_v1_nestedC L4: TM bal. acc. 0.579, answered 0.82
+  chain_v1_nestedC L5: TM bal. acc. 0.518, answered 0.84
+  chain_v1_nestedC X1: TM bal. acc. 0.493, answered 0.92
+  cnn_full L0: TM bal. acc. 0.753
+  hybrid_final L0: TM bal. acc. 0.779

@@ -1,0 +1,82 @@
+
+disjoint: {'pretrain_rows': 346298, 'pretrain_cols': ['subject'], 'hoffman_people': 6}
+prep clean: 4s, baseline ok 12/12, maxrss 648 MB
+prep aug0: 5s, baseline ok 12/12, maxrss 671 MB
+prep aug1: 5s, baseline ok 12/12, maxrss 684 MB
+prep aug2: 5s, baseline ok 12/12, maxrss 684 MB
+prep L1: 5s, baseline ok 12/12, maxrss 684 MB
+prep L2: 5s, baseline ok 12/12, maxrss 684 MB
+prep L3: 5s, baseline ok 12/12, maxrss 684 MB
+prep L4: 5s, baseline ok 12/12, maxrss 684 MB
+prep L5: 5s, baseline ok 12/12, maxrss 684 MB
+prep X1: 5s, baseline ok 12/12, maxrss 684 MB
+  fold hof_100001: lr 0.001 ep 2 inner 0.692 q 0.3 thr 0.595
+  fold hof_100002: lr 0.003 ep 2 inner 0.714 q 0.3 thr 0.480
+  fold hof_100003: lr 0.003 ep 16 inner 0.662 q 0.1 thr 0.690
+  fold hof_100004: lr 0.001 ep 2 inner 0.733 q 0.3 thr 0.565
+  fold hof_100005: lr 0.001 ep 2 inner 0.646 q 0.3 thr 0.477
+  fold hof_100006: lr 0.001 ep 2 inner 0.649 q 0.3 thr 0.521
+oxyssl_s0: L0 TM 0.661 (145s)
+  fold hof_100001: lr 0.003 ep 8 inner 0.504 q 0.0 thr -inf
+  fold hof_100002: lr 0.001 ep 2 inner 0.508 q 0.3 thr 0.324
+  fold hof_100003: lr 0.001 ep 4 inner 0.504 q 0.0 thr -inf
+  fold hof_100004: lr 0.001 ep 4 inner 0.505 q 0.3 thr 0.344
+  fold hof_100005: lr 0.003 ep 2 inner 0.502 q 0.1 thr 0.179
+  fold hof_100006: lr 0.003 ep 4 inner 0.510 q 0.0 thr -inf
+oxyssl_null: L0 TM 0.654 (144s)
+  fold hof_100001: lr 0.003 ep 16 inner 0.509 q 0.3 thr 0.441
+  fold hof_100002: lr 0.001 ep 2 inner 0.503 q 0.1 thr 0.225
+  fold hof_100003: lr 0.001 ep 2 inner 0.505 q 0.1 thr 0.193
+  fold hof_100004: lr 0.001 ep 2 inner 0.510 q 0.2 thr 0.266
+  fold hof_100005: lr 0.001 ep 4 inner 0.503 q 0.0 thr -inf
+  fold hof_100006: lr 0.001 ep 8 inner 0.508 q 0.3 thr 0.435
+oxyssl_d1_null: L0 TM 0.660 (146s)
+  fold hof_100001: lr 0.001 ep 2 inner 0.500 q 0.1 thr 0.177
+  fold hof_100002: lr 0.001 ep 2 inner 0.512 q 0.3 thr 0.318
+  fold hof_100003: lr 0.001 ep 2 inner 0.507 q 0.3 thr 0.317
+  fold hof_100004: lr 0.001 ep 8 inner 0.509 q 0.3 thr 0.414
+  fold hof_100005: lr 0.001 ep 8 inner 0.512 q 0.1 thr 0.327
+  fold hof_100006: lr 0.003 ep 2 inner 0.506 q 0.3 thr 0.343
+oxyssl_d2_null: L0 TM 0.614 (143s)
+  fold hof_100001: lr 0.001 ep 2 inner 0.695 q 0.3 thr 0.587
+  fold hof_100002: lr 0.003 ep 16 inner 0.706 q 0.2 thr 0.680
+  fold hof_100003: lr 0.001 ep 2 inner 0.667 q 0.3 thr 0.517
+  fold hof_100004: lr 0.001 ep 2 inner 0.730 q 0.3 thr 0.559
+  fold hof_100005: lr 0.001 ep 2 inner 0.645 q 0.3 thr 0.488
+  fold hof_100006: lr 0.001 ep 2 inner 0.651 q 0.3 thr 0.524
+oxyssl_s1: L0 TM 0.697 (104s)
+  fold hof_100001: lr 0.001 ep 2 inner 0.693 q 0.3 thr 0.582
+  fold hof_100002: lr 0.003 ep 2 inner 0.711 q 0.3 thr 0.501
+  fold hof_100003: lr 0.003 ep 16 inner 0.663 q 0.2 thr 0.742
+  fold hof_100004: lr 0.001 ep 2 inner 0.730 q 0.3 thr 0.561
+  fold hof_100005: lr 0.001 ep 2 inner 0.645 q 0.3 thr 0.491
+  fold hof_100006: lr 0.001 ep 2 inner 0.649 q 0.3 thr 0.528
+oxyssl_s2: L0 TM 0.651 (104s)
+ensemble L0: TM 0.667 answered 0.80
+ensemble L1: TM 0.670 answered 0.78
+ensemble L2: TM 0.706 answered 0.72
+ensemble L3: TM 0.697 answered 0.59
+ensemble L4: TM 0.548 answered 0.10
+ensemble L5: TM 0.522 answered 0.14
+ensemble X1: TM 0.686 answered 0.51
+wrote /home/daytona/w/results/photon/oxyssl_oxynet.json 896478 bytes; /home/daytona/w/results/photon/oxyssl_ref.json {'lr': 0.001, 'epochs': 2, 'thr': 0.5430647134780884, 'seed': 0, 'choices': [(0.001, 2), (0.003, 2), (0.003, 16), (0.001, 2), (0.001, 2), (0.001, 2)]}
+......                                                                   [100%]
+6 passed in 2.27s
+  fold hof_100001: lr 0.001 ep 16 inner 0.720 q 0.3 thr 0.746
+  fold hof_100002: lr 0.003 ep 8 inner 0.750 q 0.0 thr -inf
+  fold hof_100003: lr 0.003 ep 2 inner 0.673 q 0.3 thr 0.540
+  fold hof_100004: lr 0.001 ep 4 inner 0.779 q 0.3 thr 0.532
+  fold hof_100005: lr 0.003 ep 2 inner 0.677 q 0.3 thr 0.425
+  fold hof_100006: lr 0.003 ep 2 inner 0.651 q 0.3 thr 0.480
+oxyssl_noaug: L0 TM 0.652 (35s)
+EXIT 0
+
+oxyssl_init L0: TM 0.506
+oxyssl_init L1: TM 0.511
+oxyssl_init L2: TM 0.517
+oxyssl_init L3: TM 0.540
+oxyssl_init L4: TM 0.500
+oxyssl_init L5: TM 0.500
+oxyssl_init X1: TM 0.524
+EXIT 0
+

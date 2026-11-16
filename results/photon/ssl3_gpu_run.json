@@ -1,0 +1,77 @@
+{
+ "model": "ssl3_gpu",
+ "compute": "Kaggle GPU kernel (private)",
+ "kernel_slugs": [
+  "aravhawk/oxy-ssl3-remote"
+ ],
+ "dataset_slugs": [
+  "aravhawk/oxy-ssl3-bundle"
+ ],
+ "torch_cuda_device_name": [
+  "Tesla T4",
+  "Tesla T4"
+ ],
+ "n_gpus": 2,
+ "wall_time_s": 1860.84805893898,
+ "pretrain": "{'steps': 3174, 'sec': 300.1, 'bs': 384, 'bs_phone': 128, 'lr': 0.002, 'w_rec': 1.0, 'sources': ['ptt_ppg', 'moshekam', 'apnoea', 'butppg', 'mths'], 'contact_rows': 92477, 'phone_rows': 5905, 'samples_seen': 1625088}",
+ "fit_exits": [
+  [
+   "s0",
+   "0",
+   "1822.3097820281982"
+  ],
+  [
+   "n0",
+   "0",
+   "1822.310439825058"
+  ],
+  [
+   "s1",
+   "0",
+   "1822.3106529712677"
+  ],
+  [
+   "n1",
+   "0",
+   "1822.3108110427856"
+  ],
+  [
+   "s2",
+   "0",
+   "1822.3109629154205"
+  ],
+  [
+   "n2",
+   "0",
+   "1822.3111155033112"
+  ]
+ ],
+ "code": "python/oxydrop_ml/photon/ssl3.py (byte-identical to the embedded copy in the kernel script), pretrain --sec 300",
+ "score_files_copied": 31,
+ "note": "score files written by ssl3.py as ssl3*; renamed to ssl3_gpu* on pull, contents unchanged",
+ "kernel_started_ct": "~20:17 CT (launched by the earlier R3-SSL3 agent; kernel log 02:17:39 UTC first line)",
+ "kernel_finished_ct": "~20:48 CT",
+ "kernel_settings": {
+  "accelerator": "NvidiaTeslaT4 (2 x Tesla T4 visible)",
+  "private": true,
+  "internet": false
+ },
+ "pretrain_disjoint_assert": {
+  "pretrain_subjects": 156,
+  "hoffman_people": 6,
+  "contact_rows": 92477,
+  "passed": true
+ },
+ "pretrain_note": "300 s NT-Xent + masked reconstruction (3174 steps); NT-Xent plateaued at ~4.95 (top-1 pair acc ~0.25) from step 1000",
+ "null_draws": {
+  "ssl3_gpu_null": 0.465,
+  "ssl3_gpu_d1_null": 0.51,
+  "ssl3_gpu_d2_null": 0.455
+ },
+ "seed_L0_tm": {
+  "s0": 0.524,
+  "s1": 0.639,
+  "s2": 0.559
+ },
+ "ensemble_L0_tm": 0.596
+}

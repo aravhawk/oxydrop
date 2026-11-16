@@ -3,9 +3,94 @@
 
 > **Research prototype, not a medical device.** It does not measure SpO2, does not diagnose, and was validated on six hypoxic phone-camera people. The app is built to work on every phone and is not tuned to any specific phone; untested Android and other phones are a limitation (section 12).
 
-This file documents the model that the app runs: architecture, data, training, the leave-one-person-out (LOSO) evaluation, every baseline, every lever (kept and dropped), and an honest comparison with prior work. Every number is generated from `results/ml/*.csv` (see `scripts/ml_numbers.py`, `scripts/render_docs.py`, checked by `scripts/check_claims.py`). The paper-style summary is `WHITEPAPER.md`.
+This file documents the model that the app runs (section 0: PhotonDistill v2, the round-3 shipped model, numbers from `results/photon/*.csv`) and the previous hybrid engine (sections 1 to 12): architecture, data, training, the leave-one-person-out (LOSO) evaluation, every baseline, every lever (kept and dropped), and an honest comparison with prior work. Every number is generated from `results/ml/*.csv` and `results/photon/*.csv` (see `scripts/ml_numbers.py`, `scripts/render_docs.py`, checked by `scripts/check_claims.py`). The paper-style summary is `WHITEPAPER.md`.
 
-## 1. What it is, in one paragraph
+## 0. The shipped model (round 3): PhotonDistill v2
+
+**Why this is new.** Phone-camera low-oxygen detection depends on how far the flash sits from the lens, and the only open phone hypoxia data were recorded on one phone model; we built a leave-one-person-out stress test that simulates a flash farther from the lens than on the recording phone, and trained one small network, PhotonDistill v2, against it, using two simple teachers fitted on clean and physics-degraded copies of the training people only. On clean light it **ties** our logistic chain (0.784 against 0.796 time-matched balanced accuracy, paired -0.012 [-0.091, 0.012]; it does not beat it), and under the simulated distant flash it stays above chance where the chain falls to it (out-of-family stress X1: 0.682 against 0.508), answering fewer windows as the light weakens. The stress test is a simulation, a three-number colour control is nearly as robust, and there are six people, so this is a tested idea, not a validated device.
+
+**What it is.** One trained student network per seed, the app's default engine (the logistic chain stays behind `?engine=logistic`, the earlier hybrid behind `?engine=hybrid`). Per 10 s window (2 s hop) the app computes 39 causal features from the per-frame mean R, G, B, each relative to the person's own label-free first minute: 19 chain deltas (heart-rate rise, ratio-of-ratios, pulse shape), 15 signal-quality features and 5 respiratory features. This front end is unchanged from round 2. A multilayer perceptron 39 -> H ReLU -> H ReLU -> 3 heads, with H = 32 / 32 / 64 for the 3 seeds (2,435 / 2,435 / 6,915 parameters; the seed outputs are averaged), outputs P(SpO2 < 90), an SpO2 estimate (not shown to users) and its own abstain logit; the app answers when the abstain output reaches 0.916. No gate, no teacher and no chain run at inference. Code: `python/oxydrop_ml/photon/distill2.py` (on top of `distill_student.py`), weights `results/photon/distill2_weights.json`, log `results/photon/distill2_log.md`, winner report `results/photon/WINNER3.md`.
+
+![PhotonDistill v2 architecture](docs/figures/photon_architecture.png)
+
+**Training** (inside each outer fold, on the five training people only). Two teachers are refit in every outer and inner fold: logistic chain v1 gives soft targets on the clean windows, and a DC-colour logistic regression (three baseline-relative ln DC values) gives soft targets on physics-sampled distant-flash copies of the training recordings (FlashGap's declared augmentation prior: flash-lens offset, light leak, noise, exposure gain; its own random stream, disjoint from the stress levels and never X1). Loss: label cross-entropy plus a tempered distillation term plus Huber on SpO2 plus a cross-entropy abstain head that predicts whether the hypoxia head is right. Round 3 widened round 2's grid in a two-stage nested search on leave-one-inner-person-out CV: teacher set (base, or base averaged with a gradient-boosted tree teacher), distillation weight (8, 16, 32 or pure distillation), temperature (2 or 4), then width H (16, 32, 64) and weight decay, plus epochs and the abstain threshold. Over the 18 seed folds the inner search chose the base teachers 18 times (the GBDT teacher was never chosen), distillation weight 16 in 7 and 32 in 9 folds (pure distillation never), and width 64 in 7. So the clean-light gain over round 2 comes from the larger distillation weight, the temperature and the width, not from a new teacher. The deployed weights are the three seeds refit on all six people with the modal nested recipe of each seed.
+
+**How it was chosen.** The round-3 rule was fixed at 19:55 CT before any round-3 score (Amendment 8, `.agents/tasks/task-oxydrop-photon-model/ROUND3.md`): replace round 2's PhotonDistill only if a candidate's clean-light point estimate is higher, its paired difference to PhotonDistill has a lower bound above -0.02, and its mean paired stress difference to the chain over L3, L4, L5 and X1 is at least 0, with null controls passed. PhotonDistill v2 meets all four: 0.784 against 0.758; paired to PhotonDistill +0.026 [-0.010, 0.040] (4/6 people better); stress mean +0.144; nulls mean 0.504. The planner locked it at 20:22 CT (`results/photon/WINNER3.md`).
+
+**Clean light (L0) against every baseline and every candidate of all three rounds** (`results/photon/TABLE.csv`, evalkit, 95% person-bootstrap intervals, paired differences to chain v1 on the same resampled people). This harness re-runs the bootstrap, so chain v1 reads 0.796 [0.636, 0.857] here and 0.796 [0.635, 0.856] in section 8 (same model, other draws). The shipped pipeline R (0.809 [0.644, 0.863], section 8) is optimistic because its rule was chosen after the outer scores were seen; the CNN alone is 0.739 [0.574, 0.811] in the ablation section and reads 0.753 on this harness.
+
+| Model (L0 = clean light) | TM bal. acc. [95% CI] | Paired diff vs chain v1 [95% CI] | People better | Worst person | Null mean (rule: at most 0.55) |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| *Baselines* |  |  |  |  |  |
+| Logistic chain v1 (best honest baseline) | 0.796 [0.636, 0.857] | reference |  | 0.458 |  |
+| Hybrid, per-person selected (nested) | 0.779 [0.638, 0.831] | -0.017 [-0.103, 0.069] tie | 2/5 | 0.517 |  |
+| CNN alone (harness re-score, 3-seed mean) | 0.753 [0.573, 0.817] | -0.043 [-0.140, 0.005] tie | 2/6 | 0.500 |  |
+| *Round 3: trained candidates (Amendment 8; ssl3 has no score file, ens3 is listed below the table)* |  |  |  |  |  |
+| **PhotonDistill v2 (shipped, round 3)** | 0.784 [0.596, 0.834] | -0.012 [-0.091, 0.012] tie | 4/6 | 0.500 | 0.504 (3 draws) |
+| MultiDA (round 3) | 0.744 [0.553, 0.807] | -0.053 [-0.142, -0.010] loss | 3/6 | 0.500 | 0.522 (3 draws) |
+| PhotonNet-XL (round 3) | 0.660 [0.545, 0.762] | -0.136 [-0.210, -0.033] loss | 2/6 | 0.500 | 0.412 (3 draws) |
+| *Round 2: trained end-to-end candidates (eligible)* |  |  |  |  |  |
+| PhotonDistill (round-2 winner, replaced) | 0.758 [0.603, 0.813] | -0.038 [-0.103, -0.001] loss | 2/6 | 0.516 | 0.492 (3 draws) |
+| OxySeq | 0.708 [0.452, 0.790] | -0.088 [-0.221, -0.023] loss | 2/6 | 0.516 | 0.475 (1 draw) |
+| PhotonNet | 0.668 [0.508, 0.785] | -0.128 [-0.208, -0.047] loss | 2/6 | 0.500 | 0.618 (3 draws), **fails** |
+| OxySSL | 0.667 [0.498, 0.741] | -0.130 [-0.274, -0.044] loss | 1/6 | 0.400 | 0.643 (3 draws), **fails** |
+| *Round 2: ablations (not eligible)* |  |  |  |  |  |
+| PhotonDistill v1 (before the post hoc grid) | 0.696 [0.524, 0.795] | -0.100 [-0.201, -0.022] loss | 2/6 | 0.500 | 0.494 (3 draws) |
+| PhotonDistill without teachers (ablation) | 0.660 [0.529, 0.760] | -0.136 [-0.216, -0.038] loss | 2/6 | 0.505 |  |
+| PhotonNet without the physics layer (ablation) | 0.642 [0.528, 0.749] | -0.154 [-0.218, -0.061] loss | 2/6 | 0.500 |  |
+| OxySeq without test-time adaptation (ablation) | 0.639 [0.437, 0.764] | -0.158 [-0.265, -0.058] loss | 2/6 | 0.500 |  |
+| *Round 1 (Amendment 6) and controls* |  |  |  |  |  |
+| PhotonTwin gate (round-1 decision, post hoc gate) | 0.796 [0.636, 0.857] | identical to chain v1 at L0 (gate) |  | 0.458 |  |
+| OxyTrack (round 1; outer folds seen in development) | 0.809 [0.656, 0.893] | +0.013 [-0.052, 0.092] tie | 3/6 | 0.500 |  |
+| PhotonTwin-Inverse (round 1) | 0.752 [0.577, 0.810] | -0.044 [-0.127, -0.000] loss | 2/6 | 0.500 |  |
+| FlashGap (round 1) | 0.740 [0.607, 0.831] | -0.057 [-0.127, 0.021] tie | 1/4 | 0.458 |  |
+| Control: DC-colour LR (3 baseline-relative ln DC values) | 0.744 [0.543, 0.848] | -0.052 [-0.155, 0.043] tie | 2/6 | 0.514 |  |
+
+Not in the table: `ssl3` produced no score file. `ens3`, a stacking ensemble of PhotonDistill, OxySeq and the no-teacher student (three models, so not one shippable network), landed after the lock with no null controls; `results/photon/WINNER3.csv` scores it at 0.789 [0.621, 0.842], paired to chain v1 -0.007 [-0.092, 0.043] (4/6 people better). It is a candidate only.
+
+![Clean-light forest plot](docs/figures/photon_results_ci.png)
+
+**The plain statement: the shipped trained model ties the logistic chain on clean light and does not beat it** (paired -0.012 [-0.091, 0.012], 4/6 people better, worst person 0.500 against the chain's 0.458). "Beats the chain" needs the interval above 0 and at least 5 of 6 people better; neither holds. The round-2 model it replaces lost to the chain by 0.038 (paired -0.038 [-0.103, -0.001]). The 90% target set for round 3 was not reached: the best eligible clean-light estimate is 0.784.
+
+**Clean and simulated distant-flash stress side by side** (TM [95% CI]; second line: paired difference to chain v1 [95% CI], verdict, people better). Levels L1 to L5 add 2 to 10 mm of simulated flash-to-lens offset to the held-out person's whole recording; X1 is an out-of-family degradation that no training path samples. No model is refit per level. PhotonDistill v2 wins against the chain at L3 (+0.133 [0.001, 0.248]), L4 (+0.097 [0.011, 0.195], 6/6), L5 (+0.170 [0.027, 0.249]) and X1 (+0.174 [0.044, 0.284], 6/6).
+
+| Model | L0 (clean) | L3 (simulated) | L4 (simulated) | L5 (simulated) | X1 (out of family) |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Logistic chain v1 (best honest baseline) | 0.796 [0.636, 0.857] | 0.565 [0.503, 0.625] | 0.598 [0.526, 0.640] | 0.535 [0.477, 0.598] | 0.508 [0.439, 0.554] |
+| **PhotonDistill v2 (shipped, round 3)** | 0.784 [0.596, 0.834]<br>-0.012 [-0.091, 0.012] tie, 4/6 | 0.698 [0.555, 0.789]<br>+0.133 [0.001, 0.248] win, 4/6 | 0.695 [0.558, 0.785]<br>+0.097 [0.011, 0.195] win, 6/6 | 0.704 [0.562, 0.779]<br>+0.170 [0.027, 0.249] win, 5/6 | 0.682 [0.547, 0.748]<br>+0.174 [0.044, 0.284] win, 6/6 |
+| PhotonDistill (round-2 winner, replaced) | 0.758 [0.603, 0.813]<br>-0.038 [-0.103, -0.001] loss, 2/6 | 0.680 [0.552, 0.772]<br>+0.116 [-0.002, 0.226] tie, 4/6 | 0.681 [0.566, 0.772]<br>+0.083 [0.008, 0.178] win, 6/6 | 0.701 [0.570, 0.770]<br>+0.166 [0.035, 0.242] win, 5/6 | 0.676 [0.564, 0.747]<br>+0.169 [0.058, 0.285] win, 6/6 |
+| MultiDA (round 3) | 0.744 [0.553, 0.807]<br>-0.053 [-0.142, -0.010] loss, 3/6 | 0.680 [0.559, 0.780]<br>+0.115 [0.003, 0.216] win, 4/6 | 0.691 [0.559, 0.782]<br>+0.093 [0.002, 0.189] win, 6/6 | 0.696 [0.557, 0.764]<br>+0.161 [0.026, 0.232] win, 5/6 | 0.678 [0.547, 0.791]<br>+0.170 [0.027, 0.328] win, 6/6 |
+| PhotonNet-XL (round 3) | 0.660 [0.545, 0.762]<br>-0.136 [-0.210, -0.033] loss, 2/6 | 0.680 [0.520, 0.772]<br>+0.115 [-0.028, 0.229] tie, 3/6 | 0.684 [0.522, 0.794]<br>+0.086 [-0.020, 0.207] tie, 5/6 | 0.704 [0.563, 0.796]<br>+0.169 [0.018, 0.270] win, 5/6 | 0.691 [0.597, 0.746]<br>+0.184 [0.072, 0.290] win, 6/6 |
+| Control: DC-colour LR (3 baseline-relative ln DC values) | 0.744 [0.543, 0.848]<br>-0.052 [-0.155, 0.043] tie, 2/6 | 0.692 [0.529, 0.769]<br>+0.127 [-0.015, 0.232] tie, 4/6 | 0.658 [0.511, 0.748]<br>+0.060 [-0.051, 0.163] tie, 5/6 | 0.599 [0.536, 0.652]<br>+0.064 [-0.026, 0.150] tie, 4/6 | 0.646 [0.511, 0.735]<br>+0.139 [-0.014, 0.225] tie, 5/5 |
+| PhotonNet | 0.668 [0.508, 0.785]<br>-0.128 [-0.208, -0.047] loss, 2/6 | 0.689 [0.526, 0.812]<br>+0.125 [-0.019, 0.267] tie, 4/6 | 0.703 [0.516, 0.829]<br>+0.105 [-0.025, 0.245] tie, 5/6 | 0.720 [0.564, 0.818]<br>+0.185 [0.023, 0.290] win, 5/6 | 0.672 [0.537, 0.775]<br>+0.165 [0.020, 0.316] win, 6/6 |
+| OxySSL | 0.667 [0.498, 0.741]<br>-0.130 [-0.274, -0.044] loss, 1/6 | 0.697 [0.596, 0.733]<br>+0.132 [0.024, 0.171] win, 1/6 | 0.548 [0.503, 0.601]<br>-0.050 [-0.123, 0.045] tie, 3/6 | 0.522 [0.500, 0.552]<br>-0.013 [-0.098, 0.068] tie, 2/5 | 0.686 [0.567, 0.732]<br>+0.178 [0.043, 0.214] win, 5/6 |
+| OxySeq | 0.708 [0.452, 0.790]<br>-0.088 [-0.221, -0.023] loss, 2/6 | 0.533 [0.399, 0.620]<br>-0.032 [-0.133, 0.046] tie, 3/6 | 0.503 [0.493, 0.515]<br>-0.094 [-0.137, -0.015] loss, 3/6 | 0.498 [0.490, 0.505]<br>-0.036 [-0.098, 0.017] tie, 2/6 | 0.508 [0.441, 0.587]<br>+0.001 [-0.047, 0.059] tie, 3/6 |
+
+![Stress curve](docs/figures/photon_stress_curve.png)
+
+**Abstention.** Abstention is the model's own abstain head with a nested threshold. As the simulated light weakens, PhotonDistill v2 answers fewer windows and keeps most of its answered accuracy, while the chain keeps answering at about chance and OxySeq's learned abstain head does not notice the low light:
+
+| Coverage / answered accuracy | L0 | L1 | L2 | L3 | L4 | L5 | X1 |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **PhotonDistill v2 (shipped, round 3)** | 0.69 / 0.933 | 0.61 / 0.963 | 0.67 / 0.923 | 0.58 / 0.918 | 0.53 / 0.926 | 0.35 / 0.910 | 0.40 / 0.861 |
+| PhotonDistill (round-2 winner, replaced) | 0.61 / 0.922 | 0.59 / 0.926 | 0.60 / 0.920 | 0.49 / 0.937 | 0.42 / 0.946 | 0.21 / 0.943 | 0.27 / 0.964 |
+| Logistic chain v1 (best honest baseline) | 0.84 / 0.939 | 0.84 / 0.929 | 0.88 / 0.822 | 0.92 / 0.534 | 0.86 / 0.576 | 0.91 / 0.491 | 0.92 / 0.507 |
+| OxySeq | 0.79 / 0.769 | 0.78 / 0.743 | 0.77 / 0.699 | 0.71 / 0.556 | 0.71 / 0.543 | 0.71 / 0.539 | 0.71 / 0.583 |
+
+**Disclosures that apply to every number in this section.**
+
+* All round-3 models were designed after the round-1 and round-2 outer results on the same six people were seen (Amendment 8, `python/oxydrop_ml/amendments/AMENDMENT_8_round3.md`); round-2 models after round 1 (Amendment 7). PhotonDistill v2's wider grid was chosen because round 2's distillation weight hit the grid edge in every fold. Their clean-light numbers are optimistic and not a blind test, and picking the round-3 winner by its clean-light point estimate adds a selection effect that is not quantified.
+* **Deadline.** PhotonDistill v2's clean-light ensemble arrived at 20:08 CT; its null and stress files arrived at 20:16 CT, one minute after the stated 20:15 CT cutoff. The winner script flags this as late; the planner's lock accepted it and the waiver is written next to the flag in `results/photon/WINNER3.md`.
+* The stress test is a simulation that scales whole recordings. Features relative to the person's first minute cancel a constant attenuation by design, so part of the robustness is built in. The control `ctl_dc_lr` (logistic regression on three baseline-relative ln DC values, no network) is nearly as stress-robust (0.646 at X1, a tie with chain v1 by its interval). Levels L1 to L5 lie inside the augmentation prior (in-simulator); only X1 is out of family. Real phones with a distant flash are untested.
+* Null control (labels permuted across the training windows, teachers included): 0.525, 0.444, 0.543, mean 0.504 over 3 draws (the rule asks for a mean of at most 0.55).
+* Teachers: the GBDT-augmented teacher was offered and never chosen; the physics teacher (PhotonTwin inversion) was not used because it needs raw per-frame RGB and the optics renderer per fold, which did not fit the deadline; OxySeq and OxyTrack outputs were not used as teachers because their saved scores would leak the held-out person.
+* One dark-skinned person among the six Hoffman people: no skin-tone claim is made. Six people, 12 recordings, Nexus 6P phones.
+* Other candidates are reported as candidates, not results: MultiDA loses on clean light (-0.053 [-0.142, -0.010]); PhotonNet-XL loses (-0.136 [-0.210, -0.033]); round 2's PhotonNet and OxySSL fail their null controls (0.618, 0.643); OxySeq loses on clean light and its abstain head does not detect the simulated low light; the round-1 models (Amendment 6) include `twin_gate`, a hand-coded gate that the round-2 requirement ruled out, and OxyTrack, whose clean-light tie is optimistic because four versions were scored on the outer folds.
+
+## 1. The previous engine (hybrid, `?engine=hybrid`), in one paragraph
+
+Sections 1 to 12 document the hybrid that was the app's engine before round 2 and its pre-registered P1 to P3 evaluation on `results/ml`.
+
 
 A **hybrid of a physiological logistic chain and a small 1D CNN**. The chain (the v1 model: heart-rate rise, pulse-shape and ratio-of-ratios features, each relative to the person's own first minute, two logistic regressions) gives a low-oxygen logit. A 167,588-parameter CNN (`OxyNet`, three seeds) learns a **residual correction** to that logit from the 10 s window of per-frame mean RGB. A small logistic meta-learner maps the sum to a decision. The same CNN also outputs heart rate, a quality score and an experimental SpO2 value that the app never shows. **The pre-registered primary metric was not beaten**: the deployed pipeline R scores 0.809 [0.644, 0.863] (optimistic: chosen after the outer scores were seen) and the nested per-person-selected hybrid 0.779 [0.638, 0.831], both ties with the shipped chain (0.796 [0.635, 0.856]). **A chain refit with the same levers and no CNN has the higher point estimate (0.816), and so does the chain-only conformal control (the conformal section)**; the intervals overlap, so this is a tie. ML is the app's core path by design (Amendment 2), not because it wins.
 
@@ -387,6 +472,9 @@ bash scripts/reproduce_ml.sh baselines           # baselines (about 8 min)
 bash scripts/reproduce_ml.sh core-report         # core CNN tables from the run files
 bash scripts/reproduce_ml.sh hybrid-report       # hybrid tables (needs the hybrid run directory)
 bash scripts/reproduce_ml.sh docs                # figures + README, MODEL.md, WHITEPAPER.md (+ PDF) from results/ml/*.csv, then check_claims
+cd python && python -m oxydrop_ml.photon.evalkit  # photon harness: results/photon/TABLE.csv, STRESS.csv from the score files
+python -m oxydrop_ml.photon.winner2              # round-2 verdict: results/photon/WINNER2.md, SIDE_BY_SIDE.md
+cd .. && python scripts/make_photon_figs.py      # docs/figures/photon_{architecture,results_ci,stress_curve}.png
 ```
 
 Heavy stages (SSL, stage B, per-fold fits) ran on a Daytona sandbox because OpenOximetry arrays may only live there (`scripts/ml_daytona.py`); checkpoints and run directories stay outside git, with SHA-256 in `results/ml/ssl_manifest.json`.

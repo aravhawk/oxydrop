@@ -1,0 +1,9 @@
+    photonnet_xl: 24/144 fits, 80 s
+    photonnet_xl: 48/144 fits, 149 s
+    photonnet_xl: 72/144 fits, 219 s
+    photonnet_xl: 96/144 fits, 289 s
+    photonnet_xl: 120/144 fits, 359 s
+    photonnet_xl: 144/144 fits, 429 s
+  photonnet_xl: 144 fits in 429 s
+photonnet_xl seed 0: 0: 0.639/0.81, 1: 0.661/0.77, 2: 0.651/0.78, 3: 0.685/0.77, 4: 0.698/0.82, 5: 0.702/0.65, X1: 0.678/0.68
+main done in 430 s

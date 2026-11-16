@@ -1,0 +1,25 @@
+    photonnet_xl_nullscr_d0: 24/144 fits, 80 s
+    photonnet_xl_nullscr_d0: 48/144 fits, 151 s
+    photonnet_xl_nullscr_d0: 72/144 fits, 221 s
+    photonnet_xl_nullscr_d0: 96/144 fits, 291 s
+    photonnet_xl_nullscr_d0: 120/144 fits, 361 s
+    photonnet_xl_nullscr_d0: 144/144 fits, 431 s
+  photonnet_xl_nullscr_d0: 144 fits in 431 s
+photonnet_xl_nullscr draw 0: TM 0.356
+    photonnet_xl_nullscr_d1: 24/144 fits, 71 s
+    photonnet_xl_nullscr_d1: 48/144 fits, 140 s
+    photonnet_xl_nullscr_d1: 72/144 fits, 208 s
+    photonnet_xl_nullscr_d1: 96/144 fits, 276 s
+    photonnet_xl_nullscr_d1: 120/144 fits, 345 s
+    photonnet_xl_nullscr_d1: 144/144 fits, 413 s
+  photonnet_xl_nullscr_d1: 144 fits in 413 s
+photonnet_xl_nullscr draw 1: TM 0.493
+    photonnet_xl_nullscr_d2: 24/144 fits, 71 s
+    photonnet_xl_nullscr_d2: 48/144 fits, 139 s
+    photonnet_xl_nullscr_d2: 72/144 fits, 207 s
+    photonnet_xl_nullscr_d2: 96/144 fits, 275 s
+    photonnet_xl_nullscr_d2: 120/144 fits, 343 s
+    photonnet_xl_nullscr_d2: 144/144 fits, 412 s
+  photonnet_xl_nullscr_d2: 144 fits in 412 s
+photonnet_xl_nullscr draw 2: TM 0.434
+nullscr done in 1258 s

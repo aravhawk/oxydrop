@@ -1,0 +1,64 @@
+[{"stream_name":"stdout","time":1.54010289,"data":"inputs ['/kaggle/input/datasets/aravhawk/oxyseq-feat011-data/up.tgz'] ['/kaggle/input/datasets/aravhawk']\n"}
+,{"stream_name":"stderr","time":2.1950567149999998,"data":"/kaggle/src/script.py:13: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.\n"}
+,{"stream_name":"stderr","time":2.19509213,"data":"  t.extractall(W)\n"}
+,{"stream_name":"stdout","time":2.425706082,"data":"$ /usr/bin/python3 -m oxydrop_ml.photon.oxyseq\n"}
+,{"stream_name":"stdout","time":13.289184946,"data":"oxyseq nested\n"}
+,{"stream_name":"stdout","time":57.547294432,"data":"  fold 100001: steps=100 thr=0.558 tau=0.388 inner TM 0.770 (trace 25:0.691, 50:0.687, 100:0.770, 200:0.730) inner cover 1.00 rate 0.030 (44 s)\n"}
+,{"stream_name":"stdout","time":94.658588925,"data":"  fold 100002: steps=100 thr=0.557 tau=0.398 inner TM 0.858 (trace 25:0.716, 50:0.746, 100:0.858, 200:0.834) inner cover 1.00 rate 0.030 (37 s)\n"}
+,{"stream_name":"stdout","time":132.103476884,"data":"  fold 100003: steps=100 thr=0.724 tau=0.516 inner TM 0.800 (trace 25:0.710, 50:0.727, 100:0.800, 200:0.767) inner cover 1.00 rate 0.030 (37 s)\n"}
+,{"stream_name":"stdout","time":170.052347089,"data":"  fold 100004: steps=100 thr=0.448 tau=0.352 inner TM 0.799 (trace 25:0.756, 50:0.771, 100:0.799, 200:0.769) inner cover 1.00 rate 0.030 (38 s)\n"}
+,{"stream_name":"stdout","time":207.546283824,"data":"  fold 100005: steps=100 thr=0.656 tau=0.913 inner TM 0.755 (trace 25:0.672, 50:0.678, 100:0.755, 200:0.694) inner cover 0.20 rate 0.030 (37 s)\n"}
+,{"stream_name":"stdout","time":244.993554054,"data":"  fold 100006: steps=100 thr=0.589 tau=0.902 inner TM 0.723 (trace 25:0.669, 50:0.663, 100:0.723, 200:0.712) inner cover 0.20 rate 0.030 (37 s)\n"}
+,{"stream_name":"stdout","time":249.185621593,"data":"L0 {'oxyseq__L0': np.float64(0.708), 'oxyseq_blank__L0': np.float64(0.5)} (236 s)\n"}
+,{"stream_name":"stdout","time":251.481783396,"data":"L1 {'oxyseq__L0': np.float64(0.708), 'oxyseq_blank__L0': np.float64(0.5), 'oxyseq__L1': np.float64(0.694)} (238 s)\n"}
+,{"stream_name":"stdout","time":253.750973478,"data":"L2 {'oxyseq__L0': np.float64(0.708), 'oxyseq_blank__L0': np.float64(0.5), 'oxyseq__L1': np.float64(0.694), 'oxyseq__L2': np.float64(0.656)} (241 s)\n"}
+,{"stream_name":"stdout","time":256.009816214,"data":"L3 {'oxyseq__L0': np.float64(0.708), 'oxyseq_blank__L0': np.float64(0.5), 'oxyseq__L1': np.float64(0.694), 'oxyseq__L2': np.float64(0.656), 'oxyseq__L3': np.float64(0.533)} (243 s)\n"}
+,{"stream_name":"stdout","time":258.295185459,"data":"L4 {'oxyseq__L0': np.float64(0.708), 'oxyseq_blank__L0': np.float64(0.5), 'oxyseq__L1': np.float64(0.694), 'oxyseq__L2': np.float64(0.656), 'oxyseq__L3': np.float64(0.533), 'oxyseq__L4': np.float64(0.503)} (245 s)\n"}
+,{"stream_name":"stdout","time":260.560789374,"data":"L5 {'oxyseq__L0': np.float64(0.708), 'oxyseq_blank__L0': np.float64(0.5), 'oxyseq__L1': np.float64(0.694), 'oxyseq__L2': np.float64(0.656), 'oxyseq__L3': np.float64(0.533), 'oxyseq__L4': np.float64(0.503), 'oxyseq__L5': np.float64(0.498)} (247 s)\n"}
+,{"stream_name":"stdout","time":262.853046603,"data":"X1 {'oxyseq__L0': np.float64(0.708), 'oxyseq_blank__L0': np.float64(0.5), 'oxyseq__L1': np.float64(0.694), 'oxyseq__L2': np.float64(0.656), 'oxyseq__L3': np.float64(0.533), 'oxyseq__L4': np.float64(0.503), 'oxyseq__L5': np.float64(0.498), 'oxyseq__X1': np.float64(0.508)} (250 s)\n"}
+,{"stream_name":"stdout","time":297.873073661,"data":"  fold 100001: steps=200 thr=0.474 tau=0.386 inner TM 0.513 (trace 25:0.507, 50:0.504, 100:0.504, 200:0.513) inner cover 0.98 rate 0.041 (35 s)\n"}
+,{"stream_name":"stdout","time":332.705542557,"data":"  fold 100002: steps=200 thr=0.496 tau=0.417 inner TM 0.520 (trace 25:0.504, 50:0.511, 100:0.515, 200:0.520) inner cover 0.94 rate 0.040 (35 s)\n"}
+,{"stream_name":"stdout","time":363.134714724,"data":"  fold 100003: steps=50 thr=0.518 tau=0.335 inner TM 0.512 (trace 25:0.507, 50:0.512, 100:0.509, 200:0.502) inner cover 0.98 rate 0.027 (30 s)\n"}
+,{"stream_name":"stdout","time":397.793289708,"data":"  fold 100004: steps=200 thr=0.492 tau=0.575 inner TM 0.503 (trace 25:0.502, 50:0.503, 100:0.501, 200:0.503) inner cover 0.38 rate 0.041 (35 s)\n"}
+,{"stream_name":"stdout","time":429.774482483,"data":"  fold 100005: steps=100 thr=0.505 tau=0.511 inner TM 0.505 (trace 25:0.502, 50:0.502, 100:0.505, 200:0.502) inner cover 0.64 rate 0.031 (32 s)\n"}
+,{"stream_name":"stdout","time":461.730099239,"data":"  fold 100006: steps=100 thr=0.477 tau=0.489 inner TM 0.508 (trace 25:0.504, 50:0.506, 100:0.508, 200:0.503) inner cover 0.52 rate 0.031 (32 s)\n"}
+,{"stream_name":"stdout","time":462.022147501,"data":"null draw 0: 0.475 (449 s)\n"}
+,{"stream_name":"stdout","time":491.642147145,"data":"  fold 100001: steps=25 thr=0.507 tau=0.563 inner TM 0.502 (trace 25:0.502, 50:0.501, 100:0.502, 200:0.501) inner cover 0.20 rate 0.025 (30 s)\n"}
+,{"stream_name":"stdout","time":526.447371943,"data":"  fold 100002: steps=200 thr=0.532 tau=0.533 inner TM 0.514 (trace 25:0.508, 50:0.512, 100:0.510, 200:0.514) inner cover 0.46 rate 0.040 (35 s)\n"}
+,{"stream_name":"stdout","time":556.187879374,"data":"  fold 100003: steps=25 thr=0.491 tau=0.578 inner TM 0.513 (trace 25:0.513, 50:0.512, 100:0.508, 200:0.509) inner cover 0.22 rate 0.025 (30 s)\n"}
+,{"stream_name":"stdout","time":588.199423645,"data":"  fold 100004: steps=100 thr=0.514 tau=0.597 inner TM 0.513 (trace 25:0.502, 50:0.505, 100:0.513, 200:0.503) inner cover 0.22 rate 0.031 (32 s)\n"}
+,{"stream_name":"stdout","time":617.848301808,"data":"  fold 100005: steps=25 thr=0.443 tau=0.568 inner TM 0.507 (trace 25:0.507, 50:0.504, 100:0.502, 200:0.503) inner cover 0.20 rate 0.025 (30 s)\n"}
+,{"stream_name":"stdout","time":649.669639618,"data":"  fold 100006: steps=100 thr=0.485 tau=0.515 inner TM 0.506 (trace 25:0.501, 50:0.503, 100:0.506, 200:0.502) inner cover 0.50 rate 0.031 (32 s)\n"}
+,{"stream_name":"stdout","time":649.893753963,"data":"null draw 1: 0.491 (637 s)\n"}
+,{"stream_name":"stdout","time":679.427904323,"data":"  fold 100001: steps=25 thr=0.521 tau=0.600 inner TM 0.515 (trace 25:0.515, 50:0.505, 100:0.505, 200:0.505) inner cover 0.20 rate 0.025 (30 s)\n"}
+,{"stream_name":"stdout","time":710.627225068,"data":"  fold 100002: steps=50 thr=0.467 tau=0.448 inner TM 0.513 (trace 25:0.507, 50:0.513, 100:0.509, 200:0.512) inner cover 0.84 rate 0.027 (31 s)\n"}
+,{"stream_name":"stdout","time":740.58967672,"data":"  fold 100003: steps=25 thr=0.493 tau=0.474 inner TM 0.509 (trace 25:0.509, 50:0.507, 100:0.502, 200:0.502) inner cover 0.72 rate 0.025 (30 s)\n"}
+,{"stream_name":"stdout","time":770.580434688,"data":"  fold 100004: steps=25 thr=0.451 tau=0.518 inner TM 0.508 (trace 25:0.508, 50:0.505, 100:0.504, 200:0.506) inner cover 0.46 rate 0.025 (30 s)\n"}
+,{"stream_name":"stdout","time":805.551953746,"data":"  fold 100005: steps=200 thr=0.493 tau=0.628 inner TM 0.501 (trace 25:0.501, 50:0.501, 100:0.501, 200:0.501) inner cover 0.20 rate 0.040 (35 s)\n"}
+,{"stream_name":"stdout","time":837.385051797,"data":"  fold 100006: steps=100 thr=0.494 tau=0.540 inner TM 0.508 (trace 25:0.502, 50:0.503, 100:0.508, 200:0.508) inner cover 0.22 rate 0.031 (32 s)\n"}
+,{"stream_name":"stdout","time":837.610966837,"data":"null draw 2: 0.424 (824 s)\n"}
+,{"stream_name":"stdout","time":837.611026724,"data":"oxyseq_notta nested\n"}
+,{"stream_name":"stdout","time":872.465906353,"data":"  fold 100001: steps=100 thr=0.465 tau=0.378 inner TM 0.764 (trace 25:0.677, 50:0.683, 100:0.764, 200:0.712) inner cover 1.00 rate 0.000 (35 s)\n"}
+,{"stream_name":"stdout","time":908.089959995,"data":"  fold 100002: steps=100 thr=0.614 tau=0.356 inner TM 0.850 (trace 25:0.708, 50:0.745, 100:0.850, 200:0.799) inner cover 1.00 rate 0.000 (36 s)\n"}
+,{"stream_name":"stdout","time":943.055627203,"data":"  fold 100003: steps=100 thr=0.642 tau=0.512 inner TM 0.772 (trace 25:0.710, 50:0.729, 100:0.772, 200:0.737) inner cover 1.00 rate 0.000 (35 s)\n"}
+,{"stream_name":"stdout","time":977.760802159,"data":"  fold 100004: steps=100 thr=0.459 tau=0.320 inner TM 0.778 (trace 25:0.757, 50:0.775, 100:0.778, 200:0.730) inner cover 1.00 rate 0.000 (35 s)\n"}
+,{"stream_name":"stdout","time":1012.622947269,"data":"  fold 100005: steps=100 thr=0.677 tau=0.903 inner TM 0.720 (trace 25:0.657, 50:0.675, 100:0.720, 200:0.656) inner cover 0.22 rate 0.000 (35 s)\n"}
+,{"stream_name":"stdout","time":1047.435199699,"data":"  fold 100006: steps=100 thr=0.753 tau=0.893 inner TM 0.706 (trace 25:0.656, 50:0.659, 100:0.706, 200:0.690) inner cover 0.22 rate 0.000 (35 s)\n"}
+,{"stream_name":"stdout","time":1063.227638884,"data":"notta done (1050 s)\n"}
+,{"stream_name":"stdout","time":1063.228350472,"data":"done (1050 s)\n"}
+,{"stream_name":"stdout","time":1064.414865943,"data":"exit 0\n"}
+,{"stream_name":"stdout","time":1064.414903834,"data":"$ /usr/bin/python3 -m oxydrop_ml.photon.oxyseq_export\n"}
+,{"stream_name":"stdout","time":1078.49285804,"data":"wrote /kaggle/working/w/results/photon/oxyseq_model.json (117 kB); steps 100, thr 0.574, tau 0.457; numpy vs torch max diff 3.70e-06\n"}
+,{"stream_name":"stdout","time":1079.311699814,"data":"exit 0\n"}
+,{"stream_name":"stdout","time":1079.311738252,"data":"$ /usr/bin/python3 -m pip install -q pytest \u003e/dev/null 2\u003e\u00261; /usr/bin/python3 -m pytest oxydrop_ml/tests/test_photon_oxyseq.py -q -p no:cacheprovider 2\u003e\u00261 | tail -5\n"}
+,{"stream_name":"stdout","time":1091.455372509,"data":".....                                                                    [100%]\n"}
+,{"stream_name":"stdout","time":1091.455444087,"data":"5 passed in 3.09s\n"}
+,{"stream_name":"stdout","time":1091.45598314,"data":"exit 0\n"}
+,{"stream_name":"stdout","time":1093.302040839,"data":"packed\n"}
+,{"stream_name":"stderr","time":1096.370585473,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":1096.370646151,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":1096.75543286,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":1096.755465517,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":1097.811716903,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":1099.317250705,"data":"[NbConvertApp] Writing 281741 bytes to __results__.html\n"}
+]

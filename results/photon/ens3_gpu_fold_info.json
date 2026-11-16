@@ -1,0 +1,1182 @@
+{
+ "ens3_gpu": [
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.7409,
+    "distill2": 0.7629,
+    "distill_nokd": 0.6913
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.7055,
+   "tau": 0.27265231840658405,
+   "tau_certified": true,
+   "inner_cov": 0.74,
+   "inner_acc": 0.903,
+   "coef": {
+    "distill2:logit": 3.3636,
+    "distill2:conf": -0.8489,
+    "distill:logit": -1.3496,
+    "distill:conf": 0.5796,
+    "distill_nokd:logit": 0.0169,
+    "distill_nokd:conf": 0.2925
+   },
+   "intercept": -1.2898,
+   "sid": "100001",
+   "device": "Tesla T4",
+   "fold_wall_s": 624.8,
+   "w_raw": [
+    3.363625249720901,
+    -0.848911117104687,
+    -1.349595544597794,
+    0.5796288137952471,
+    0.016854988961852824,
+    0.29247518766500297
+   ],
+   "b_raw": -1.2897923126272368
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.7445,
+    "distill2": 0.7751,
+    "distill_nokd": 0.6773
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.7003,
+   "tau": 0.35416327515917345,
+   "tau_certified": true,
+   "inner_cov": 0.6,
+   "inner_acc": 0.901,
+   "coef": {
+    "distill2:logit": 2.9181,
+    "distill2:conf": -0.6546,
+    "distill:logit": -0.9748,
+    "distill:conf": -0.2571,
+    "distill_nokd:logit": -0.058,
+    "distill_nokd:conf": 1.3958
+   },
+   "intercept": -2.0234,
+   "sid": "100002",
+   "device": "Tesla T4",
+   "fold_wall_s": 573.1,
+   "w_raw": [
+    2.9181482182788305,
+    -0.6545757988483444,
+    -0.9747998653910006,
+    -0.2571293628888678,
+    -0.05795027932269287,
+    1.395837332342837
+   ],
+   "b_raw": -2.0233851959221454
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.7467,
+    "distill2": 0.7769,
+    "distill_nokd": 0.6641
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.799,
+   "tau": 0.45177859189861436,
+   "tau_certified": true,
+   "inner_cov": 0.53,
+   "inner_acc": 0.902,
+   "coef": {
+    "distill2:logit": 1.2389,
+    "distill2:conf": 0.3934,
+    "distill:logit": 0.9211,
+    "distill:conf": -0.9339,
+    "distill_nokd:logit": -0.0921,
+    "distill_nokd:conf": 1.4781
+   },
+   "intercept": -3.2241,
+   "sid": "100003",
+   "device": "Tesla T4",
+   "fold_wall_s": 578.8,
+   "w_raw": [
+    1.238864292235883,
+    0.3933776674162702,
+    0.9211180362827435,
+    -0.9339438274268461,
+    -0.09214982301275106,
+    1.4780825642049804
+   ],
+   "b_raw": -3.2240933708861466
+  },
+  {
+   "members": [
+    "distill",
+    "distill2",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.7911,
+    "distill2": 0.7807,
+    "distill_nokd": 0.7202
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.7974,
+   "tau": 0.22273164575640725,
+   "tau_certified": true,
+   "inner_cov": 0.85,
+   "inner_acc": 0.904,
+   "coef": {
+    "distill:logit": -0.0452,
+    "distill:conf": 0.4164,
+    "distill2:logit": 2.3369,
+    "distill2:conf": -1.0533,
+    "distill_nokd:logit": -0.1018,
+    "distill_nokd:conf": 0.1857
+   },
+   "intercept": -0.1562,
+   "sid": "100004",
+   "device": "Tesla T4",
+   "fold_wall_s": 660.5,
+   "w_raw": [
+    -0.04521338903672365,
+    0.41639318487943633,
+    2.3368955427562605,
+    -1.0532840971842903,
+    -0.10182053432730853,
+    0.18568951085873564
+   ],
+   "b_raw": -0.15622140852892247
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.6767,
+    "distill2": 0.7268,
+    "distill_nokd": 0.6459
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.7061,
+   "tau": 0.2901342377122529,
+   "tau_certified": true,
+   "inner_cov": 0.77,
+   "inner_acc": 0.901,
+   "coef": {
+    "distill2:logit": 3.9418,
+    "distill2:conf": -0.0713,
+    "distill:logit": -2.2887,
+    "distill:conf": -0.7248,
+    "distill_nokd:logit": 0.1786,
+    "distill_nokd:conf": 1.4817
+   },
+   "intercept": -2.6289,
+   "sid": "100005",
+   "device": "Tesla T4",
+   "fold_wall_s": 596.3,
+   "w_raw": [
+    3.941828530033973,
+    -0.07128620779079813,
+    -2.2887209226254344,
+    -0.7247801179216407,
+    0.17859843914549128,
+    1.4817360038821825
+   ],
+   "b_raw": -2.628897785291093
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.708,
+    "distill2": 0.7249,
+    "distill_nokd": 0.6091
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.7278,
+   "tau": 0.2818711777077416,
+   "tau_certified": true,
+   "inner_cov": 0.75,
+   "inner_acc": 0.902,
+   "coef": {
+    "distill2:logit": 0.7123,
+    "distill2:conf": -0.1832,
+    "distill:logit": 1.6884,
+    "distill:conf": -0.1185,
+    "distill_nokd:logit": -0.2472,
+    "distill_nokd:conf": 1.2269
+   },
+   "intercept": -2.409,
+   "sid": "100006",
+   "device": "Tesla T4",
+   "fold_wall_s": 637.9,
+   "w_raw": [
+    0.7123473316253341,
+    -0.18316868827915617,
+    1.6883739623874892,
+    -0.11851055230937155,
+    -0.2472353232682453,
+    1.226864291042949
+   ],
+   "b_raw": -2.4089874642937015
+  }
+ ],
+ "ens3_gpu_s0": [
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.7557,
+    "distill2": 0.7761,
+    "distill_nokd": 0.6913
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.7136,
+   "tau": 0.20495805089749142,
+   "tau_certified": true,
+   "inner_cov": 0.74,
+   "inner_acc": 0.903,
+   "coef": {
+    "distill2:logit": 0.5477,
+    "distill2:conf": -0.0344,
+    "distill:logit": 0.4741,
+    "distill:conf": -0.0283,
+    "distill_nokd:logit": 0.0804,
+    "distill_nokd:conf": 0.1306
+   },
+   "intercept": -0.9615,
+   "sid": "100001",
+   "device": "Tesla T4",
+   "fold_wall_s": 624.8,
+   "w_raw": [
+    0.5477443424212178,
+    -0.03441972815538007,
+    0.4741081122690386,
+    -0.028293207103889564,
+    0.08037381970677507,
+    0.13057978531198547
+   ],
+   "b_raw": -0.9615455269056643
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.7764,
+    "distill2": 0.7893,
+    "distill_nokd": 0.6773
+   },
+   "C": 0.1,
+   "inner_lopo_tm": 0.7197,
+   "tau": 0.2738084173943969,
+   "tau_certified": true,
+   "inner_cov": 0.67,
+   "inner_acc": 0.901,
+   "coef": {
+    "distill2:logit": 0.7178,
+    "distill2:conf": -0.2754,
+    "distill:logit": 0.6576,
+    "distill:conf": 0.1356,
+    "distill_nokd:logit": 0.0599,
+    "distill_nokd:conf": 0.5574
+   },
+   "intercept": -1.7846,
+   "sid": "100002",
+   "device": "Tesla T4",
+   "fold_wall_s": 573.1,
+   "w_raw": [
+    0.7177665859569506,
+    -0.2753983362933301,
+    0.6576392863137089,
+    0.13564932383501843,
+    0.05987760890701891,
+    0.5574377233566942
+   ],
+   "b_raw": -1.7846158495050406
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.7641,
+    "distill2": 0.7827,
+    "distill_nokd": 0.6641
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.7371,
+   "tau": 0.4947539240726267,
+   "tau_certified": true,
+   "inner_cov": 0.26,
+   "inner_acc": 0.906,
+   "coef": {
+    "distill2:logit": 1.4811,
+    "distill2:conf": -0.179,
+    "distill:logit": 0.2444,
+    "distill:conf": -0.12,
+    "distill_nokd:logit": -0.0752,
+    "distill_nokd:conf": 1.2865
+   },
+   "intercept": -3.4885,
+   "sid": "100003",
+   "device": "Tesla T4",
+   "fold_wall_s": 578.8,
+   "w_raw": [
+    1.4811100436926934,
+    -0.1790436326066889,
+    0.2443617525119308,
+    -0.1200370147111314,
+    -0.07524815474417505,
+    1.2865254896974763
+   ],
+   "b_raw": -3.488477926081938
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.7881,
+    "distill2": 0.7959,
+    "distill_nokd": 0.7202
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.7483,
+   "tau": 0.467729659576961,
+   "tau_certified": true,
+   "inner_cov": 0.41,
+   "inner_acc": 0.901,
+   "coef": {
+    "distill2:logit": 1.0569,
+    "distill2:conf": -0.3939,
+    "distill:logit": 0.2251,
+    "distill:conf": 0.4138,
+    "distill_nokd:logit": 0.064,
+    "distill_nokd:conf": 0.0135
+   },
+   "intercept": -0.62,
+   "sid": "100004",
+   "device": "Tesla T4",
+   "fold_wall_s": 660.5,
+   "w_raw": [
+    1.0568510903542494,
+    -0.39386005807609803,
+    0.22506032912466792,
+    0.41377510150573754,
+    0.06396254386869644,
+    0.01349597940837328
+   ],
+   "b_raw": -0.6199718231177832
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.6911,
+    "distill2": 0.7266,
+    "distill_nokd": 0.6459
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.6951,
+   "tau": 0.32319133528422006,
+   "tau_certified": true,
+   "inner_cov": 0.73,
+   "inner_acc": 0.906,
+   "coef": {
+    "distill2:logit": 1.6584,
+    "distill2:conf": -0.0127,
+    "distill:logit": 0.2411,
+    "distill:conf": -0.3246,
+    "distill_nokd:logit": 0.0329,
+    "distill_nokd:conf": 1.2645
+   },
+   "intercept": -2.6216,
+   "sid": "100005",
+   "device": "Tesla T4",
+   "fold_wall_s": 596.3,
+   "w_raw": [
+    1.658432009250541,
+    -0.012657090541307666,
+    0.24107893597318014,
+    -0.3245832332379098,
+    0.03293028900844838,
+    1.2644810330307024
+   ],
+   "b_raw": -2.6215998728587926
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.7046,
+    "distill2": 0.729,
+    "distill_nokd": 0.6091
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.714,
+   "tau": 0.41149019171233475,
+   "tau_certified": true,
+   "inner_cov": 0.5,
+   "inner_acc": 0.902,
+   "coef": {
+    "distill2:logit": 0.6083,
+    "distill2:conf": -0.1017,
+    "distill:logit": 1.1403,
+    "distill:conf": -0.0406,
+    "distill_nokd:logit": -0.0944,
+    "distill_nokd:conf": 1.0594
+   },
+   "intercept": -2.5347,
+   "sid": "100006",
+   "device": "Tesla T4",
+   "fold_wall_s": 637.9,
+   "w_raw": [
+    0.6082629411912379,
+    -0.10171460255777727,
+    1.140313493316066,
+    -0.04061134364756552,
+    -0.09444495384142887,
+    1.0593873520148882
+   ],
+   "b_raw": -2.534708482685329
+  }
+ ],
+ "ens3_gpu_null": [
+  {
+   "members": [
+    "distill2",
+    "distill_nokd",
+    "distill"
+   ],
+   "rank": {
+    "distill": 0.4958,
+    "distill2": 0.5085,
+    "distill_nokd": 0.499
+   },
+   "C": 0.1,
+   "inner_lopo_tm": 0.4999,
+   "tau": 0.06994464817216395,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.434,
+   "coef": {
+    "distill2:logit": 29.2324,
+    "distill2:conf": -0.2984,
+    "distill_nokd:logit": 0.3324,
+    "distill_nokd:conf": -0.313,
+    "distill:logit": -2.6851,
+    "distill:conf": 0.5578
+   },
+   "intercept": 0.1212,
+   "sid": "100001",
+   "device": "Tesla T4",
+   "fold_wall_s": 287.4,
+   "w_raw": [
+    29.23235428907696,
+    -0.2984434816434903,
+    0.3324039293670491,
+    -0.3130157373196928,
+    -2.6851112698270674,
+    0.5578140770745788
+   ],
+   "b_raw": 0.12122925022085326
+  },
+  {
+   "members": [
+    "distill",
+    "distill2",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.5251,
+    "distill2": 0.5241,
+    "distill_nokd": 0.5033
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.5274,
+   "tau": 0.03882480658447468,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.566,
+   "coef": {
+    "distill:logit": 1.0863,
+    "distill:conf": 0.0482,
+    "distill2:logit": -0.0137,
+    "distill2:conf": -0.0345,
+    "distill_nokd:logit": -0.3128,
+    "distill_nokd:conf": -0.0034
+   },
+   "intercept": -0.0113,
+   "sid": "100002",
+   "device": "Tesla T4",
+   "fold_wall_s": 252.0,
+   "w_raw": [
+    1.0862560748568888,
+    0.048229628766652086,
+    -0.013717263308619282,
+    -0.03446624003621314,
+    -0.3128046643557024,
+    -0.003398441394276787
+   ],
+   "b_raw": -0.01132174652534321
+  },
+  {
+   "members": [
+    "distill",
+    "distill_nokd",
+    "distill2"
+   ],
+   "rank": {
+    "distill": 0.51,
+    "distill2": 0.5035,
+    "distill_nokd": 0.5073
+   },
+   "C": 0.1,
+   "inner_lopo_tm": 0.5026,
+   "tau": 0.10076214700202502,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.589,
+   "coef": {
+    "distill:logit": -0.7393,
+    "distill:conf": 0.1877,
+    "distill_nokd:logit": 2.7639,
+    "distill_nokd:conf": -0.1675,
+    "distill2:logit": 0.6516,
+    "distill2:conf": -0.2896
+   },
+   "intercept": -0.0146,
+   "sid": "100003",
+   "device": "Tesla T4",
+   "fold_wall_s": 296.9,
+   "w_raw": [
+    -0.739291675113476,
+    0.1877151363174413,
+    2.763933248624859,
+    -0.16752241424602765,
+    0.6516234635234828,
+    -0.28964853005382896
+   ],
+   "b_raw": -0.014554318694514201
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.5063,
+    "distill2": 0.5082,
+    "distill_nokd": 0.4981
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.5143,
+   "tau": 0.017977385873824026,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.531,
+   "coef": {
+    "distill2:logit": -1.5782,
+    "distill2:conf": 0.1127,
+    "distill:logit": 0.1569,
+    "distill:conf": 0.1079,
+    "distill_nokd:logit": -0.1478,
+    "distill_nokd:conf": 0.061
+   },
+   "intercept": -0.0257,
+   "sid": "100004",
+   "device": "Tesla T4",
+   "fold_wall_s": 290.8,
+   "w_raw": [
+    -1.5781707685229638,
+    0.1127244891669993,
+    0.156898419667758,
+    0.10785678506351323,
+    -0.14781673445282917,
+    0.06097476082419271
+   ],
+   "b_raw": -0.025663670735841068
+  },
+  {
+   "members": [
+    "distill_nokd",
+    "distill2",
+    "distill"
+   ],
+   "rank": {
+    "distill": 0.4986,
+    "distill2": 0.5063,
+    "distill_nokd": 0.5092
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.5054,
+   "tau": 0.03055420554617394,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.542,
+   "coef": {
+    "distill_nokd:logit": 14.5585,
+    "distill_nokd:conf": -3.5289,
+    "distill2:logit": 0.2103,
+    "distill2:conf": -0.02,
+    "distill:logit": 0.7866,
+    "distill:conf": -0.0374
+   },
+   "intercept": 0.0683,
+   "sid": "100005",
+   "device": "Tesla T4",
+   "fold_wall_s": 304.3,
+   "w_raw": [
+    14.558477564352726,
+    -3.5288550795373346,
+    0.2102685006931847,
+    -0.019987880432927794,
+    0.7866055442714887,
+    -0.03735496579977571
+   ],
+   "b_raw": 0.06831126169063513
+  },
+  {
+   "members": [
+    "distill2",
+    "distill_nokd",
+    "distill"
+   ],
+   "rank": {
+    "distill": 0.4963,
+    "distill2": 0.5049,
+    "distill_nokd": 0.5039
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.4992,
+   "tau": 0.11456663484627361,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.467,
+   "coef": {
+    "distill2:logit": 0.0625,
+    "distill2:conf": -0.0539,
+    "distill_nokd:logit": -5.5437,
+    "distill_nokd:conf": 2.0564,
+    "distill:logit": -0.1539,
+    "distill:conf": 0.0475
+   },
+   "intercept": 0.0821,
+   "sid": "100006",
+   "device": "Tesla T4",
+   "fold_wall_s": 312.6,
+   "w_raw": [
+    0.06248677323334871,
+    -0.053938380585794136,
+    -5.543678094767858,
+    2.056396991488942,
+    -0.1538806115388749,
+    0.04751798774912595
+   ],
+   "b_raw": 0.08210905934484246
+  }
+ ],
+ "ens3_gpu_nulld1_null": [
+  {
+   "members": [
+    "distill_nokd",
+    "distill",
+    "distill2"
+   ],
+   "rank": {
+    "distill": 0.5001,
+    "distill2": 0.4926,
+    "distill_nokd": 0.5075
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.5135,
+   "tau": 0.044956361091601005,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.505,
+   "coef": {
+    "distill_nokd:logit": 0.1119,
+    "distill_nokd:conf": -0.0691,
+    "distill:logit": 0.282,
+    "distill:conf": 0.0677,
+    "distill2:logit": -0.455,
+    "distill2:conf": 0.1636
+   },
+   "intercept": -0.0027,
+   "sid": "100001",
+   "device": "Tesla T4",
+   "fold_wall_s": 288.1,
+   "w_raw": [
+    0.11192358699454011,
+    -0.069110176870356,
+    0.28199047188956117,
+    0.0676542213395053,
+    -0.45495967714417623,
+    0.16364767867774002
+   ],
+   "b_raw": -0.0026582798015258027
+  },
+  {
+   "members": [
+    "distill",
+    "distill2",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.516,
+    "distill2": 0.5092,
+    "distill_nokd": 0.509
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.5065,
+   "tau": 0.09665320156026846,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.414,
+   "coef": {
+    "distill:logit": -2.5361,
+    "distill:conf": 0.261,
+    "distill2:logit": -0.179,
+    "distill2:conf": 0.0256,
+    "distill_nokd:logit": 51.175,
+    "distill_nokd:conf": 0.5521
+   },
+   "intercept": -0.1716,
+   "sid": "100002",
+   "device": "Tesla T4",
+   "fold_wall_s": 283.7,
+   "w_raw": [
+    -2.5360505079174955,
+    0.2610262583012587,
+    -0.1789636627138314,
+    0.025576232745498594,
+    51.17501127863097,
+    0.5521482363947416
+   ],
+   "b_raw": -0.17164308435855516
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.5048,
+    "distill2": 0.5061,
+    "distill_nokd": 0.4958
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.5088,
+   "tau": 0.35559097002842743,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.6,
+   "coef": {
+    "distill2:logit": 6.8552,
+    "distill2:conf": 0.0766,
+    "distill:logit": -0.7871,
+    "distill:conf": 0.1517,
+    "distill_nokd:logit": -1.7176,
+    "distill_nokd:conf": -0.4637
+   },
+   "intercept": 0.0159,
+   "sid": "100003",
+   "device": "Tesla T4",
+   "fold_wall_s": 238.5,
+   "w_raw": [
+    6.855150318856866,
+    0.07662449970659434,
+    -0.78711743181927,
+    0.15171998911873993,
+    -1.7176409599117373,
+    -0.463653283120754
+   ],
+   "b_raw": 0.01586277125476827
+  },
+  {
+   "members": [
+    "distill_nokd",
+    "distill2",
+    "distill"
+   ],
+   "rank": {
+    "distill": 0.5021,
+    "distill2": 0.506,
+    "distill_nokd": 0.5113
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.5012,
+   "tau": 0.033694095381710976,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.575,
+   "coef": {
+    "distill_nokd:logit": -0.0197,
+    "distill_nokd:conf": 0.212,
+    "distill2:logit": 0.7733,
+    "distill2:conf": -0.3377,
+    "distill:logit": -1.7072,
+    "distill:conf": 0.1616
+   },
+   "intercept": 0.03,
+   "sid": "100004",
+   "device": "Tesla T4",
+   "fold_wall_s": 315.1,
+   "w_raw": [
+    -0.019707811400418683,
+    0.21195805691206893,
+    0.7733257029011339,
+    -0.33765642129738255,
+    -1.7072432805253228,
+    0.16159914699340874
+   ],
+   "b_raw": 0.02997268785689394
+  },
+  {
+   "members": [
+    "distill2",
+    "distill",
+    "distill_nokd"
+   ],
+   "rank": {
+    "distill": 0.5034,
+    "distill2": 0.5131,
+    "distill_nokd": 0.5027
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.5085,
+   "tau": 0.04371284353308397,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.554,
+   "coef": {
+    "distill2:logit": 2.2476,
+    "distill2:conf": -0.2017,
+    "distill:logit": -0.9218,
+    "distill:conf": 0.1098,
+    "distill_nokd:logit": 0.6556,
+    "distill_nokd:conf": 1.6979
+   },
+   "intercept": -0.0259,
+   "sid": "100005",
+   "device": "Tesla T4",
+   "fold_wall_s": 256.3,
+   "w_raw": [
+    2.2475612178920445,
+    -0.2016557175609911,
+    -0.92181866334041,
+    0.10980494998112966,
+    0.6556398805077583,
+    1.6978957237402341
+   ],
+   "b_raw": -0.02591633514511948
+  },
+  {
+   "members": [
+    "distill2",
+    "distill_nokd",
+    "distill"
+   ],
+   "rank": {
+    "distill": 0.5007,
+    "distill2": 0.5109,
+    "distill_nokd": 0.5032
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.4883,
+   "tau": 0.042507724768348576,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.43,
+   "coef": {
+    "distill2:logit": -0.3994,
+    "distill2:conf": 0.1046,
+    "distill_nokd:logit": -0.1898,
+    "distill_nokd:conf": 0.1436,
+    "distill:logit": 0.1546,
+    "distill:conf": -0.059
+   },
+   "intercept": 0.0014,
+   "sid": "100006",
+   "device": "Tesla T4",
+   "fold_wall_s": 246.9,
+   "w_raw": [
+    -0.39942176806368934,
+    0.10458625795344534,
+    -0.1898248137373849,
+    0.14362391649933043,
+    0.15457800388424783,
+    -0.05898175766430379
+   ],
+   "b_raw": 0.0013515921959743233
+  }
+ ],
+ "ens3_gpu_nulld2_null": [
+  {
+   "members": [
+    "distill",
+    "distill_nokd",
+    "distill2"
+   ],
+   "rank": {
+    "distill": 0.5164,
+    "distill2": 0.5023,
+    "distill_nokd": 0.511
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.495,
+   "tau": 0.019853398144554724,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.56,
+   "coef": {
+    "distill:logit": -2.0345,
+    "distill:conf": 0.5733,
+    "distill_nokd:logit": -0.0207,
+    "distill_nokd:conf": 0.0559,
+    "distill2:logit": 1.2335,
+    "distill2:conf": -0.0443
+   },
+   "intercept": 0.0116,
+   "sid": "100001",
+   "device": "Tesla T4",
+   "fold_wall_s": 174.7,
+   "w_raw": [
+    -2.034478417329658,
+    0.5732548001326371,
+    -0.020673974231758874,
+    0.05587091060225043,
+    1.2335075089228884,
+    -0.04432102205712042
+   ],
+   "b_raw": 0.01164397044206073
+  },
+  {
+   "members": [
+    "distill_nokd",
+    "distill",
+    "distill2"
+   ],
+   "rank": {
+    "distill": 0.5137,
+    "distill2": 0.4954,
+    "distill_nokd": 0.5189
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.5198,
+   "tau": 0.034266638280958106,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.538,
+   "coef": {
+    "distill_nokd:logit": 10.2871,
+    "distill_nokd:conf": -0.9178,
+    "distill:logit": -0.5652,
+    "distill:conf": -0.0299,
+    "distill2:logit": 0.8985,
+    "distill2:conf": -0.0101
+   },
+   "intercept": 0.0404,
+   "sid": "100002",
+   "device": "Tesla T4",
+   "fold_wall_s": 156.3,
+   "w_raw": [
+    10.287145015228784,
+    -0.9177959245216175,
+    -0.5651688383718249,
+    -0.029859703140542832,
+    0.8984816486131502,
+    -0.01009836723184529
+   ],
+   "b_raw": 0.040357989989447944
+  },
+  {
+   "members": [
+    "distill_nokd",
+    "distill2",
+    "distill"
+   ],
+   "rank": {
+    "distill": 0.5004,
+    "distill2": 0.501,
+    "distill_nokd": 0.5083
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.4909,
+   "tau": 0.03103584432864709,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.436,
+   "coef": {
+    "distill_nokd:logit": 5.6302,
+    "distill_nokd:conf": -0.8404,
+    "distill2:logit": 0.1234,
+    "distill2:conf": 0.0465,
+    "distill:logit": -0.1719,
+    "distill:conf": -0.0368
+   },
+   "intercept": -0.0598,
+   "sid": "100003",
+   "device": "Tesla T4",
+   "fold_wall_s": 168.6,
+   "w_raw": [
+    5.630175246540041,
+    -0.8403684180250397,
+    0.12344347501047262,
+    0.04646305585673479,
+    -0.17188790547800248,
+    -0.036756272710934915
+   ],
+   "b_raw": -0.05983841825349107
+  },
+  {
+   "members": [
+    "distill2",
+    "distill_nokd",
+    "distill"
+   ],
+   "rank": {
+    "distill": 0.5023,
+    "distill2": 0.5063,
+    "distill_nokd": 0.5038
+   },
+   "C": 1.0,
+   "inner_lopo_tm": 0.5004,
+   "tau": 0.03899319318103778,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.558,
+   "coef": {
+    "distill2:logit": -0.1386,
+    "distill2:conf": 0.4478,
+    "distill_nokd:logit": -0.4047,
+    "distill_nokd:conf": 0.2567,
+    "distill:logit": 1.1151,
+    "distill:conf": -0.3314
+   },
+   "intercept": -0.0222,
+   "sid": "100004",
+   "device": "Tesla T4",
+   "fold_wall_s": 159.3,
+   "w_raw": [
+    -0.13862812021601234,
+    0.4477721542446095,
+    -0.40465677260112476,
+    0.2567373537609632,
+    1.1150622312146334,
+    -0.3313579336222752
+   ],
+   "b_raw": -0.022189026715213164
+  },
+  {
+   "members": [
+    "distill2",
+    "distill_nokd",
+    "distill"
+   ],
+   "rank": {
+    "distill": 0.4966,
+    "distill2": 0.5078,
+    "distill_nokd": 0.506
+   },
+   "C": 0.01,
+   "inner_lopo_tm": 0.4967,
+   "tau": 0.0205017285022292,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.518,
+   "coef": {
+    "distill2:logit": -0.4251,
+    "distill2:conf": -0.0074,
+    "distill_nokd:logit": -0.7241,
+    "distill_nokd:conf": 0.4187,
+    "distill:logit": 0.5051,
+    "distill:conf": 0.0677
+   },
+   "intercept": 0.0024,
+   "sid": "100005",
+   "device": "Tesla T4",
+   "fold_wall_s": 163.2,
+   "w_raw": [
+    -0.4250889895669912,
+    -0.0073959955132702725,
+    -0.7241343696080055,
+    0.41872955246812327,
+    0.5051336981528539,
+    0.06772568498415114
+   ],
+   "b_raw": 0.002441377774912569
+  },
+  {
+   "members": [
+    "distill_nokd",
+    "distill2",
+    "distill"
+   ],
+   "rank": {
+    "distill": 0.5032,
+    "distill2": 0.5051,
+    "distill_nokd": 0.5093
+   },
+   "C": 0.1,
+   "inner_lopo_tm": 0.5001,
+   "tau": 0.04798160879951202,
+   "tau_certified": false,
+   "inner_cov": 0.2,
+   "inner_acc": 0.448,
+   "coef": {
+    "distill_nokd:logit": -23.8193,
+    "distill_nokd:conf": 1.7506,
+    "distill2:logit": -0.3975,
+    "distill2:conf": 0.8442,
+    "distill:logit": -1.1261,
+    "distill:conf": 0.2209
+   },
+   "intercept": 0.0319,
+   "sid": "100006",
+   "device": "Tesla T4",
+   "fold_wall_s": 151.4,
+   "w_raw": [
+    -23.81931085846962,
+    1.7506116748620526,
+    -0.39746789637265834,
+    0.8442123501538341,
+    -1.1260823118863124,
+    0.22094845590856266
+   ],
+   "b_raw": 0.03193477400408036
+  }
+ ]
+}

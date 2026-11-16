@@ -10,6 +10,18 @@ README.md,cf:deployed_R/0.1:coverage|pct,74.5%
 README.md,cf:deployed_R/0.1:acc|pct,89.5%
 README.md,hp:all/HYBRID_agree:within5_full,0.480
 README.md,hp:all/v2_spectral_acf__forced:within5_full,0.419
+README.md,ph:distill2:0|full,"0.784 [0.596, 0.834]"
+README.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+README.md,ph:distill2:0|d,"-0.012 [-0.091, 0.012]"
+README.md,ph:distill2:0|nb,4/6
+README.md,ph:distill2:X1,0.682
+README.md,ph:chain_v1:X1,0.508
+README.md,ph:distill2:X1|d,"+0.174 [0.044, 0.284]"
+README.md,ph:distill:0,0.758
+README.md,phw2:seeds,3
+README.md,phw2:hidden,32 / 32 / 64
+README.md,phw2:params,"2,435 / 2,435 / 6,915"
+README.md,phw2:n_in,39
 README.md,v:params,"167,588"
 README.md,v:prereg_commit,3e708fe
 README.md,@p1_main,<block 2137 chars>
@@ -66,6 +78,60 @@ README.md,@app_state,<block 1243 chars>
 README.md,v:guard_mths,6.7%
 README.md,v:guard_but,8.8%
 README.md,v:guard_hof,0.1%
+MODEL.md,ph:distill2:0,0.784
+MODEL.md,ph:chain_v1:0,0.796
+MODEL.md,ph:distill2:0|d,"-0.012 [-0.091, 0.012]"
+MODEL.md,ph:distill2:X1,0.682
+MODEL.md,ph:chain_v1:X1,0.508
+MODEL.md,phw2:n_in,39
+MODEL.md,phw2:n_in,39
+MODEL.md,phw2:hidden,32 / 32 / 64
+MODEL.md,phw2:seeds,3
+MODEL.md,phw2:params,"2,435 / 2,435 / 6,915"
+MODEL.md,phw2:tau,0.916
+MODEL.md,d2fold:n,18
+MODEL.md,d2fold:teacher:base,18
+MODEL.md,d2fold:lam:16,7
+MODEL.md,d2fold:lam:32,9
+MODEL.md,d2fold:H:64,7
+MODEL.md,ph:distill2:0,0.784
+MODEL.md,ph:distill:0,0.758
+MODEL.md,phd:distill2:0,"+0.026 [-0.010, 0.040]"
+MODEL.md,phd:distill2:0|nb,4/6
+MODEL.md,w3:distill2:g3_mean,+0.144
+MODEL.md,phnull:distill2,0.504
+MODEL.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+MODEL.md,b1:chain_v1:tm_bacc|full,"0.796 [0.635, 0.856]"
+MODEL.md,hy:default_R:tm_bacc|full,"0.809 [0.644, 0.863]"
+MODEL.md,ab:full/p23:p1_tm_bacc|full,"0.739 [0.574, 0.811]"
+MODEL.md,ph:cnn_full:0,0.753
+MODEL.md,@photon_candidates,<block 2715 chars>
+MODEL.md,w3:ens3:tm|full,"0.789 [0.621, 0.842]"
+MODEL.md,w3:ens3:d_chain,"-0.007 [-0.092, 0.043]"
+MODEL.md,w3:ens3:nb_chain,4/6
+MODEL.md,ph:distill2:0|d,"-0.012 [-0.091, 0.012]"
+MODEL.md,ph:distill2:0|nb,4/6
+MODEL.md,ph:distill2:0|worst,0.500
+MODEL.md,ph:chain_v1:0|worst,0.458
+MODEL.md,ph:distill:0|dabs,0.038
+MODEL.md,ph:distill:0|d,"-0.038 [-0.103, -0.001]"
+MODEL.md,ph:distill2:0,0.784
+MODEL.md,ph:distill2:3|d,"+0.133 [0.001, 0.248]"
+MODEL.md,ph:distill2:4|d,"+0.097 [0.011, 0.195]"
+MODEL.md,ph:distill2:4|nb,6/6
+MODEL.md,ph:distill2:5|d,"+0.170 [0.027, 0.249]"
+MODEL.md,ph:distill2:X1|d,"+0.174 [0.044, 0.284]"
+MODEL.md,ph:distill2:X1|nb,6/6
+MODEL.md,@photon_stress,<block 2850 chars>
+MODEL.md,@photon_abstain,<block 690 chars>
+MODEL.md,ph:ctl_dc_lr:X1,0.646
+MODEL.md,phnull:distill2|draws,"0.525, 0.444, 0.543"
+MODEL.md,phnull:distill2,0.504
+MODEL.md,phnull:distill2|n,3
+MODEL.md,ph:multida:0|d,"-0.053 [-0.142, -0.010]"
+MODEL.md,ph:photonnet_xl:0|d,"-0.136 [-0.210, -0.033]"
+MODEL.md,phnull:photonnet,0.618
+MODEL.md,phnull:oxyssl,0.643
 MODEL.md,v:params,"167,588"
 MODEL.md,hy:default_R:tm_bacc|full,"0.809 [0.644, 0.863]"
 MODEL.md,hy:HYBRID_FINAL:tm_bacc|full,"0.779 [0.638, 0.831]"
@@ -190,6 +256,11 @@ WHITEPAPER.md,hr:spec:within5_full,0.883
 WHITEPAPER.md,hr:agree:within5_full,0.826
 WHITEPAPER.md,ox:lag_star/R:mae|full,"2.94 [2.45, 3.50]"
 WHITEPAPER.md,ox:lag_star/ror_textbook:mae|full,"3.07 [2.60, 3.54]"
+WHITEPAPER.md,ph:distill2:0|full,"0.784 [0.596, 0.834]"
+WHITEPAPER.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+WHITEPAPER.md,ph:distill2:0|d,"-0.012 [-0.091, 0.012]"
+WHITEPAPER.md,ph:distill2:X1,0.682
+WHITEPAPER.md,ph:chain_v1:X1,0.508
 WHITEPAPER.md,v:n_windows_p1,"5,644"
 WHITEPAPER.md,v:n_windows_p2,"5,905"
 WHITEPAPER.md,v:n_windows_p3,"1,141"
@@ -267,6 +338,34 @@ WHITEPAPER.md,cf:deployed_R/0.1:set_cov_hypoxic|pct,91.3%
 WHITEPAPER.md,cf:deployed_R/0.1:set_cov_normal|pct,93.2%
 WHITEPAPER.md,cpp:deployed_R/0.1/hof_100001:confident_miss|pct,51.3%
 WHITEPAPER.md,cpp:deployed_R/0.1/hof_100004:share_unsure|pct,58.2%
+WHITEPAPER.md,phw2:n_in,39
+WHITEPAPER.md,phw2:seeds,3
+WHITEPAPER.md,phw2:hidden,32 / 32 / 64
+WHITEPAPER.md,phw2:params,"2,435 / 2,435 / 6,915"
+WHITEPAPER.md,d2fold:teacher:base,18
+WHITEPAPER.md,d2fold:n,18
+WHITEPAPER.md,ph:distill2:0|full,"0.784 [0.596, 0.834]"
+WHITEPAPER.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+WHITEPAPER.md,ph:distill2:0|d,"-0.012 [-0.091, 0.012]"
+WHITEPAPER.md,ph:distill2:0|nb,4/6
+WHITEPAPER.md,ph:distill:0|full,"0.758 [0.603, 0.813]"
+WHITEPAPER.md,ph:distill:0|dabs,0.038
+WHITEPAPER.md,phd:distill2:0,"+0.026 [-0.010, 0.040]"
+WHITEPAPER.md,w3:distill2:g3_mean,+0.144
+WHITEPAPER.md,phnull:distill2,0.504
+WHITEPAPER.md,ph:distill2:3|d,"+0.133 [0.001, 0.248]"
+WHITEPAPER.md,ph:distill2:4|d,"+0.097 [0.011, 0.195]"
+WHITEPAPER.md,ph:distill2:4|nb,6/6
+WHITEPAPER.md,ph:distill2:5|d,"+0.170 [0.027, 0.249]"
+WHITEPAPER.md,ph:distill2:X1|d,"+0.174 [0.044, 0.284]"
+WHITEPAPER.md,ph:distill2:X1|nb,6/6
+WHITEPAPER.md,ph:distill2:X1|cov,0.40
+WHITEPAPER.md,ph:ctl_dc_lr:X1,0.646
+WHITEPAPER.md,ph:multida:0,0.744
+WHITEPAPER.md,ph:photonnet_xl:0,0.660
+WHITEPAPER.md,ph:oxyseq:0,0.708
+WHITEPAPER.md,ph:photonnet:0,0.668
+WHITEPAPER.md,ph:oxyssl:0,0.667
 WHITEPAPER.md,@openox,<block 2442 chars>
 WHITEPAPER.md,@skin_hoffman,<block 113 chars>
 WHITEPAPER.md,v:guard_mths,6.7%
@@ -279,6 +378,18 @@ WHITEPAPER.md,hvs:hof_100004/cnn:mae,21.0
 WHITEPAPER.md,hv:butppg+mths/vote+harmonic+octave+median5/clean:doubling,0.00%
 WHITEPAPER.md,v:guard_mths,6.7%
 WHITEPAPER.md,v:guard_but,8.8%
+docs/WRITEUP.md,phw2:seeds,3
+docs/WRITEUP.md,phw2:hidden,32 / 32 / 64
+docs/WRITEUP.md,phw2:params,"2,435 / 2,435 / 6,915"
+docs/WRITEUP.md,phw2:n_in,39
+docs/WRITEUP.md,ph:distill2:0|full,"0.784 [0.596, 0.834]"
+docs/WRITEUP.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+docs/WRITEUP.md,ph:distill2:0|d,"-0.012 [-0.091, 0.012]"
+docs/WRITEUP.md,ph:distill2:0|nb,4/6
+docs/WRITEUP.md,ph:distill2:X1,0.682
+docs/WRITEUP.md,ph:chain_v1:X1,0.508
+docs/WRITEUP.md,ph:distill2:X1|d,"+0.174 [0.044, 0.284]"
+docs/WRITEUP.md,ph:distill:0,0.758
 docs/WRITEUP.md,v:params,"167,588"
 docs/WRITEUP.md,v:ssl_rows,"299,754"
 docs/WRITEUP.md,v:prereg_commit,3e708fe

@@ -16,7 +16,11 @@ A web app (works in a phone browser, nothing to install, video never leaves the 
 ![From video to three states](figures/ml_flow.png)
 
 ## How it works
-**Model.** A hybrid: the v1 logistic chain (heart-rate rise, pulse shape and ratio-of-ratios features relative to your first minute) gives a low-oxygen logit, and a 167,588-parameter 1D CNN (three seeds, plain JavaScript, offline) learns a residual correction. The CNN was pretrained self-supervised on 299,754 unlabeled windows and warmed up on contact-oximeter data (OpenOximetry) before fine-tuning on phone video. It also outputs heart rate and a quality score. Details and every lever, kept or dropped: [MODEL.md](../MODEL.md).
+**Model (round 3, what the app runs now): PhotonDistill v2**, one small trained network per seed (3 seeds of widths 32 / 32 / 64, 2,435 / 2,435 / 6,915 parameters) on 39 window features relative to your first minute, taught in each fold by two simple teachers (the logistic chain on clean windows, a colour regression on physics-simulated distant-flash copies) fitted on the training people only. **It ties the logistic chain on clean light and does not beat it** (0.784 [0.596, 0.834] against 0.796 [0.636, 0.857], paired -0.012 [-0.091, 0.012], 4/6 people better) and is more robust under a *simulated* distant flash (out-of-family stress X1: 0.682 against 0.508, paired +0.174 [0.044, 0.284]). It replaced round 2's PhotonDistill (0.758, a loss to the chain) under a rule fixed before any round-3 score. Round-3 models were designed after the earlier results were seen, its last files arrived one minute after the stated cutoff, a three-number colour control is nearly as robust, and the 90% target was not reached. Details: [MODEL.md](../MODEL.md) section 0, [pitch](submission/PITCH.md).
+
+![PhotonDistill v2 architecture](figures/photon_architecture.png)
+
+**Previous engine (`?engine=hybrid`).** A hybrid: the v1 logistic chain (heart-rate rise, pulse shape and ratio-of-ratios features relative to your first minute) gives a low-oxygen logit, and a 167,588-parameter 1D CNN (three seeds, plain JavaScript, offline) learns a residual correction. The CNN was pretrained self-supervised on 299,754 unlabeled windows and warmed up on contact-oximeter data (OpenOximetry) before fine-tuning on phone video. It also outputs heart rate and a quality score. Details and every lever, kept or dropped: [MODEL.md](../MODEL.md).
 
 ![Architecture](figures/ml_architecture.png)
 

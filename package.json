@@ -1,6 +1,6 @@
 { "name": "oxydrop", "version": "2.0.0", "private": true, "type": "module", "license": "MIT",
   "scripts": {
-    "test": "npm run test:decision && npm run test:parity:v2 && npm run test:parity:v1 && npm run test:hr && npm run test:capture && npm run test:stall && npm run test:lens && npm run test:flow && npm run test:ui && npm run test:cnn && npm run test:hybrid && npm run test:worker && npm run test:sw && npm run test:docs",
+    "test": "npm run test:decision && npm run test:parity:v2 && npm run test:parity:v1 && npm run test:hr && npm run test:capture && npm run test:stall && npm run test:lens && npm run test:flow && npm run test:ui && npm run test:cnn && npm run test:hybrid && npm run test:distill && npm run test:nnrt && npm run test:worker && npm run test:sw && npm run test:docs",
     "test:parity:v2": "node tests/parity.mjs v2 tests/fixtures/ref_2rec_v2.json tests/fixtures/ppg-csv",
     "test:parity:v1": "node tests/parity.mjs v1 tests/fixtures/ref_2rec.json tests/fixtures/ppg-csv",
     "test:decision": "node tests/decision.mjs",
@@ -11,9 +11,11 @@
     "test:lens": "node tests/lensprobe.mjs && node tests/ios_startup.mjs",
     "test:cnn": "node tests/cnn_parity.mjs",
     "test:hybrid": "node tests/hybrid_engine.mjs",
+    "test:distill": "node tests/distill_parity.mjs",
+    "test:nnrt": "node tests/nn_runtime.mjs",
     "test:worker": "node tests/worker_fail.mjs",
     "test:sw": "node tests/sw_assets.mjs",
     "test:docs": "bash scripts/check_claims.sh",
     "test:ui": "node tests/ui_contract.mjs && node tests/ui_flow.mjs",
-    "test:flow": "node tests/flow.mjs && FLOW_HYBRID_FAIL=1 node tests/flow.mjs && FLOW_WORKER_FAIL=1 node tests/flow.mjs && FLOW_ENGINE=logistic node tests/flow.mjs",
+    "test:flow": "node tests/flow.mjs && FLOW_ENGINE=hybrid FLOW_HYBRID_FAIL=1 node tests/flow.mjs && FLOW_ENGINE=hybrid FLOW_WORKER_FAIL=1 node tests/flow.mjs && FLOW_ENGINE=logistic node tests/flow.mjs && FLOW_ENGINE=hybrid node tests/flow.mjs && FLOW_ENGINE=distill node tests/flow.mjs && FLOW_DISTILL_FAIL=1 node tests/flow.mjs",
     "serve": "python3 -m http.server 8080 --directory app" } }

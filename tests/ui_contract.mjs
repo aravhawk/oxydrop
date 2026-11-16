@@ -155,7 +155,7 @@ ok('one-handed layout plumbing is in place');
 // ----------------------------------------------------------------- 7. ui.js is loaded, precached and side-effect free in Node
 check(html.includes('js/ui.js') && html.indexOf('js/ui.js') < html.indexOf('js/app.js'), 'ui.js must be loaded before app.js');
 check(sw.includes("'js/ui.js'"), 'ui.js must be precached by the service worker');
-check(/const V = 'oxydrop-v3\.5/.test(sw), 'the service worker cache version must be bumped for this deploy');
+check(/const V = 'oxydrop-v3\.6\.1-photon-distill2'/.test(sw), 'the service worker cache version must be bumped for this deploy');
 check(!/\b(getUserMedia|CameraSource|Chain|HybridEngine|decide\()/.test(ui), 'ui.js must not touch capture, model or decision logic');
 ok('ui.js is wired in, precached, and contains no pipeline logic');
 

@@ -4,6 +4,7 @@ import { runProbeLadder, liveQuality, ringState, probeSummary, isVirtualCamera }
 import { MIN_TRACKABLE_BPM, GATE } from './hr.js';
 import { HybridEngine, loadHybridAssets, ENGINE_ID } from './hybrid_engine.js';
 import { HybridWorker, HybridWorkerEngine, loadHybridLite } from './hybrid_async.js';
+import { PhotonEngine, loadPhotonAssets, DEFAULT_PHOTON_MODEL } from './photon_engine.js';
 import { decide, hrToShow, assessPlacement, stalledDecision, gapContext, calibrationInterrupt, calibrationFingerReason, STATE, STATE_TEXT, MOTION_MAX, STALL_MS } from './decision.js';
 
 const $ = (id) => document.getElementById(id);
@@ -20,13 +21,17 @@ const GET_READY_S = 3;          // countdown so the finger is on the plateau bef
 const WEAK_PROMPT_MS = 4000;    // live signal quality must stay in 'reposition' this long before the re-position prompt replaces a reading
 const WEAK_MSG = 'Weak signal: slide your finger so it covers the lens and the flash, press lightly.';
 const RAW_MAX = 15 * 60 * FS;   // raw trace ring buffer: 15 minutes at 30 Hz
-// Engine: the hybrid (v1 physics chain + residual CNN + conformal three-state rule, app/js/hybrid_engine.js) is the main path; ?engine=logistic runs the v2 logistic chain
-// (the baseline of the evaluation). ?alpha=0.05 sets the conformal level (debug; default is the pre-declared 0.10).
+// Engine: the default is the engine slot (app/js/photon_engine.js) running PhotonDistill (app/js/distill_engine.js + distill_features.js, model file app/data/distill.json:
+// a trained student MLP whose own output and abstain head are shown with no extra masking; ?engine=distill names it explicitly, ?model=<name> picks another file of a
+// registered format, debug). ?engine=hybrid runs the previous hybrid (v1 physics chain + residual CNN + conformal rule, app/js/hybrid_engine.js), ?engine=logistic the
+// v2 logistic chain (the baseline of the evaluation). ?alpha=0.05 sets the hybrid's conformal level (debug; default is the pre-declared 0.10).
 const QS = new URLSearchParams(location.search);
-const ENGINE_REQ = QS.get('engine') === 'logistic' ? 'logistic' : 'hybrid';
+const ENGINE_ARG = QS.get('engine');
+const ENGINE_REQ = ENGINE_ARG === 'logistic' ? 'logistic' : ENGINE_ARG === 'hybrid' ? 'hybrid' : 'photon';   // 'photon' = the engine slot (default)
+const PHOTON_MODEL = QS.get('model') || DEFAULT_PHOTON_MODEL;
 const CAMERA_HR_GATE = { ...GATE, harmonicGuard: true };
 const ALPHA_REQ = QS.get('alpha') ? Number(QS.get('alpha')) : null;
-let engineUsed = ENGINE_REQ, engineNote = '', hybridLite = null, hybridFull = null, hybridWorker = null, hybridAlpha = null;
+let engineUsed = ENGINE_REQ, engineNote = '', hybridLite = null, hybridFull = null, hybridWorker = null, hybridAlpha = null, photonAssets = null;
 
 let mode = null;                // null | 'setup' | 'measure'
 let kind = null;                // 'live' | 'replay'
@@ -73,15 +78,33 @@ async function loadHybrid(needFull) {
     if (!hybridWorker) throw new Error('model worker unavailable; capture requires a free page thread');
   } catch (e) { engineUsed = 'logistic'; engineNote = `hybrid model could not be loaded (${e && e.message ? e.message : e}); using the logistic chain. `; }
 }
+// Engine slot assets (default engine; the model file data/<PHOTON_MODEL>.json and the v2 chain weights; runs in the page thread). A load failure falls back to the logistic
+// chain and says so on screen (never silently, and never to the hybrid: that would swap in a different model with different numbers).
+async function loadPhoton() {
+  if (ENGINE_REQ !== 'photon' || engineUsed !== 'photon') return;
+  try { if (!photonAssets) photonAssets = await loadPhotonAssets(fetchJson, PHOTON_MODEL); }
+  catch (e) { engineUsed = 'logistic'; noticeText = PHOTON_FALLBACK_NOTICE; engineNote = `model file data/${PHOTON_MODEL}.json could not be loaded (${e && e.message ? e.message : e}); using the logistic chain. `; }
+}
 // The hybrid model failing must never be silent: the page switched to the logistic chain alone, so the measurement screen says so (text only, no device logic).
 // Two cases: the assets could not be loaded, or the Web Worker errored or stopped answering after it had loaded. Not shown when the chain was asked for on purpose (?engine=logistic).
 const FALLBACK_NOTICE = 'Notice: the neural-network part of the model could not be loaded, so these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
 const WORKER_NOTICE = 'Notice: the neural-network part of the model stopped working, so from now on these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
+// The same rule for the photon engine slot (?engine=photon): its model file could not be loaded, or the model threw during a measurement.
+const PHOTON_FALLBACK_NOTICE = 'Notice: the selected on-device model could not be loaded, so these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
+const PHOTON_FAIL_NOTICE = 'Notice: the selected on-device model stopped working, so from now on these answers come from the simpler logistic chain alone. Reload the page to try again. The three result words are unchanged.';
 const WORKER_STALL_MS = 2000;  // a window the worker has not answered for this long counts as a dead worker (normal latency is 50 to 300 ms)
 let noticeText = FALLBACK_NOTICE;
 function showEngineNotice() {
-  const el = $('engine-note'), fell = ENGINE_REQ === 'hybrid' && engineUsed === 'logistic';
+  const el = $('engine-note'), fell = ENGINE_REQ !== 'logistic' && engineUsed === 'logistic';
   el.hidden = !fell; el.textContent = fell ? noticeText : '';
+}
+// The photon model threw during a measurement: the engine already serves the logistic chain's windows (its v2 chain holds the calibration); leave the
+// photon slot for the rest of this page load and say so on screen.
+function photonFailed(msg) {
+  if (engineUsed !== 'photon') return;
+  engineUsed = 'logistic'; noticeText = PHOTON_FAIL_NOTICE; engineNote += `model file data/${PHOTON_MODEL}.json failed during the measurement (${msg}); using the logistic chain. `;
+  if (chain && chain.degrade) chain.degrade(msg);
+  showEngineNotice();
 }
 // The CNN worker errored, or stopped answering, after it had loaded: leave the hybrid for good (this page load), keep the running measurement on the logistic chain
 // (the quality chain inside the worker engine already holds the calibration), and say so on screen.
@@ -94,6 +117,10 @@ function workerFailed(msg) {
 }
 // a fresh engine for one measurement (calibration restarts get a new one)
 function newMeasureEngine(w) {
+  if (engineUsed === 'photon' && photonAssets) {
+    try { return new PhotonEngine(photonAssets, kind === 'live' ? { hrGate: CAMERA_HR_GATE } : {}); }
+    catch (e) { engineUsed = 'logistic'; noticeText = PHOTON_FALLBACK_NOTICE; engineNote = `model file data/${PHOTON_MODEL}.json could not be started (${e && e.message ? e.message : e}); using the logistic chain. `; }
+  }
   if (engineUsed === 'hybrid' && hybridLite) {
     if (kind === 'live' && hybridWorker) { const e = new HybridWorkerEngine(hybridLite, hybridWorker, hybridAlpha, (d) => { if (chain === e) dispatchWindow(d); }, { hrGate: CAMERA_HR_GATE }); return e; }
     if (hybridFull) return new HybridEngine(hybridFull, { alpha: hybridAlpha });
@@ -156,14 +183,17 @@ document.querySelectorAll('[data-dl]').forEach((b) => b.addEventListener('click'
 document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyDebug(b)));
 
 function engineLine() {
-  const inf = chain && chain.info, lat = chain && chain.latency ? chain.latency() : null, f1 = (v) => (Number.isFinite(v) ? v.toFixed(0) : '-');
+  const inf = chain && chain.info, lat = chain && chain.latency ? chain.latency() : null, f1 = (v) => (Number.isFinite(v) ? v.toFixed(0) : '-'), f2l = (v) => (Number.isFinite(v) ? v.toFixed(1) : '-');
+  const latTxt = lat && lat.n ? `last ${f1(lat.last)} ms, median ${f1(lat.median)} ms, p95 ${f1(lat.p95)} ms` + (lat.async ? ` (model ${f1(lat.coreMedian)} ms in the worker, quality chain ${f1(lat.v2Median)} ms on the page)` : '') : 'no window yet';
+  if (engineUsed === 'photon' && inf && chain instanceof PhotonEngine) return `engine ${inf.id} (default engine slot, ?engine=distill, model file data/${PHOTON_MODEL}.json): ${inf.model}, ${(inf.perSeed || [inf.params]).map((v) => v.toLocaleString('en-US')).join(' / ')} parameters per seed (${inf.paramsTotal.toLocaleString('en-US')} in total), runs in the page thread; output shown as the model gives it (its own abstention = Unsure); latency per 2 s window: ${lat && lat.n ? `last ${f2l(lat.last)} ms, median ${f2l(lat.median)} ms, p95 ${f2l(lat.p95)} ms` : 'no window yet'}${engineNote ? '  ' + engineNote : ''}`;
+  if (engineUsed === 'photon') return `engine slot (default, ?engine=distill, model file data/${PHOTON_MODEL}.json; only the quality chain runs during setup, the model starts with the calibration minute)${engineNote ? '  ' + engineNote : ''}`;
   if (engineUsed !== 'hybrid' || !inf) return `engine ${engineUsed === 'hybrid' ? 'hybrid (only the quality chain runs during setup; the CNN starts with the calibration minute)' : 'logistic chain v2 (baseline / fallback)'}${ENGINE_REQ === 'logistic' ? ' (?engine=logistic)' : ''}${engineNote ? '  ' + engineNote : ''}`;
   const th = inf.thresholds;
-  return `engine ${ENGINE_ID}: v1 physics chain + ${inf.model}, ${inf.params.toLocaleString('en-US')} parameters per seed (${inf.paramsTotal.toLocaleString('en-US')} total), runs ${chain.worker ? 'in a Web Worker' : 'in the page thread'}; conformal alpha ${inf.alpha} (Normal below z ${th.normal_below.toFixed(3)}, Low above ${th.low_above.toFixed(3)}); latency per 2 s window: ${lat && lat.n ? `last ${f1(lat.last)} ms, median ${f1(lat.median)} ms, p95 ${f1(lat.p95)} ms` + (lat.async ? ` (model ${f1(lat.coreMedian)} ms in the worker, quality chain ${f1(lat.v2Median)} ms on the page)` : '') : 'no window yet'}${engineNote ? '  ' + engineNote : ''}`;
+  return `engine ${ENGINE_ID}: v1 physics chain + ${inf.model}, ${inf.params.toLocaleString('en-US')} parameters per seed (${inf.paramsTotal.toLocaleString('en-US')} total), runs ${chain.worker ? 'in a Web Worker' : 'in the page thread'}; conformal alpha ${inf.alpha} (Normal below z ${th.normal_below.toFixed(3)}, Low above ${th.low_above.toFixed(3)}); latency per 2 s window: ${latTxt}${ENGINE_ARG === 'hybrid' ? ' (?engine=hybrid)' : ''}${engineNote ? '  ' + engineNote : ''}`;
 }
 function debugText() {
   const L = []; const st = cam ? cam.stats : null;
-  L.push('capture build oxydrop-v3.4-ios-frames');
+  L.push('capture build oxydrop-v3.6.1-photon-distill2');
   L.push(`mode ${mode || '-'} / ${kind || '-'}   samples ${rawN}   t ${(rawN / FS).toFixed(1)} s`);
   L.push(engineLine());
   if (cam && st) {
@@ -182,7 +212,10 @@ function debugText() {
   if (probe) { L.push('lens probe scores (per lens, 0-100, usable >= 35):'); L.push(probeSummary(probe.results, probe.choice)); } else L.push('lens probe: not run');
   if (lastD) {
     const d = lastD; L.push(`live HR override ${!!d.cameraHrOverride}; window s=${d.s}  SQI ${f4(d.sqi)}  ACF ${f4(d.acf)}  hrEst ${f2(d.hrEst)}  hrBeat ${f2(d.hrBeat)}  ch ${d.ch}  sat ${f4(d.sat)}  valid ${d.valid}  label ${d.label || 'calibrating'}  p ${f4(d.p)}`);
-    if (Number.isFinite(d.z)) L.push(`hybrid: chain logit c ${f2(d.c)}  CNN correction ${f2(d.corr)}  z ${f2(d.z)}  CNN HR ${f2(d.cnnHr)}  spectral HR ${f2(d.specHr)}  | EXPERIMENTAL SpO2 from the CNN head (not validated, do not use): ${f2(d.spo2Exp)}`);
+    if (d.model !== undefined && d.pulseLock !== undefined) {   // photon slot window: the model's raw output, then the model-specific extras
+      const m = d.model || {};
+      L.push(`model ${d.engine}: raw P(SpO2<90) ${f4(d.modelP)}  abstain ${d.modelAbstain} (abstain head ${f4(m.conf)})  label ${d.label}  model latency ${f2(m.ms)} ms  v2 pulse lock ${d.pulseLock}  | EXPERIMENTAL SpO2 estimate of the model (not validated, do not use): ${f2(d.modelSpo2)}`);
+    } else if (Number.isFinite(d.z)) L.push(`hybrid: chain logit c ${f2(d.c)}  CNN correction ${f2(d.corr)}  z ${f2(d.z)}  CNN HR ${f2(d.cnnHr)}  spectral HR ${f2(d.specHr)}  | EXPERIMENTAL SpO2 from the CNN head (not validated, do not use): ${f2(d.spo2Exp)}`);
     if (lastDecision) L.push(`decision ${lastDecision.state}${lastDecision.reason ? ' (' + lastDecision.reason + ')' : ''}  hr shown ${lastDecision.hr != null ? lastDecision.hr.toFixed(1) : '-'}`);
   } else L.push('no window yet');
   L.push(`lock history (last 5): ${lockHist.map((v) => (v ? '1' : '0')).join('') || '-'}  motion ${motion && motion.ok && motion.level(10) != null ? motion.level(10).toFixed(2) + ' m/s2' : 'no sensor'}`);
@@ -200,7 +233,7 @@ $('btn-cam').addEventListener('click', async () => {
   let gen = -1;
   try {
     cleanup(); gen = sessionGen; motion = new Motion(); const mp = motion.start();   // start the motion permission prompt first: iOS needs it inside the tap
-    await loadWeights(); $('cam-state').textContent = 'Loading the on-device model…'; await loadHybrid(false); await keepAwake();
+    await loadWeights(); $('cam-state').textContent = 'Loading the on-device model…'; await loadHybrid(false); await loadPhoton(); await keepAwake();
     kind = 'live'; mode = 'setup'; startUi();
     const choice = await runProbe(gen);   // session token: startCamera() below bumps camGen on purpose, which must not cancel this flow
     if (gen !== sessionGen) return;
@@ -356,7 +389,7 @@ $('btn-begin-anyway').addEventListener('click', beginLive);
 
 // ---------------- replay flow ----------------
 $('btn-replay').addEventListener('click', async () => {
-  cleanup(); await loadWeights(); await loadHybrid(true); show('measure'); kind = 'replay'; resetRecorder();
+  cleanup(); await loadWeights(); await loadHybrid(true); await loadPhoton(); show('measure'); kind = 'replay'; resetRecorder();
   const pick = new URLSearchParams(location.search).get('rec') || (Math.random() < 0.5 ? '100001L' : '100004R');
   const [meta, buf] = await Promise.all([fetch(`data/replay/${pick}.json`).then((r) => r.json()), fetch(`data/replay/${pick}.bin`).then((r) => r.arrayBuffer())]);
   replay = { meta, rgb: new Float32Array(buf), i: 0, speed: 30 };
@@ -414,6 +447,7 @@ function watchCalibration(now, stalled) {
 function uiTick() {
   tickN++;
   if (chain && chain.degraded && engineUsed === 'hybrid') workerFailed('model latency exceeded capture budget');
+  if (chain && chain.degraded && engineUsed === 'photon') photonFailed(chain.failMsg || 'model error');
   if (chain && chain.worker && chain.oldestPendingMs && chain.oldestPendingMs() > WORKER_STALL_MS) workerFailed('no answer from the model worker for ' + Math.round(WORKER_STALL_MS / 1000) + ' s');
   if (kind === 'live' && cam) {
     const st = cam.stats, now = performance.now();
@@ -477,7 +511,8 @@ function updateQuality(st, now, stalled) {
   }
 }
 function watchWeak() {
-  if (weakNow && !calFailed) {
+  // the engine slot's model judges the signal itself (its abstain head): no weak-signal override of its answers during the measurement
+  if (weakNow && !calFailed && !(chain && chain.ownQuality)) {
     if (!weakShown) { weakShown = true; pushStrip('d-uns', 'unsure: weak_signal'); }
     setStatus('uns', '?', STATE_TEXT.UNSURE, WEAK_MSG); $('hr').textContent = '–'; $('dhr').textContent = '–'; $('sig').textContent = 'Weak'; $('sig-u').textContent = 're-position';
   } else if (weakShown) {
@@ -522,7 +557,7 @@ function onWindow(d) {
   }
   if (calFailed) { logDecision(d, null); showHr(d, ctx); return; }
   let dec = decide(d, ctx);
-  if (weakNow && kind === 'live') dec = { state: STATE.UNSURE, reason: 'weak_signal', text: STATE_TEXT.UNSURE, detail: WEAK_MSG, hr: null };
+  if (weakNow && kind === 'live' && !d.ownQuality) dec = { state: STATE.UNSURE, reason: 'weak_signal', text: STATE_TEXT.UNSURE, detail: WEAK_MSG, hr: null };
   lastDecision = dec; logDecision(d, dec);
   showHr(d, ctx); if (weakNow && kind === 'live') $('hr').textContent = '–'; setSig(d); $('dhr').textContent = d.valid && dec.hr != null && Number.isFinite(d.dHR) ? (d.dHR >= 0 ? '+' : '') + d.dHR.toFixed(0) : '–';
   let ref = null; if (kind === 'replay') { ref = refAt(d.s); $('ref').textContent = ref == null ? '–' : ref.toFixed(0); }
@@ -536,7 +571,8 @@ function onWindow(d) {
   $('tally').textContent = `${n} readings: ${tally.normal} normal, ${tally.low} possible low oxygen, ${tally.uns + tally.pause} unsure.` + (kind === 'replay' ? ` Against the study reference, ${tally.right} of ${tally.right + tally.wrong} answered readings were correct` + (chain && chain.core ? ' (the model saw this person: demo only, not a test).' : '.') : '');
 }
 function setSig(d) {
-  const lvl = d.valid ? (d.sqi >= 0.45 ? 'Good' : 'Fair') : 'Poor';
+  const lock = d.pulseLock ?? d.valid;     // photon slot windows are marked valid (the model decides); the signal tile still reports the v2 pulse lock
+  const lvl = lock ? (d.sqi >= 0.45 ? 'Good' : 'Fair') : 'Poor';
   $('sig').textContent = lvl; $('sig-u').textContent = Number.isFinite(d.sqi) ? 'quality ' + d.sqi.toFixed(2) : '';
 }
 
@@ -547,6 +583,7 @@ function checkCalibration() {
   if (kind === 'live' && cam && cam.stats.gaps - calGaps0 > CAL_GAPS_MAX) return 'The camera dropped too many frames during calibration.';
   if (kind === 'live') { const fr = calibrationFingerReason(calFingerGood, calFingerN); if (fr) return fr; }
   if (kind === 'live' && calDirty) return 'Your fingertip came off the lens or flash during calibration and was not put back.';
+  if (chain && chain.ownQuality) return calMotion.length && calMotion.filter(Boolean).length / calMotion.length > 0.25 ? 'You moved too much during calibration.' : null;   // engine slot: no pulse-signal gate on top of the model (its abstain head decides)
   if (!Number.isFinite(s.hr)) return 'No pulse was found during calibration.';
   const cw = calWin.filter((x) => x[0] > CAL_WARM_S), vf = cw.length ? cw.filter((x) => x[1]).length / cw.length : 0;
   if (vf < CAL_VALID_MIN) return `The pulse was only clearly detected in ${Math.round(vf * 100)}% of the calibration minute (need ${Math.round(CAL_VALID_MIN * 100)}%).`;

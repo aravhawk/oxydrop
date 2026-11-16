@@ -1,0 +1,220 @@
+{
+ "model": "ens3_gpu",
+ "device": "Tesla T4",
+ "n_gpu": 2,
+ "torch": "2.11.0+cu130",
+ "kaggle_kernels": [
+  "aravhawk/ens3-gpu-all (version 1, private, GPU T4 x2, internet on)"
+ ],
+ "kaggle_datasets": [
+  "aravhawk/ens3-r3-data (private; Hoffman-derived 39-feature pack + code, reused)"
+ ],
+ "pushed_ct": "20:48:51",
+ "completed_ct": "~21:02",
+ "kernel_train_wall_s": 763.3,
+ "kernel_total_wall_s": 770.3,
+ "fold_wall_s": {
+  "ens3_gpu": [
+   [
+    "100001",
+    "Tesla T4",
+    624.8
+   ],
+   [
+    "100002",
+    "Tesla T4",
+    573.1
+   ],
+   [
+    "100003",
+    "Tesla T4",
+    578.8
+   ],
+   [
+    "100004",
+    "Tesla T4",
+    660.5
+   ],
+   [
+    "100005",
+    "Tesla T4",
+    596.3
+   ],
+   [
+    "100006",
+    "Tesla T4",
+    637.9
+   ]
+  ],
+  "ens3_gpu_s0": [
+   [
+    "100001",
+    "Tesla T4",
+    624.8
+   ],
+   [
+    "100002",
+    "Tesla T4",
+    573.1
+   ],
+   [
+    "100003",
+    "Tesla T4",
+    578.8
+   ],
+   [
+    "100004",
+    "Tesla T4",
+    660.5
+   ],
+   [
+    "100005",
+    "Tesla T4",
+    596.3
+   ],
+   [
+    "100006",
+    "Tesla T4",
+    637.9
+   ]
+  ],
+  "ens3_gpu_null": [
+   [
+    "100001",
+    "Tesla T4",
+    287.4
+   ],
+   [
+    "100002",
+    "Tesla T4",
+    252.0
+   ],
+   [
+    "100003",
+    "Tesla T4",
+    296.9
+   ],
+   [
+    "100004",
+    "Tesla T4",
+    290.8
+   ],
+   [
+    "100005",
+    "Tesla T4",
+    304.3
+   ],
+   [
+    "100006",
+    "Tesla T4",
+    312.6
+   ]
+  ],
+  "ens3_gpu_nulld1_null": [
+   [
+    "100001",
+    "Tesla T4",
+    288.1
+   ],
+   [
+    "100002",
+    "Tesla T4",
+    283.7
+   ],
+   [
+    "100003",
+    "Tesla T4",
+    238.5
+   ],
+   [
+    "100004",
+    "Tesla T4",
+    315.1
+   ],
+   [
+    "100005",
+    "Tesla T4",
+    256.3
+   ],
+   [
+    "100006",
+    "Tesla T4",
+    246.9
+   ]
+  ],
+  "ens3_gpu_nulld2_null": [
+   [
+    "100001",
+    "Tesla T4",
+    174.7
+   ],
+   [
+    "100002",
+    "Tesla T4",
+    156.3
+   ],
+   [
+    "100003",
+    "Tesla T4",
+    168.6
+   ],
+   [
+    "100004",
+    "Tesla T4",
+    159.3
+   ],
+   [
+    "100005",
+    "Tesla T4",
+    163.2
+   ],
+   [
+    "100006",
+    "Tesla T4",
+    151.4
+   ]
+  ]
+ },
+ "jobs": [
+  "--fold 0 --draw real",
+  "--fold 1 --draw real",
+  "--fold 2 --draw real",
+  "--fold 3 --draw real",
+  "--fold 4 --draw real",
+  "--fold 5 --draw real",
+  "--fold 0 --draw 0",
+  "--fold 1 --draw 0",
+  "--fold 2 --draw 0",
+  "--fold 3 --draw 0",
+  "--fold 4 --draw 0",
+  "--fold 5 --draw 0",
+  "--fold 0 --draw 1",
+  "--fold 1 --draw 1",
+  "--fold 2 --draw 1",
+  "--fold 3 --draw 1",
+  "--fold 4 --draw 1",
+  "--fold 5 --draw 1",
+  "--fold 0 --draw 2",
+  "--fold 1 --draw 2",
+  "--fold 2 --draw 2",
+  "--fold 3 --draw 2",
+  "--fold 4 --draw 2",
+  "--fold 5 --draw 2"
+ ],
+ "score_files": [
+  "ens3_gpu__L0..L5,X1",
+  "ens3_gpu_s0__L0..L5,X1",
+  "ens3_gpu_null__L0",
+  "ens3_gpu_nulld1_null__L0",
+  "ens3_gpu_nulld2_null__L0"
+ ],
+ "single_graph": {
+  "form": "ens3_gpu_s0 (seed-0 members)",
+  "exact_in_real_arithmetic": true,
+  "float64_max_abs_score_diff": 1.1243316755393806e-07,
+  "shared_prep_all_folds": true,
+  "three_seed_ens3_gpu_foldable": false,
+  "reason": "3 seeds -> 3 Prep fits and logit(mean of sigmoids); nn-runtime-v1 has no log/logit op"
+ },
+ "trained_locally": false
+}

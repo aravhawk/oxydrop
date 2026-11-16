@@ -1,0 +1,19 @@
+{
+ "model": "multida_gpu",
+ "status": "NO RESULT: missed 21:00/21:05 deadline",
+ "kernel_slugs": [
+  "aravhawk/oxy-r3mgpu-a"
+ ],
+ "attempt_1": {
+  "pushed": "21:02:04 CT",
+  "device": "Tesla T4",
+  "wall_s": 18,
+  "outcome": "crashed at start of training: AttributeError multida._sig (Kaggle dataset holds an older multida.py); no model trained, no score files"
+ },
+ "attempt_2": {
+  "outcome": "push refused 21:04-21:07 CT: Kaggle account limit of 2 batch GPU sessions held by other agents (oxy-distill2-gpu-a, ens3-gpu-all); abandoned after the deadline"
+ },
+ "push_refusals": "20:45-21:02 CT, same GPU session limit",
+ "fix_applied": "multida_gpu.py now defines its own sigmoid; kernel script embeds the current multida.py and multida_gpu.py (ml_cache/r3m_gpu/ka)",
+ "licence_notice": "Any multida_gpu weights would be trained on MTHS (CC BY-NC-ND 4.0): non-commercial research only."
+}

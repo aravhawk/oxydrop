@@ -1,0 +1,8 @@
+fold 100003 draw real distill s0 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 125.8 s on Tesla T4
+fold 100003 draw real distill s1 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 94.1 s on Tesla T4
+fold 100003 draw real distill s2 {'teacher': 'base', 'lam': 8.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 15}: 48.9 s on Tesla T4
+fold 100003 draw real distill2 s0 {'teacher': 'base', 'lam': 32.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 15}: 46.0 s on Tesla T4
+fold 100003 draw real distill2 s1 {'teacher': 'base', 'lam': 16.0, 'T': 2.0, 'H': 32, 'wd': 0.0001, 'epochs': 30}: 90.4 s on Tesla T4
+fold 100003 draw real distill2 s2 {'teacher': 'base', 'lam': 32.0, 'T': 4.0, 'H': 64, 'wd': 0.0001, 'epochs': 30}: 93.5 s on Tesla T4
+fold 100003 draw real distill_nokd s0 {'teacher': 'base', 'lam': 0.0, 'T': 2.0, 'H': 32, 'wd': 0.01, 'epochs': 30}: 79.4 s on Tesla T4
+saved fold 2 draw real: 579 s on Tesla T4
