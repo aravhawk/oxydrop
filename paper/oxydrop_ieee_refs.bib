@@ -1,39 +1,24 @@
-% References for paper/OxyDrop_paper.tex (IEEEtran, numbered).
-% Each entry was checked on November 15, 2026 by opening its DOI or URL
-% (DOIs resolved through doi.org or the Crossref API; URLs returned HTTP 200).
+% References for paper/OxyDrop_paper.tex (IEEEtran.bst, numbered in order of citation).
+% Every entry was checked by resolving its DOI (Crossref API for journal and conference DOIs,
+% DataCite API for PhysioNet DOIs), its arXiv abstract page, or its URL (HTTP 200).
+% Entries that could not be verified were left out.
 
+% ---------------------------------------------------------------- datasets
 @article{hoffman2022,
   author = {Hoffman, Jason S. and Viswanath, Varun K. and Tian, Caiwei and Ding, Xinyi and Thompson, Matthew J. and Larson, Eric C. and Patel, Shwetak N. and Wang, Edward J.},
   title = {Smartphone camera oximetry in an induced hypoxemia study},
   journal = {npj Digital Medicine},
-  year = {2022}, volume = {5}, pages = {146},
+  year = {2022}, volume = {5}, number = {1}, pages = {146},
   doi = {10.1038/s41746-022-00665-y},
-  url = {https://doi.org/10.1038/s41746-022-00665-y}
+  note = {doi: \href{https://doi.org/10.1038/s41746-022-00665-y}{10.1038/s41746-022-00665-y}}
 }
 
 @misc{hoffmandata,
   author = {{UW Ubicomp Lab}},
   title = {Smartphone camera oximetry in an induced hypoxemia study: data and code},
-  howpublished = {GitHub repository},
+  howpublished = {GitHub repository, MIT licence},
   url = {https://github.com/ubicomplab/oximetry-phone-cam-data},
-  note = {MIT licence. Accessed Nov. 15, 2026}
-}
-
-@article{sjoding2020,
-  author = {Sjoding, Michael W. and Dickson, Robert P. and Iwashyna, Theodore J. and Gay, Steven E. and Valley, Thomas S.},
-  title = {Racial bias in pulse oximetry measurement},
-  journal = {New England Journal of Medicine},
-  year = {2020}, volume = {383}, number = {25}, pages = {2477--2478},
-  doi = {10.1056/NEJMc2029240},
-  url = {https://doi.org/10.1056/NEJMc2029240}
-}
-
-@misc{hinton2015,
-  author = {Hinton, Geoffrey and Vinyals, Oriol and Dean, Jeff},
-  title = {Distilling the knowledge in a neural network},
-  howpublished = {arXiv:1503.02531},
-  url = {https://arxiv.org/abs/1503.02531},
-  year = {2015}
+  year = {2022}
 }
 
 @misc{samavati2022,
@@ -42,7 +27,16 @@
   howpublished = {arXiv:2204.08989},
   url = {https://arxiv.org/abs/2204.08989},
   year = {2022},
-  note = {Introduces the MTHS dataset}
+  note = {Introduces the MTHS dataset, \url{https://github.com/MahdiFarvardin/MEDVSE}}
+}
+
+@article{nemcova2021,
+  author = {Nemcova, Andrea and Vargova, Enik{\"o} and Smisek, Radovan and Marsanova, Lucie and Smital, Lukas and Vitek, Martin},
+  title = {Brno {U}niversity of {T}echnology smartphone {PPG} database ({BUT PPG}): annotated dataset for {PPG} quality assessment and heart rate estimation},
+  journal = {BioMed Research International},
+  year = {2021}, volume = {2021}, pages = {3453007},
+  doi = {10.1155/2021/3453007},
+  note = {doi: \href{https://doi.org/10.1155/2021/3453007}{10.1155/2021/3453007}}
 }
 
 @misc{butppg2024,
@@ -51,41 +45,270 @@
   howpublished = {PhysioNet},
   year = {2024},
   doi = {10.13026/tn53-8153},
-  url = {https://doi.org/10.13026/tn53-8153}
+  note = {doi: \href{https://doi.org/10.13026/tn53-8153}{10.13026/tn53-8153}}
 }
 
 @article{fong2025,
   author = {Fong, Nicholas and Lipnick, Michael S. and Behnke, Ella and others},
   title = {Open access dataset and common data model for pulse oximeter performance data},
   journal = {Scientific Data},
-  year = {2025}, volume = {12}, pages = {570},
+  year = {2025}, volume = {12}, number = {1}, pages = {570},
   doi = {10.1038/s41597-025-04870-8},
-  url = {https://doi.org/10.1038/s41597-025-04870-8}
+  note = {doi: \href{https://doi.org/10.1038/s41597-025-04870-8}{10.1038/s41597-025-04870-8}}
 }
 
 @misc{openox2025,
   author = {Fong, Nicholas and Lipnick, Michael and Bickler, Philip and Feiner, John and Law, Tyler},
   title = {{OpenOximetry} repository, version 1.1.1},
-  howpublished = {PhysioNet (restricted access)},
+  howpublished = {PhysioNet (credentialed access)},
   year = {2025},
   doi = {10.13026/be2e-cn29},
-  url = {https://doi.org/10.13026/be2e-cn29}
+  note = {doi: \href{https://doi.org/10.13026/be2e-cn29}{10.13026/be2e-cn29}}
 }
 
+@misc{pttppg2022,
+  author = {Mehrgardt, Philip and Khushi, Matloob and Poon, Simon and Withana, Anusha},
+  title = {Pulse transit time {PPG} dataset, version 1.1.0},
+  howpublished = {PhysioNet},
+  year = {2022},
+  doi = {10.13026/jpan-6n92},
+  note = {doi: \href{https://doi.org/10.13026/jpan-6n92}{10.13026/jpan-6n92}}
+}
+
+@misc{bidmcdata,
+  author = {Pimentel, Marco and Johnson, Alistair E. W. and Charlton, Peter and Birrenkott, Drew and Watkinson, Peter and Tarassenko, Lionel and Clifton, David},
+  title = {{BIDMC} {PPG} and respiration dataset},
+  howpublished = {PhysioNet},
+  year = {2018},
+  doi = {10.13026/C2208R},
+  note = {doi: \href{https://doi.org/10.13026/C2208R}{10.13026/C2208R}}
+}
+
+@article{goldberger2000,
+  author = {Goldberger, Ary L. and Amaral, Luis A. N. and Glass, Leon and Hausdorff, Jeffrey M. and Ivanov, Plamen Ch. and Mark, Roger G. and Mietus, Joseph E. and Moody, George B. and Peng, Chung-Kang and Stanley, H. Eugene},
+  title = {{PhysioBank}, {PhysioToolkit}, and {PhysioNet}: components of a new research resource for complex physiologic signals},
+  journal = {Circulation},
+  year = {2000}, volume = {101}, number = {23}, pages = {e215--e220},
+  doi = {10.1161/01.CIR.101.23.e215},
+  note = {doi: \href{https://doi.org/10.1161/01.CIR.101.23.e215}{10.1161/01.CIR.101.23.e215}}
+}
+
+% ---------------------------------------------------------------- pulse oximetry and camera PPG
+@article{allen2007,
+  author = {Allen, John},
+  title = {Photoplethysmography and its application in clinical physiological measurement},
+  journal = {Physiological Measurement},
+  year = {2007}, volume = {28}, number = {3}, pages = {R1--R39},
+  doi = {10.1088/0967-3334/28/3/R01},
+  note = {doi: \href{https://doi.org/10.1088/0967-3334/28/3/R01}{10.1088/0967-3334/28/3/R01}}
+}
+
+@article{verkruysse2008,
+  author = {Verkruysse, Wim and Svaasand, Lars O. and Nelson, J. Stuart},
+  title = {Remote plethysmographic imaging using ambient light},
+  journal = {Optics Express},
+  year = {2008}, volume = {16}, number = {26}, pages = {21434--21445},
+  doi = {10.1364/OE.16.021434},
+  note = {doi: \href{https://doi.org/10.1364/OE.16.021434}{10.1364/OE.16.021434}}
+}
+
+@article{scully2012,
+  author = {Scully, Christopher G. and Lee, Jinseok and Meyer, Joseph and Gorbach, Alexander M. and Granquist-Fraser, Domhnull and Mendelson, Yitzhak and Chon, Ki H.},
+  title = {Physiological parameter monitoring from optical recordings with a mobile phone},
+  journal = {IEEE Transactions on Biomedical Engineering},
+  year = {2012}, volume = {59}, number = {2}, pages = {303--306},
+  doi = {10.1109/TBME.2011.2163157},
+  note = {doi: \href{https://doi.org/10.1109/TBME.2011.2163157}{10.1109/TBME.2011.2163157}}
+}
+
+@article{ding2019,
+  author = {Ding, Xinyi and Nassehi, Damoun and Larson, Eric C.},
+  title = {Measuring oxygen saturation with smartphone cameras using convolutional neural networks},
+  journal = {IEEE Journal of Biomedical and Health Informatics},
+  year = {2019}, volume = {23}, number = {6}, pages = {2603--2610},
+  doi = {10.1109/JBHI.2018.2887209},
+  note = {doi: \href{https://doi.org/10.1109/JBHI.2018.2887209}{10.1109/JBHI.2018.2887209}}
+}
+
+@article{sun2021,
+  author = {Sun, Zhiyuan and He, Qinghua and Li, Yuandong and Wang, Wendy and Wang, Ruikang K.},
+  title = {Robust non-contact peripheral oxygenation saturation measurement using smartphone-enabled imaging photoplethysmography},
+  journal = {Biomedical Optics Express},
+  year = {2021}, volume = {12}, number = {3}, pages = {1746},
+  doi = {10.1364/BOE.419268},
+  note = {doi: \href{https://doi.org/10.1364/BOE.419268}{10.1364/BOE.419268}}
+}
+
+@article{tian2022,
+  author = {Tian, Xin and Wong, Chau-Wai and Ranadive, Sushant M. and Wu, Min},
+  title = {A multi-channel ratio-of-ratios method for noncontact hand video based {SpO2} monitoring using smartphone cameras},
+  journal = {IEEE Journal of Selected Topics in Signal Processing},
+  year = {2022}, volume = {16}, number = {2}, pages = {197--207},
+  doi = {10.1109/JSTSP.2022.3152352},
+  note = {doi: \href{https://doi.org/10.1109/JSTSP.2022.3152352}{10.1109/JSTSP.2022.3152352}}
+}
+
+% ---------------------------------------------------------------- skin pigmentation and oximeter bias
+@article{bickler2005,
+  author = {Bickler, Philip E. and Feiner, John R. and Severinghaus, John W.},
+  title = {Effects of skin pigmentation on pulse oximeter accuracy at low saturation},
+  journal = {Anesthesiology},
+  year = {2005}, volume = {102}, number = {4}, pages = {715--719},
+  doi = {10.1097/00000542-200504000-00004},
+  note = {doi: \href{https://doi.org/10.1097/00000542-200504000-00004}{10.1097/00000542-200504000-00004}}
+}
+
+@article{feiner2007,
+  author = {Feiner, John R. and Severinghaus, John W. and Bickler, Philip E.},
+  title = {Dark skin decreases the accuracy of pulse oximeters at low oxygen saturation: the effects of oximeter probe type and gender},
+  journal = {Anesthesia \& Analgesia},
+  year = {2007}, volume = {105}, number = {6}, pages = {S18--S23},
+  doi = {10.1213/01.ane.0000285988.35174.d9},
+  note = {doi: \href{https://doi.org/10.1213/01.ane.0000285988.35174.d9}{10.1213/01.ane.0000285988.35174.d9}}
+}
+
+@article{sjoding2020,
+  author = {Sjoding, Michael W. and Dickson, Robert P. and Iwashyna, Theodore J. and Gay, Steven E. and Valley, Thomas S.},
+  title = {Racial bias in pulse oximetry measurement},
+  journal = {New England Journal of Medicine},
+  year = {2020}, volume = {383}, number = {25}, pages = {2477--2478},
+  doi = {10.1056/NEJMc2029240},
+  note = {doi: \href{https://doi.org/10.1056/NEJMc2029240}{10.1056/NEJMc2029240}}
+}
+
+@article{chardon1991,
+  author = {Chardon, A. and Cretois, I. and Hourseau, C.},
+  title = {Skin colour typology and suntanning pathways},
+  journal = {International Journal of Cosmetic Science},
+  year = {1991}, volume = {13}, number = {4}, pages = {191--208},
+  doi = {10.1111/j.1467-2494.1991.tb00561.x},
+  note = {doi: \href{https://doi.org/10.1111/j.1467-2494.1991.tb00561.x}{10.1111/j.1467-2494.1991.tb00561.x}}
+}
+
+% ---------------------------------------------------------------- tissue optics and camera sensitivity
 @article{farrell1992,
   author = {Farrell, Thomas J. and Patterson, Michael S. and Wilson, Brian},
   title = {A diffusion theory model of spatially resolved, steady-state diffuse reflectance for the noninvasive determination of tissue optical properties in vivo},
   journal = {Medical Physics},
   year = {1992}, volume = {19}, number = {4}, pages = {879--888},
   doi = {10.1118/1.596777},
-  url = {https://doi.org/10.1118/1.596777}
+  note = {doi: \href{https://doi.org/10.1118/1.596777}{10.1118/1.596777}}
 }
 
+@misc{prahl1998,
+  author = {Prahl, Scott},
+  title = {Tabulated molar extinction coefficient for hemoglobin in water},
+  howpublished = {Oregon Medical Laser Center},
+  year = {1998},
+  url = {https://omlc.org/spectra/hemoglobin/summary.html}
+}
+
+@misc{jacques1998,
+  author = {Jacques, Steven L.},
+  title = {Skin optics},
+  howpublished = {Oregon Medical Laser Center News},
+  year = {1998},
+  month = jan,
+  url = {https://omlc.org/news/jan98/skinoptics.html}
+}
+
+@inproceedings{jiang2013,
+  author = {Jiang, Jun and Liu, Dengyu and Gu, Jinwei and S{\"u}sstrunk, Sabine},
+  title = {What is the space of spectral sensitivity functions for digital color cameras?},
+  booktitle = {Proc. IEEE Workshop on Applications of Computer Vision (WACV)},
+  year = {2013}, pages = {168--179},
+  doi = {10.1109/WACV.2013.6475015},
+  note = {doi: \href{https://doi.org/10.1109/WACV.2013.6475015}{10.1109/WACV.2013.6475015}}
+}
+
+% ---------------------------------------------------------------- learning
+@misc{hinton2015,
+  author = {Hinton, Geoffrey and Vinyals, Oriol and Dean, Jeff},
+  title = {Distilling the knowledge in a neural network},
+  howpublished = {arXiv:1503.02531},
+  url = {https://arxiv.org/abs/1503.02531},
+  year = {2015}
+}
+
+@inproceedings{chen2020,
+  author = {Chen, Ting and Kornblith, Simon and Norouzi, Mohammad and Hinton, Geoffrey},
+  title = {A simple framework for contrastive learning of visual representations},
+  booktitle = {Proc. 37th International Conference on Machine Learning (ICML)},
+  series = {PMLR}, volume = {119},
+  year = {2020}, pages = {1597--1607},
+  url = {https://proceedings.mlr.press/v119/chen20j.html}
+}
+
+% ---------------------------------------------------------------- conformal prediction
+@book{vovk2005,
+  author = {Vovk, Vladimir and Gammerman, Alexander and Shafer, Glenn},
+  title = {Algorithmic Learning in a Random World},
+  publisher = {Springer},
+  address = {New York, NY, USA},
+  year = {2005},
+  doi = {10.1007/b106715},
+  note = {doi: \href{https://doi.org/10.1007/b106715}{10.1007/b106715}}
+}
+
+@inproceedings{vovk2012,
+  author = {Vovk, Vladimir},
+  title = {Conditional validity of inductive conformal predictors},
+  booktitle = {Proc. Asian Conference on Machine Learning (ACML)},
+  series = {PMLR}, volume = {25},
+  year = {2012}, pages = {475--490},
+  url = {https://proceedings.mlr.press/v25/vovk12.html}
+}
+
+@article{angelopoulos2023,
+  author = {Angelopoulos, Anastasios N. and Bates, Stephen},
+  title = {Conformal prediction: a gentle introduction},
+  journal = {Foundations and Trends in Machine Learning},
+  year = {2023}, volume = {16}, number = {4}, pages = {494--591},
+  doi = {10.1561/2200000101},
+  note = {doi: \href{https://doi.org/10.1561/2200000101}{10.1561/2200000101}}
+}
+
+% ---------------------------------------------------------------- evaluation and statistics
 @article{saeb2017,
   author = {Saeb, Sohrab and Lonini, Luca and Jayaraman, Arun and Mohr, David C. and Kording, Konrad P.},
   title = {The need to approximate the use-case in clinical machine learning},
   journal = {GigaScience},
   year = {2017}, volume = {6}, number = {5}, pages = {gix019},
   doi = {10.1093/gigascience/gix019},
-  url = {https://doi.org/10.1093/gigascience/gix019}
+  note = {doi: \href{https://doi.org/10.1093/gigascience/gix019}{10.1093/gigascience/gix019}}
+}
+
+@article{varma2006,
+  author = {Varma, Sudhir and Simon, Richard},
+  title = {Bias in error estimation when using cross-validation for model selection},
+  journal = {BMC Bioinformatics},
+  year = {2006}, volume = {7}, pages = {91},
+  doi = {10.1186/1471-2105-7-91},
+  note = {doi: \href{https://doi.org/10.1186/1471-2105-7-91}{10.1186/1471-2105-7-91}}
+}
+
+@article{ojala2010,
+  author = {Ojala, Markus and Garriga, Gemma C.},
+  title = {Permutation tests for studying classifier performance},
+  journal = {Journal of Machine Learning Research},
+  year = {2010}, volume = {11}, pages = {1833--1863},
+  url = {https://www.jmlr.org/papers/v11/ojala10a.html}
+}
+
+@article{efron1979,
+  author = {Efron, Bradley},
+  title = {Bootstrap methods: another look at the jackknife},
+  journal = {The Annals of Statistics},
+  year = {1979}, volume = {7}, number = {1}, pages = {1--26},
+  doi = {10.1214/aos/1176344552},
+  note = {doi: \href{https://doi.org/10.1214/aos/1176344552}{10.1214/aos/1176344552}}
+}
+
+@article{bland1986,
+  author = {Bland, J. Martin and Altman, Douglas G.},
+  title = {Statistical methods for assessing agreement between two methods of clinical measurement},
+  journal = {The Lancet},
+  year = {1986}, volume = {327}, number = {8476}, pages = {307--310},
+  doi = {10.1016/S0140-6736(86)90837-8},
+  note = {doi: \href{https://doi.org/10.1016/S0140-6736(86)90837-8}{10.1016/S0140-6736(86)90837-8}}
 }

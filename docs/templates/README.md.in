@@ -63,6 +63,38 @@ On clean light PhotonDistill v2 is on par with the chain. It does not beat it: t
 
 The team reviewed the AI-assisted work and can explain every component.
 
+## References
+
+IEEE style; the full list (34 entries) is in [paper/oxydrop_ieee_refs.bib](paper/oxydrop_ieee_refs.bib).
+
+**Datasets**
+
+1. J. S. Hoffman *et al.*, "Smartphone camera oximetry in an induced hypoxemia study," *npj Digital Medicine*, vol. 5, no. 1, p. 146, 2022. <https://doi.org/10.1038/s41746-022-00665-y>
+2. T. Samavati, M. Farvardin, and A. Ghaffari, "Efficient deep learning-based estimation of the vital signs on smartphones" (MTHS dataset), arXiv, 2022. <https://arxiv.org/abs/2204.08989>
+3. A. Nemcova *et al.*, "Brno University of Technology smartphone PPG database (BUT PPG)," PhysioNet, 2024. <https://doi.org/10.13026/tn53-8153>
+4. N. Fong *et al.*, "Open access dataset and common data model for pulse oximeter performance data," *Scientific Data*, vol. 12, p. 570, 2025. <https://doi.org/10.1038/s41597-025-04870-8>
+5. N. Fong, M. Lipnick, P. Bickler, J. Feiner, and T. Law, "OpenOximetry repository," PhysioNet, 2025. <https://doi.org/10.13026/be2e-cn29>
+6. P. Mehrgardt, M. Khushi, S. Poon, and A. Withana, "Pulse transit time PPG dataset," PhysioNet, 2022. <https://doi.org/10.13026/jpan-6n92>
+7. M. Pimentel *et al.*, "BIDMC PPG and respiration dataset," PhysioNet, 2018. <https://doi.org/10.13026/C2208R>
+8. A. L. Goldberger *et al.*, "PhysioBank, PhysioToolkit, and PhysioNet," *Circulation*, vol. 101, no. 23, pp. e215–e220, 2000. <https://doi.org/10.1161/01.CIR.101.23.e215>
+
+**Key papers**
+
+9. P. E. Bickler, J. R. Feiner, and J. W. Severinghaus, "Effects of skin pigmentation on pulse oximeter accuracy at low saturation," *Anesthesiology*, vol. 102, no. 4, pp. 715–719, 2005. <https://doi.org/10.1097/00000542-200504000-00004>
+10. M. W. Sjoding, R. P. Dickson, T. J. Iwashyna, S. E. Gay, and T. S. Valley, "Racial bias in pulse oximetry measurement," *New England Journal of Medicine*, vol. 383, no. 25, pp. 2477–2478, 2020. <https://doi.org/10.1056/NEJMc2029240>
+11. T. J. Farrell, M. S. Patterson, and B. Wilson, "A diffusion theory model of spatially resolved, steady-state diffuse reflectance for the noninvasive determination of tissue optical properties in vivo," *Medical Physics*, vol. 19, no. 4, pp. 879–888, 1992. <https://doi.org/10.1118/1.596777>
+12. S. Prahl, "Tabulated molar extinction coefficient for hemoglobin in water," Oregon Medical Laser Center, 1998. <https://omlc.org/spectra/hemoglobin/summary.html>
+13. S. L. Jacques, "Skin optics," Oregon Medical Laser Center News, Jan. 1998. <https://omlc.org/news/jan98/skinoptics.html>
+14. J. Jiang, D. Liu, J. Gu, and S. Süsstrunk, "What is the space of spectral sensitivity functions for digital color cameras?" in *Proc. IEEE WACV*, 2013, pp. 168–179. <https://doi.org/10.1109/WACV.2013.6475015>
+15. G. Hinton, O. Vinyals, and J. Dean, "Distilling the knowledge in a neural network," arXiv, 2015. <https://arxiv.org/abs/1503.02531>
+16. A. N. Angelopoulos and S. Bates, "Conformal prediction: a gentle introduction," *Foundations and Trends in Machine Learning*, vol. 16, no. 4, pp. 494–591, 2023. <https://doi.org/10.1561/2200000101>
+17. W. Verkruysse, L. O. Svaasand, and J. S. Nelson, "Remote plethysmographic imaging using ambient light," *Optics Express*, vol. 16, no. 26, pp. 21434–21445, 2008. <https://doi.org/10.1364/OE.16.021434>
+
+**Tools**
+
+18. F. Pedregosa *et al.*, "Scikit-learn: machine learning in Python," *Journal of Machine Learning Research*, vol. 12, pp. 2825–2830, 2011. <https://www.jmlr.org/papers/v12/pedregosa11a.html>
+19. A. Paszke *et al.*, "PyTorch: an imperative style, high-performance deep learning library," arXiv, 2019. <https://arxiv.org/abs/1912.01703>
+
 ## Full details
 
 > **Earlier rounds. The pre-registered primary metric (P1, detecting SpO2 below 90 on six held-out people) was not beaten.** The previous engine (now behind `?engine=hybrid`), the fixed hybrid pipeline R, scores {{hy:default_R:tm_bacc|full}} against {{b1:chain_v1:tm_bacc|full}} for the best baseline, the shipped logistic chain (a tie). That {{hy:default_R:tm_bacc}} is **optimistic**: pipeline R was chosen after its outer-fold scores had been seen. The unbiased estimate for the whole selection procedure is the nested {{hy:HYBRID_FINAL:tm_bacc|full}}. **The simpler chain has the higher point estimates**: a chain refit with the same levers and no CNN scores {{hy:CHAIN_SAME_LEVERS:tm_bacc}}, and at the same conformal level the chain-only control answers {{cf:chain_v1/0.1:coverage|pct}} of windows at {{cf:chain_v1/0.1:acc|pct}} accuracy against {{cf:deployed_R/0.1:coverage|pct}} at {{cf:deployed_R/0.1:acc|pct}} for the deployed hybrid. All of these intervals overlap, so it is a tie, and the CNN alone ties as well. What held: the CNN beating the weaker baselines (clock, ratio-of-ratios), a calibrated three-state hybrid that runs on the device (ML is the app's core path by design, not because it wins), an open pre-registered leave-one-person-out audit, and an exploratory heart-rate gain (P2, within 5 bpm {{hp:all/HYBRID_agree:within5_full}} against {{hp:all/v2_spectral_acf__forced:within5_full}}) that is **post hoc and comes from BUT PPG**, not a clean win (see below).
