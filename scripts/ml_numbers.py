@@ -379,8 +379,191 @@ def _ns_json(args, mod):
     return str(d)
 
 
+# ------------------------------------------------------------------------------------------------------------ photon harness (results/photon)
+# Round-1 / round-2 photon models scored by python -m oxydrop_ml.photon.evalkit on the shared distant-flash harness (results/photon/TABLE.csv).
+# Note: this harness re-runs the person bootstrap, so chain_v1 is 0.796 [0.636, 0.857] here and 0.796 [0.635, 0.856] in results/ml (same model, other draws).
+PHOTON = os.path.join(ROOT, 'results', 'photon')
+PH_LEVELS = ['0', '1', '2', '3', '4', '5', 'X1']
+_PH_NULL_RE = re.compile(r'^(?P<base>.+?)_(?P<kind>null|blank)(?:_.*)?$')
+_PH_TOK_RE = re.compile(r'_(?:s\d+|seed\d+|gperm|perm\d*|shift\d*|d\d+|draw\d+)$')
+PH_LABEL = {
+    'chain_v1': 'Logistic chain v1 (best honest baseline)', 'chain_v1_nestedC': 'Logistic chain v1, C by nested CV', 'hybrid_final': 'Hybrid, per-person selected (nested)',
+    'cnn_full': 'CNN alone (harness re-score, 3-seed mean)', 'ctl_dc_lr': 'Control: DC-colour LR (3 baseline-relative ln DC values)',
+    'distill': '**PhotonDistill (shipped)**', 'oxyseq': 'OxySeq', 'photonnet': 'PhotonNet', 'oxyssl': 'OxySSL',
+    'distill_v1': 'PhotonDistill v1 (before the post hoc grid)', 'distill_nokd': 'PhotonDistill without teachers (ablation)',
+    'photonnet_nophys': 'PhotonNet without the physics layer (ablation)', 'oxyseq_notta': 'OxySeq without test-time adaptation (ablation)',
+    'twin_gate': 'PhotonTwin gate (round-1 decision, post hoc gate)', 'oxytrack': 'OxyTrack (round 1; outer folds seen in development)',
+    'twin_inverse': 'PhotonTwin-Inverse (round 1)', 'flashgap': 'FlashGap (round 1)', 'twin_inverse_noresid': 'PhotonTwin-Inverse, physics path only (control)',
+}
+
+
+def ph_table() -> pd.DataFrame:
+    if 'ph_table' not in _CACHE:
+        _CACHE['ph_table'] = pd.read_csv(os.path.join(PHOTON, 'TABLE.csv'), dtype={'level': str})
+    return _CACHE['ph_table']
+
+
+def ph(model: str, level: str = '0') -> pd.Series:
+    return _row(ph_table(), model=model, level=str(level))
+
+
+def ph_null(model: str, kind: str = 'null') -> list[tuple[str, float]]:
+    """L0 null (or blank) draws of a model: files <model>[_s<k>|_d<k>|...]_null[...]; byte-for-byte duplicate draws (identical metrics) counted once."""
+    t = ph_table()
+    t = t[t.level == '0']
+    out, seen = [], set()
+    for _, r in t.sort_values('model').iterrows():
+        m = _PH_NULL_RE.match(r.model)
+        if not m or m.group('kind') != kind:
+            continue
+        base = m.group('base')
+        while _PH_TOK_RE.search(base):
+            base = _PH_TOK_RE.sub('', base)
+        if base != model:
+            continue
+        key = (round(r.tm_bacc, 9), round(r.auroc, 9), round(r.coverage, 9), round(r.bacc, 9))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((r.model, float(r.tm_bacc)))
+    return out
+
+
+def _lvl(l: str) -> str:
+    return 'X1' if l == 'X1' else f'L{l}'
+
+
+def _ns_ph(args, mod):
+    """ph:<model>:<level>|mod   level 0..5 or X1 from results/photon/TABLE.csv.
+    mods: (none) TM | full TM [lo, hi] | ci | d paired diff vs chain_v1 [lo, hi] | dabs |diff| | dsgn signed diff | nb people better/compared | verdict |
+          cov coverage (2 dp) | ans answered accuracy | worst worst-person TM | mae SpO2 MAE (1 dp) | auroc"""
+    r = ph(args[0], args[1] if len(args) > 1 else '0')
+    if mod is None:
+        return f(r.tm_bacc)
+    if mod == 'full':
+        return f'{f(r.tm_bacc)} {ci(r.tm_lo, r.tm_hi)}'
+    if mod == 'ci':
+        return ci(r.tm_lo, r.tm_hi)
+    if mod == 'd':
+        return dstr(r.diff_vs_chain_v1, r.diff_lo, r.diff_hi)
+    if mod == 'dabs':
+        return f(abs(r.diff_vs_chain_v1))
+    if mod == 'dsgn':
+        return sgn(r.diff_vs_chain_v1)
+    if mod == 'nb':
+        return f'{int(r.n_people_improved)}/{int(r.n_people_compared)}'
+    if mod == 'verdict':
+        return str(r.verdict)
+    if mod == 'cov':
+        return f(r.coverage, 2)
+    if mod == 'ans':
+        return f(r.acc_ans)
+    if mod == 'worst':
+        return f(r.worst_person_tm)
+    if mod == 'mae':
+        return f(r.spo2_mae, 1)
+    if mod == 'auroc':
+        return f(r.auroc)
+    raise KeyError(f'unknown ph modifier {mod!r}')
+
+
+def _ns_phnull(args, mod):
+    """phnull:<model>[:blank]|mod   mean TM over the L0 null (or blank) draws; mods: n (draw count), draws (list), max."""
+    d = ph_null(args[0], args[1] if len(args) > 1 else 'null')
+    if not d:
+        raise KeyError(f'no null draws for {args[0]}')
+    v = np.array([x for _, x in d])
+    if mod is None:
+        return f(v.mean())
+    if mod == 'n':
+        return str(len(v))
+    if mod == 'draws':
+        return ', '.join(f(x) for x in v)
+    if mod == 'max':
+        return f(v.max())
+    raise KeyError(f'unknown phnull modifier {mod!r}')
+
+
+
+def _ns_phw(args, mod):
+    """phw:<key>  from results/photon/distill_weights.json (the shipped PhotonDistill weights): params (per seed), seeds, n_in, hidden, tau (3 dp)."""
+    w = json.load(open(os.path.join(PHOTON, 'distill_weights.json')))
+    st = w['students']
+    k = args[0]
+    if k == 'params':
+        n = sum(len(st[0][x]) * (len(st[0][x][0]) if isinstance(st[0][x][0], list) else 1) for x in ('w1', 'b1', 'w2', 'b2', 'wo', 'bo'))
+        return f'{n:,}'
+    if k == 'seeds':
+        return str(len(st))
+    if k == 'n_in':
+        return str(len(w['cols']))
+    if k == 'hidden':
+        return str(w['hidden'])
+    if k == 'tau':
+        return f(w['tau'])
+    raise KeyError(f'unknown phw key {k!r}')
+
+
+def _ph_null_cell(m):
+    d = ph_null(m)
+    if not d:
+        return 'n/a'
+    mean = float(np.mean([x for _, x in d]))
+    return f'{f(mean)} ({len(d)} draw{"s" if len(d) > 1 else ""}){"" if mean <= 0.55 else ", **fails**"}'
+
+
+def block_photon_candidates() -> str:
+    """L0 table: baselines, the four round-2 trained candidates, their ablations, round-1 candidates and the DC-colour control."""
+    groups = [('Baselines', ['chain_v1', 'hybrid_final', 'cnn_full']),
+              ('Round 2: trained end-to-end candidates (eligible)', ['distill', 'oxyseq', 'photonnet', 'oxyssl']),
+              ('Round 2: ablations (not eligible)', ['distill_v1', 'distill_nokd', 'photonnet_nophys', 'oxyseq_notta']),
+              ('Round 1 (Amendment 6) and controls', ['twin_gate', 'oxytrack', 'twin_inverse', 'flashgap', 'ctl_dc_lr'])]
+    rows = []
+    for title, ms in groups:
+        rows.append([f'*{title}*', '', '', '', '', ''])
+        for m in ms:
+            r = ph(m, '0')
+            d = 'reference' if m == 'chain_v1' else 'identical to chain v1 at L0 (gate)' if m == 'twin_gate' else (f'{dstr(r.diff_vs_chain_v1, r.diff_lo, r.diff_hi)} {r.verdict}' if _ok(r.diff_vs_chain_v1) else 'n/a')
+            nb = '' if m in ('chain_v1', 'twin_gate') or not _ok(r.n_people_improved) else f'{int(r.n_people_improved)}/{int(r.n_people_compared)}'
+            nl = _ph_null_cell(m) if m in ('distill', 'oxyseq', 'photonnet', 'oxyssl', 'distill_v1') else ''
+            rows.append([PH_LABEL.get(m, m), f'{f(r.tm_bacc)} {ci(r.tm_lo, r.tm_hi)}', d, nb, f(r.worst_person_tm), nl])
+    return md_table(['Model (L0 = clean light)', 'TM bal. acc. [95% CI]', 'Paired diff vs chain v1 [95% CI]', 'People better', 'Worst person', 'Null mean (rule: at most 0.55)'], rows,
+                    ['l', 'r', 'r', 'r', 'r', 'r'])
+
+
+def block_photon_stress() -> str:
+    """TM [CI] per stress level and paired difference to chain_v1 for the stress-curve models."""
+    ms = ['chain_v1', 'distill', 'ctl_dc_lr', 'photonnet', 'oxyssl', 'oxyseq']
+    levels = ['0', '3', '4', '5', 'X1']
+    rows = []
+    for m in ms:
+        cells = []
+        for l in levels:
+            r = ph(m, l)
+            c = f'{f(r.tm_bacc)} {ci(r.tm_lo, r.tm_hi)}'
+            if m != 'chain_v1':
+                c += f'<br>{dstr(r.diff_vs_chain_v1, r.diff_lo, r.diff_hi)} {r.verdict}, {int(r.n_people_improved)}/{int(r.n_people_compared)}'
+            cells.append(c)
+        rows.append([PH_LABEL.get(m, m)] + cells)
+    return md_table(['Model'] + [f'{_lvl(l)}' + (' (clean)' if l == '0' else ' (out of family)' if l == 'X1' else ' (simulated)') for l in levels], rows,
+                    ['l'] + ['r'] * len(levels))
+
+
+def block_photon_abstain() -> str:
+    """Own abstention per level: coverage and answered accuracy, PhotonDistill next to chain_v1."""
+    rows = []
+    for m in ('distill', 'chain_v1', 'oxyseq'):
+        cells = []
+        for l in PH_LEVELS:
+            r = ph(m, l)
+            cells.append(f'{f(r.coverage, 2)} / {f(r.acc_ans)}')
+        rows.append([PH_LABEL.get(m, m)] + cells)
+    return md_table(['Coverage / answered accuracy'] + [_lvl(l) for l in PH_LEVELS], rows, ['l'] + ['r'] * len(PH_LEVELS))
+
+
 NS = {'b1': _ns_b1, 'b2': _ns_b2, 'b3': _ns_b3, 'ab': _ns_ab, 'hy': _ns_hy, 'hg': _ns_hg, 'pd1': _ns_pd1, 'cp': _ns_cp, 'hp': _ns_hp,
-      'hpd': _ns_hpd, 'hr': _ns_hr, 'hs': _ns_hs, 'hgrid': _ns_hgrid, 'bn': _ns_bn, 'v': _ns_v, 'json': _ns_json}
+      'hpd': _ns_hpd, 'hr': _ns_hr, 'hs': _ns_hs, 'hgrid': _ns_hgrid, 'bn': _ns_bn, 'v': _ns_v, 'json': _ns_json,
+      'ph': _ns_ph, 'phnull': _ns_phnull, 'phw': _ns_phw}
 
 
 # ------------------------------------------------------------------------------------------------------------ custom scalars
@@ -1188,6 +1371,9 @@ BLOCKS = {
     'hrvote': lambda: block_hrvote(False),
     'hrvote_full': lambda: block_hrvote(True),
     'app_state': block_app_state,
+    'photon_candidates': block_photon_candidates,
+    'photon_stress': block_photon_stress,
+    'photon_abstain': block_photon_abstain,
 }
 
 

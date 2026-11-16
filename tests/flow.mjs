@@ -4,9 +4,13 @@
 // Regression this guards: startCamera() bumps the camera generation, and the caller then compared it with the value read before the probe, so the
 // setup UI never appeared (REVIEW.md section 3). Cases: (1) cancel during the countdown, (2) full flow, (3) stale deviceId falls back to facingMode.
 // Usage: node tests/flow.mjs        (about 25 s of real time: the app's own 3 s get-ready countdown and 3.5 s lens probe are not mocked)
-//        FLOW_HYBRID_FAIL=1 node tests/flow.mjs   the hybrid model assets fail to load (HTTP 503): the app falls back to the logistic chain and the measurement screen must say so
-//        FLOW_WORKER_FAIL=1 node tests/flow.mjs   the CNN Web Worker loads fine and then errors during the measurement: the app drops to the logistic chain and shows a visible, device-agnostic notice
+//        (default)                                the default engine slot runs PhotonDistill (app/data/distill.json) in the page thread
+//        FLOW_ENGINE=hybrid FLOW_HYBRID_FAIL=1 node tests/flow.mjs   ?engine=hybrid and the hybrid model assets fail to load (HTTP 503): the app falls back to the logistic chain and the measurement screen must say so
+//        FLOW_ENGINE=hybrid FLOW_WORKER_FAIL=1 node tests/flow.mjs   the CNN Web Worker loads fine and then errors during the measurement: the app drops to the logistic chain and shows a visible, device-agnostic notice
 //        FLOW_ENGINE=logistic node tests/flow.mjs   the live camera path with ?engine=logistic: the logistic chain runs on purpose, no fallback notice
+//        FLOW_ENGINE=hybrid node tests/flow.mjs     ?engine=hybrid selects the previous hybrid (CNN worker)
+//        FLOW_ENGINE=distill node tests/flow.mjs    ?engine=distill names the default PhotonDistill engine explicitly, no fallback notice
+//        FLOW_DISTILL_FAIL=1 node tests/flow.mjs    the default model file data/distill.json fails to load (HTTP 503): logistic chain + visible notice, never the hybrid
 //        FLOW_APP=../app/js/app_old.js node tests/flow.mjs    runs another copy of app.js (a path relative to this file, copy placed in app/js/) to show an old version fails
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -96,9 +100,14 @@ globalThis.document = document;
 globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
 globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 const LOGISTIC_REQ = process.env.FLOW_ENGINE === 'logistic';
-globalThis.location = { search: LOGISTIC_REQ ? '?engine=logistic&debug=1' : '?debug=1' };
+const DISTILL_ARG = process.env.FLOW_ENGINE === 'distill';
+const HYBRID_ARG = process.env.FLOW_ENGINE === 'hybrid';
+const DISTILL_REQ = !LOGISTIC_REQ && !HYBRID_ARG;          // the default engine (no ?engine=) is the PhotonDistill engine slot
+globalThis.location = { search: LOGISTIC_REQ ? '?engine=logistic&debug=1' : DISTILL_ARG ? '?engine=distill&debug=1' : HYBRID_ARG ? '?engine=hybrid&debug=1' : '?debug=1' };
 const HYBRID_FAIL = process.env.FLOW_HYBRID_FAIL === '1';
 const WORKER_FAIL = process.env.FLOW_WORKER_FAIL === '1';
+const DISTILL_FAIL = process.env.FLOW_DISTILL_FAIL === '1';
+if ((HYBRID_FAIL || WORKER_FAIL) && !HYBRID_ARG) throw new Error('FLOW_HYBRID_FAIL / FLOW_WORKER_FAIL need FLOW_ENGINE=hybrid (the hybrid is no longer the default)');
 if (!LOGISTIC_REQ) {
   // A stand-in module Worker: it starts and reports ready (so the app commits to the worker path), never answers a window, and raises an error event 1 s after the measurement's engine is created.
   globalThis.Worker = class {
@@ -113,6 +122,7 @@ if (!LOGISTIC_REQ) {
 }
 globalThis.fetch = async (url) => {
   if (HYBRID_FAIL && /hybrid_|conformal/.test(url)) return { ok: false, status: 503, json: async () => { throw new Error('unavailable'); } };
+  if (DISTILL_FAIL && /distill/.test(url)) return { ok: false, status: 503, json: async () => { throw new Error('unavailable'); } };
   return { ok: true, json: async () => JSON.parse(fs.readFileSync(new URL('../app/' + url, import.meta.url), 'utf8')) };
 };
 
@@ -170,6 +180,21 @@ if (LOGISTIC_REQ) {
   assert.equal($('engine-note').hidden, true, 'no fallback notice when the chain was requested on purpose');
   assert.equal($('status-main').textContent, 'Calibrating');
   ok('?engine=logistic on the live camera path: logistic chain, no fallback notice');
+} else if (DISTILL_REQ && DISTILL_FAIL) {
+  assert.match($('dbg-measure').textContent, /engine logistic chain v2 \(baseline \/ fallback\).*model file data\/distill\.json could not be loaded/, 'the debug text records the load failure of the default model');
+  assert.equal($('engine-note').hidden, false, 'the default model load failure must be visible on the measurement screen');
+  assert.match($('engine-note').textContent, /selected on-device model could not be loaded.*logistic chain alone.*three result words are unchanged/, $('engine-note').textContent);
+  assert.doesNotMatch($('engine-note').textContent, /iPhone|Android|Pixel|Samsung/, 'the notice is device-agnostic');
+  assert.doesNotMatch($('dbg-measure').textContent, /oxydrop-hybrid-v1/, 'a failed default model never falls back to the hybrid');
+  assert.equal($('status-main').textContent, 'Calibrating', 'the measurement itself still runs on the fallback chain');
+  ok('default engine with data/distill.json failing to load (HTTP 503): the logistic chain runs and the screen shows a visible, device-agnostic notice');
+} else if (DISTILL_REQ) {
+  assert.match($('dbg-measure').textContent, /engine oxydrop-photon-distill-v1 \(default engine slot, \?engine=distill, model file data\/distill\.json\): PhotonDistill student MLP 39-32-32-3, 3 seeds.*runs in the page thread; output shown as the model gives it/, 'the default engine runs PhotonDistill in the page thread');
+  assert.doesNotMatch($('dbg-measure').textContent, /oxydrop-hybrid-v1/, 'no hybrid engine in this mode');
+  assert.equal(globalThis.__fakeWorker, undefined, 'the default engine starts no CNN worker');
+  assert.equal($('engine-note').hidden, true, 'no fallback notice while the model runs');
+  assert.equal($('status-main').textContent, 'Calibrating');
+  ok(`${DISTILL_ARG ? '?engine=distill' : 'default (no ?engine=)'} on the live camera path: the PhotonDistill engine slot runs data/distill.json, no fallback notice`);
 } else if (WORKER_FAIL) {
   assert.ok(globalThis.__fakeWorker, 'the app started the Web Worker');
   assert.equal(globalThis.__fakeWorker.terminated, true, 'the failed worker is shut down');
@@ -183,7 +208,7 @@ if (LOGISTIC_REQ) {
   assert.match($('dbg-measure').textContent, /engine oxydrop-hybrid-v1: v1 physics chain \+ OxyNet residual CNN, 3 seeds, 167,588 parameters per seed/, 'the default engine in the measurement is the hybrid (CNN)');
   assert.match($('dbg-measure').textContent, /conformal alpha 0\.1 /, 'the conformal level is shown in the debug summary');
   assert.equal($('engine-note').hidden, true, 'no fallback notice while the hybrid model runs');
-  ok('begin -> calibration starts after exposure setup and is not restarted while the finger stays on; the default engine is the hybrid CNN');
+  ok('?engine=hybrid: calibration starts after exposure setup and is not restarted while the finger stays on; the hybrid CNN runs');
 } else {
   assert.match($('dbg-measure').textContent, /engine logistic chain v2 \(baseline \/ fallback\).*hybrid model could not be loaded/, 'the debug text records the load failure');
   assert.equal($('engine-note').hidden, false, 'the load failure must be visible on the measurement screen, not only in the debug text');

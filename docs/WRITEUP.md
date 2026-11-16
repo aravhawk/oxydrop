@@ -16,7 +16,11 @@ A web app (works in a phone browser, nothing to install, video never leaves the 
 ![From video to three states](figures/ml_flow.png)
 
 ## How it works
-**Model.** A hybrid: the v1 logistic chain (heart-rate rise, pulse shape and ratio-of-ratios features relative to your first minute) gives a low-oxygen logit, and a 167,588-parameter 1D CNN (three seeds, plain JavaScript, offline) learns a residual correction. The CNN was pretrained self-supervised on 299,754 unlabeled windows and warmed up on contact-oximeter data (OpenOximetry) before fine-tuning on phone video. It also outputs heart rate and a quality score. Details and every lever, kept or dropped: [MODEL.md](../MODEL.md).
+**Model (round 2, what the app runs now): PhotonDistill**, one small trained network (2,435 parameters per seed, 3 seeds) on 39 window features relative to your first minute, taught in each fold by two simple teachers (the logistic chain on clean windows, a colour regression on physics-simulated distant-flash copies) fitted on the training people only. **It loses to the logistic chain on clean light by 0.038** (0.758 [0.603, 0.813] against 0.796 [0.636, 0.857], paired -0.038 [-0.103, -0.001]) and is more robust under a *simulated* distant flash (out-of-family stress X1: 0.676 against 0.508, paired +0.169 [0.058, 0.285]); a three-number colour control is nearly as robust, and the rule that picked it was extended after the results were seen. Details: [MODEL.md](../MODEL.md) section 0, [pitch](submission/PITCH.md).
+
+![PhotonDistill architecture](figures/photon_architecture.png)
+
+**Previous engine (`?engine=hybrid`).** A hybrid: the v1 logistic chain (heart-rate rise, pulse shape and ratio-of-ratios features relative to your first minute) gives a low-oxygen logit, and a 167,588-parameter 1D CNN (three seeds, plain JavaScript, offline) learns a residual correction. The CNN was pretrained self-supervised on 299,754 unlabeled windows and warmed up on contact-oximeter data (OpenOximetry) before fine-tuning on phone video. It also outputs heart rate and a quality score. Details and every lever, kept or dropped: [MODEL.md](../MODEL.md).
 
 ![Architecture](figures/ml_architecture.png)
 

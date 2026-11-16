@@ -21,10 +21,14 @@ The winner rule (ROUND2.md, "Winner rule for round 2", stated 18:25 CT before an
   Otherwise: among eligible models whose L0 paired CI includes 0 (a tie) and whose nulls passed, the highest L0 point estimate; models within 0.01 of it are
   near-ties, ordered by the mean paired difference to chain_v1 over L3, L4, L5, X1, then by the mean answered accuracy at their own coverage over the same levels.
   A model whose CI lies below 0 is a loss and cannot win; a model without a passed null control cannot win.
+  Step 3 (planner extension, task.json notes 19:15 / 19:32 CT, written after the round-2 outer results were seen; disclosed in Amendment 7): when no
+  eligible model beats or ties chain_v1, ship the eligible model with passed nulls and the highest L0 point estimate, and state that it LOSES on clean
+  light. `--no-extension` applies the 18:25 CT rule alone (verdict: no winner).
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 from pathlib import Path
 
@@ -139,12 +143,19 @@ def null_summary(ev, files, primary):
     """{kind: dict(n, mean, max, tms)} of the null / blank files owned by `primary` (level 0 only)."""
     out = {}
     for kind in ('null', 'blank'):
-        tms = []
+        tms, seen = [], {}
         for name in files:
             role, owner = classify(name, [primary])
             if role == kind and owner == primary:
                 r = ev.get(name, 0)
                 if r is not None:
+                    h = hashlib.sha1((ev.dir / f'{name}__L0.csv').read_bytes()).hexdigest()
+                    if h in seen:                      # byte-identical copy of another draw (e.g. <m>_null = <m>_null_d0): count the draw once
+                        note = f'null file {name}__L0.csv is a byte-identical copy of {seen[h]}__L0.csv; counted once'
+                        if note not in ev.notes:
+                            ev.notes.append(note)
+                        continue
+                    seen[h] = name
                     tms.append((name, r['tm']))
         if tms:
             v = np.array([t for _, t in tms])
@@ -206,8 +217,31 @@ def evaluate_round2(ev, models, primaries):
     return cands
 
 
-def decide(cands):
-    """Mechanical verdict. Returns (winner model or None, lines of reasoning)."""
+def extension(have, lines):
+    """Planner extension of the round-2 rule (task.json notes 19:15 and 19:32 CT, written AFTER the round-2 outer results were seen; disclosed in
+    Amendment 7, Outcome): when no eligible model beats or ties chain_v1, ship the eligible model (primary file, nulls passed) with the highest L0 point
+    estimate and state plainly that it LOSES to chain_v1 on clean light. Models whose nulls failed stay ineligible."""
+    ok = [c for c in have if c['nulls_ok']]
+    for c in [c for c in have if not c['nulls_ok']]:
+        lines.append(f'Extension: `{c["model"]}` is excluded because its null controls are {c["nulls_text"]}.')
+    if not ok:
+        lines.append('Extension (19:15 CT): no eligible model with passed nulls. **NO WINNER**.')
+        return None, lines
+    ok.sort(key=lambda c: -c['tm'])
+    w = ok[0]
+    lines.append('Rule step 3 (planner extension, task.json 19:15/19:32 CT, stated after the round-2 outer results were seen, disclosed in Amendment 7): '
+                 'when no eligible model beats or ties chain_v1, ship the eligible model with passed nulls and the highest L0 point estimate, and say that it loses. '
+                 'Candidates: ' + ', '.join(f'{c["model"]} {c["tm"]:.3f}' for c in ok) + '.')
+    lines.append(f'**SHIPPED (extension): `{w["model"]}`, which LOSES to chain_v1 on clean light**: L0 TM {w["tm"]:.3f} [{w["lo"]:.3f}, {w["hi"]:.3f}] vs '
+                 f'chain_v1, paired {w["diff"]:+.3f} [{w["dlo"]:+.3f}, {w["dhi"]:+.3f}], {w["nb"]}/{w["nc"]} people better. It is not a win and not a tie; '
+                 f'mean paired difference over {"+".join(w["stress_levels_used"]) or "no stress level"} is {w["stress_diff"]:+.3f} (simulated distant-flash stress).')
+    if w['missing']:
+        lines.append(f'Caveat: `{w["model"]}` has no score file for {", ".join(w["missing"])}.')
+    return w['model'], lines
+
+
+def decide(cands, extend=True):
+    """Mechanical verdict. Returns (winner model or None, lines of reasoning). extend=False applies the 18:25 CT rule only (no step 3)."""
     lines = []
     have = [c for c in cands if c['r0'] is not None]
     if not have:
@@ -231,8 +265,11 @@ def decide(cands):
         why = [n for n, k in (('(b) people better', 'b'), ('(c) worst person', 'c'), ('(d) nulls', 'd')) if not c[k]]
         lines.append(f'`{c["model"]}` has a paired CI above 0 but fails {", ".join(why)}; it is neither a win nor a tie winner.')
     if not ties:
-        lines.append('Rule step 2: no round-2 model is a tie with passed nulls. **NO WINNER**; the shipped chain stays the headline.')
-        return None, lines
+        lines.append('Rule step 2: no round-2 model is a tie with passed nulls; the pre-stated rule (18:25 CT) has no branch for this case.')
+        if not extend:
+            lines.append('**NO WINNER** under the pre-stated rule; the shipped chain stays the headline.')
+            return None, lines
+        return extension(have, lines)
     top = max(c['tm'] for c in ties)
     near = [c for c in ties if c['tm'] >= top - NEAR_TIE]
     lines.append(f'Rule step 2: tie candidates (paired CI includes 0, nulls passed): {", ".join(f"{c["model"]} {c["tm"]:.3f}" for c in sorted(ties, key=lambda c: -c["tm"]))}. '
@@ -407,13 +444,13 @@ def winner_md(ev, cands, verdict_lines, winner, models, primaries, stamp):
     return '\n'.join(out) + '\n'
 
 
-def run(scores_dir=SCORES, out_dir=RES, B=2000, primaries=None, write=True, log=print):
+def run(scores_dir=SCORES, out_dir=RES, B=2000, primaries=None, write=True, log=print, extend=True):
     primaries = list(primaries or ROUND2)
     disc = discover(scores_dir)
     models = sorted(disc)
     ev = Evaluator(scores_dir, B)
     cands = evaluate_round2(ev, models, primaries)
-    winner, lines = decide(cands)
+    winner, lines = decide(cands, extend=extend)
     import subprocess
     try:
         stamp = subprocess.run(['date', '+%a %b %d %H:%M:%S %Z %Y'], capture_output=True, text=True).stdout.strip()
@@ -438,8 +475,9 @@ def main(argv=None):
     ap.add_argument('--out', default=str(RES))
     ap.add_argument('--models', default=','.join(ROUND2), help='comma-separated primary round-2 model names')
     ap.add_argument('--no-write', action='store_true')
+    ap.add_argument('--no-extension', action='store_true', help='apply the 18:25 CT rule only (no step 3)')
     a = ap.parse_args(argv)
-    run(a.scores, a.out, B=a.boot, primaries=a.models.split(','), write=not a.no_write)
+    run(a.scores, a.out, B=a.boot, primaries=a.models.split(','), write=not a.no_write, extend=not a.no_extension)
 
 
 if __name__ == '__main__':

@@ -108,7 +108,7 @@ export function sqiOf(a10g) {
 }
 
 // ---------- per-window features ----------
-function winFeats(lgR, lgG, lgB, acR, acG, acB, te) {
+export function winFeats(lgR, lgG, lgB, acR, acG, acB, te) {
   const f = {}, s10 = te - 10 * FS, s30 = Math.max(0, te - 30 * FS);
   const a10 = [], a30 = [];
   for (let i = s10; i < te; i++) a10.push([acR[i], acG[i], acB[i]]);

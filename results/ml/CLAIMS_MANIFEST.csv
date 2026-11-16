@@ -10,6 +10,16 @@ README.md,cf:deployed_R/0.1:coverage|pct,74.5%
 README.md,cf:deployed_R/0.1:acc|pct,89.5%
 README.md,hp:all/HYBRID_agree:within5_full,0.480
 README.md,hp:all/v2_spectral_acf__forced:within5_full,0.419
+README.md,ph:distill:0|dabs,0.038
+README.md,ph:distill:0|full,"0.758 [0.603, 0.813]"
+README.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+README.md,ph:distill:0|d,"-0.038 [-0.103, -0.001]"
+README.md,ph:distill:X1,0.676
+README.md,ph:chain_v1:X1,0.508
+README.md,ph:distill:X1|d,"+0.169 [0.058, 0.285]"
+README.md,phw:params,"2,435"
+README.md,phw:seeds,3
+README.md,phw:n_in,39
 README.md,v:params,"167,588"
 README.md,v:prereg_commit,3e708fe
 README.md,@p1_main,<block 2137 chars>
@@ -66,6 +76,38 @@ README.md,@app_state,<block 1243 chars>
 README.md,v:guard_mths,6.7%
 README.md,v:guard_but,8.8%
 README.md,v:guard_hof,0.1%
+MODEL.md,ph:distill:0|dabs,0.038
+MODEL.md,ph:distill:0,0.758
+MODEL.md,ph:chain_v1:0,0.796
+MODEL.md,ph:distill:X1,0.676
+MODEL.md,ph:chain_v1:X1,0.508
+MODEL.md,phw:n_in,39
+MODEL.md,phw:n_in,39
+MODEL.md,phw:hidden,32
+MODEL.md,phw:hidden,32
+MODEL.md,phw:params,"2,435"
+MODEL.md,phw:seeds,3
+MODEL.md,phw:tau,0.946
+MODEL.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+MODEL.md,b1:chain_v1:tm_bacc|full,"0.796 [0.635, 0.856]"
+MODEL.md,hy:default_R:tm_bacc|full,"0.809 [0.644, 0.863]"
+MODEL.md,ab:full/p23:p1_tm_bacc|full,"0.739 [0.574, 0.811]"
+MODEL.md,ph:cnn_full:0,0.753
+MODEL.md,@photon_candidates,<block 2234 chars>
+MODEL.md,ph:distill:0|dabs,0.038
+MODEL.md,ph:distill:0|d,"-0.038 [-0.103, -0.001]"
+MODEL.md,ph:distill:0|nb,2/6
+MODEL.md,@photon_stress,<block 1880 chars>
+MODEL.md,@photon_abstain,<block 528 chars>
+MODEL.md,ph:distill_v1:0,0.696
+MODEL.md,ph:distill_v1:0|d,"-0.100 [-0.201, -0.022]"
+MODEL.md,ph:ctl_dc_lr:X1,0.646
+MODEL.md,phnull:distill|draws,"0.560, 0.480, 0.436"
+MODEL.md,phnull:distill,0.492
+MODEL.md,phnull:distill|n,3
+MODEL.md,ph:distill_nokd:0,0.660
+MODEL.md,phnull:photonnet,0.618
+MODEL.md,phnull:oxyssl,0.643
 MODEL.md,v:params,"167,588"
 MODEL.md,hy:default_R:tm_bacc|full,"0.809 [0.644, 0.863]"
 MODEL.md,hy:HYBRID_FINAL:tm_bacc|full,"0.779 [0.638, 0.831]"
@@ -190,6 +232,12 @@ WHITEPAPER.md,hr:spec:within5_full,0.883
 WHITEPAPER.md,hr:agree:within5_full,0.826
 WHITEPAPER.md,ox:lag_star/R:mae|full,"2.94 [2.45, 3.50]"
 WHITEPAPER.md,ox:lag_star/ror_textbook:mae|full,"3.07 [2.60, 3.54]"
+WHITEPAPER.md,ph:distill:0|dabs,0.038
+WHITEPAPER.md,ph:distill:0|full,"0.758 [0.603, 0.813]"
+WHITEPAPER.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+WHITEPAPER.md,ph:distill:0|d,"-0.038 [-0.103, -0.001]"
+WHITEPAPER.md,ph:distill:X1,0.676
+WHITEPAPER.md,ph:chain_v1:X1,0.508
 WHITEPAPER.md,v:n_windows_p1,"5,644"
 WHITEPAPER.md,v:n_windows_p2,"5,905"
 WHITEPAPER.md,v:n_windows_p3,"1,141"
@@ -267,6 +315,25 @@ WHITEPAPER.md,cf:deployed_R/0.1:set_cov_hypoxic|pct,91.3%
 WHITEPAPER.md,cf:deployed_R/0.1:set_cov_normal|pct,93.2%
 WHITEPAPER.md,cpp:deployed_R/0.1/hof_100001:confident_miss|pct,51.3%
 WHITEPAPER.md,cpp:deployed_R/0.1/hof_100004:share_unsure|pct,58.2%
+WHITEPAPER.md,phw:n_in,39
+WHITEPAPER.md,phw:params,"2,435"
+WHITEPAPER.md,phw:seeds,3
+WHITEPAPER.md,ph:distill:0|full,"0.758 [0.603, 0.813]"
+WHITEPAPER.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+WHITEPAPER.md,ph:distill:0|d,"-0.038 [-0.103, -0.001]"
+WHITEPAPER.md,ph:distill:0|dabs,0.038
+WHITEPAPER.md,ph:distill:4|d,"+0.083 [0.008, 0.178]"
+WHITEPAPER.md,ph:distill:4|nb,6/6
+WHITEPAPER.md,ph:distill:5|d,"+0.166 [0.035, 0.242]"
+WHITEPAPER.md,ph:distill:X1|d,"+0.169 [0.058, 0.285]"
+WHITEPAPER.md,ph:distill:X1|nb,6/6
+WHITEPAPER.md,ph:distill:X1|cov,0.27
+WHITEPAPER.md,phnull:distill,0.492
+WHITEPAPER.md,ph:distill_v1:0,0.696
+WHITEPAPER.md,ph:ctl_dc_lr:X1,0.646
+WHITEPAPER.md,ph:oxyseq:0,0.708
+WHITEPAPER.md,ph:photonnet:0,0.668
+WHITEPAPER.md,ph:oxyssl:0,0.667
 WHITEPAPER.md,@openox,<block 2442 chars>
 WHITEPAPER.md,@skin_hoffman,<block 113 chars>
 WHITEPAPER.md,v:guard_mths,6.7%
@@ -279,6 +346,16 @@ WHITEPAPER.md,hvs:hof_100004/cnn:mae,21.0
 WHITEPAPER.md,hv:butppg+mths/vote+harmonic+octave+median5/clean:doubling,0.00%
 WHITEPAPER.md,v:guard_mths,6.7%
 WHITEPAPER.md,v:guard_but,8.8%
+docs/WRITEUP.md,phw:params,"2,435"
+docs/WRITEUP.md,phw:seeds,3
+docs/WRITEUP.md,phw:n_in,39
+docs/WRITEUP.md,ph:distill:0|dabs,0.038
+docs/WRITEUP.md,ph:distill:0|full,"0.758 [0.603, 0.813]"
+docs/WRITEUP.md,ph:chain_v1:0|full,"0.796 [0.636, 0.857]"
+docs/WRITEUP.md,ph:distill:0|d,"-0.038 [-0.103, -0.001]"
+docs/WRITEUP.md,ph:distill:X1,0.676
+docs/WRITEUP.md,ph:chain_v1:X1,0.508
+docs/WRITEUP.md,ph:distill:X1|d,"+0.169 [0.058, 0.285]"
 docs/WRITEUP.md,v:params,"167,588"
 docs/WRITEUP.md,v:ssl_rows,"299,754"
 docs/WRITEUP.md,v:prereg_commit,3e708fe

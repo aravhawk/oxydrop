@@ -31,6 +31,7 @@ import ml_numbers as N  # noqa: E402
 
 ROOT = N.ROOT
 RES = N.RES
+PHOTON = N.PHOTON
 DOCS = ['README.md', 'MODEL.md', 'WHITEPAPER.md', 'docs/WRITEUP.md']
 fails: list[str] = []
 warns: list[str] = []
@@ -190,6 +191,18 @@ def independent_claims() -> list[tuple[str, str, list[str]]]:
         claims.append(('parameter count from the model code', f'{n:,}', allthree))
     except Exception as e:  # torch missing: skip, not a failure
         warns.append(f'parameter count not re-derived ({type(e).__name__})')
+    # ---- photon harness (round-2 shipped model PhotonDistill), straight from results/photon/TABLE.csv with own code
+    t = pd.read_csv(os.path.join(PHOTON, 'TABLE.csv'), dtype={'level': str}).set_index(['model', 'level'])
+    sd = lambda x: f'{x:+.3f}'
+    d0, c0, dx, cx = t.loc[('distill', '0')], t.loc[('chain_v1', '0')], t.loc[('distill', 'X1')], t.loc[('chain_v1', 'X1')]
+    claims.append(('photon: PhotonDistill L0 TM [CI]', f'{f3(d0.tm_bacc)} [{f3(d0.tm_lo)}, {f3(d0.tm_hi)}]', ['MODEL.md', 'WHITEPAPER.md']))
+    claims.append(('photon: PhotonDistill L0 paired diff vs chain_v1', f'{sd(d0.diff_vs_chain_v1)} [{f3(d0.diff_lo)}, {f3(d0.diff_hi)}]', ['MODEL.md', 'WHITEPAPER.md']))
+    claims.append(('photon: PhotonDistill loses by', f'loses to the logistic chain on clean light by {f3(abs(d0.diff_vs_chain_v1))}', ['MODEL.md', 'WHITEPAPER.md']))
+    claims.append(('photon: chain_v1 L0 on the photon harness', f'{f3(c0.tm_bacc)} [{f3(c0.tm_lo)}, {f3(c0.tm_hi)}]', ['MODEL.md', 'WHITEPAPER.md']))
+    claims.append(('photon: X1 pitch numbers', f'{f3(dx.tm_bacc)} against {f3(cx.tm_bacc)}', ['MODEL.md', 'WHITEPAPER.md']))
+    for lv in ('4', '5', 'X1'):
+        r = t.loc[('distill', lv)]
+        claims.append((f'photon: PhotonDistill {lv} paired diff', f'{sd(r.diff_vs_chain_v1)} [{f3(r.diff_lo)}, {f3(r.diff_hi)}]', ['MODEL.md', 'WHITEPAPER.md']))
     return claims
 
 
@@ -255,6 +268,7 @@ ALLOW_DECIMALS = {
     '4.0',           # CC BY 4.0 / CC BY-NC-ND 4.0 licence versions
     '0.10',          # declared conformal miscoverage level alpha (Amendment 5, before any result)
     '11.6',          # million multiply-adds per window (python/oxydrop_ml/MODEL_SPEC.md, measured by model.py)
+    '0.55',          # null-control ceiling of the round-2 rule (ROUND2.md rule 5, stated before any round-2 score)
 }
 TOKEN = re.compile(r'\{\{[^{}]+\}\}')
 CODE = re.compile(r'```.*?```|`[^`\n]+`', re.S)
@@ -280,7 +294,7 @@ def check_templates():
 # ----------------------------------------------------------------------------------------------------------------------- 4. traceability of every 3-decimal number
 def value_set() -> set[str]:
     s: set[str] = set()
-    for p in glob.glob(os.path.join(RES, '*.csv')) + glob.glob(os.path.join(RES, 'scores', '*.csv')) if False else glob.glob(os.path.join(RES, '*.csv')):
+    for p in glob.glob(os.path.join(RES, '*.csv')) + glob.glob(os.path.join(PHOTON, '*.csv')):          # results/ml and the photon harness (TABLE, STRESS, NULLS)
         if p.endswith('CLAIMS_MANIFEST.csv'):
             continue
         try:
@@ -293,7 +307,7 @@ def value_set() -> set[str]:
                 s.add(f'{x:.3f}')
                 s.add(f'{abs(x):.3f}')
                 s.add(f'{100 * x:.1f}')
-    for p in glob.glob(os.path.join(RES, '*.json')) + [os.path.join(ROOT, 'app', 'data', 'hybrid_weights.json')]:
+    for p in glob.glob(os.path.join(RES, '*.json')) + [os.path.join(ROOT, 'app', 'data', 'hybrid_weights.json'), os.path.join(PHOTON, 'distill_weights.json')]:
         if not os.path.exists(p):
             continue
         def walk(o):
@@ -334,8 +348,13 @@ def derived_set() -> set[str]:
     r1 = h2[(h2.scope == 'all') & (h2.model == 'HYBRID_agree')].iloc[0]
     r2 = h2[(h2.scope == 'all') & (h2.model == 'cnn_alone')].iloc[0]
     s.add(f'{abs(r1.within5_full - r2.within5_full):.3f}')
-    for df in (csv('hybrid_p1.csv'),):
-        pass
+    # photon harness: mean TM over the null draws of each round-2 model (ml_numbers.ph_null; the rule of ROUND2.md uses the mean)
+    t = pd.read_csv(os.path.join(PHOTON, 'TABLE.csv'), dtype={'level': str})
+    for m in set(t.model):
+        for kind in ('null', 'blank'):
+            d = N.ph_null(m, kind)
+            if d:
+                s.add(f'{np.mean([x for _, x in d]):.3f}')
     return s
 
 
@@ -347,6 +366,11 @@ def check_traceable(rendered: dict):
         missing = sorted({m.group(1) for m in re.finditer(r'(?<![\w.])[+-]?(\d+\.\d{3})(?![\w.])', txt) if m.group(1) not in vs and m.group(1) not in ('0.000',)})
         if missing:
             fail(f'{d}: 3-decimal numbers not found in any results/ml file: {missing[:15]}')
+    for d in sorted(glob.glob(os.path.join(ROOT, 'docs', 'submission', '*.md'))):          # hand-written submission pack: every 3-decimal number must trace too
+        txt = CODE.sub(' ', URL.sub(' ', open(d, encoding='utf-8').read()))
+        missing = sorted({m.group(1) for m in re.finditer(r'(?<![\w.])[+-]?(\d+\.\d{3})(?![\w.])', txt) if m.group(1) not in vs and m.group(1) not in ('0.000',)})
+        if missing:
+            fail(f'{os.path.relpath(d, ROOT)}: 3-decimal numbers not found in any results/ml or results/photon file: {missing[:15]}')
 
 
 # ----------------------------------------------------------------------------------------------------------------------- 5. style, retired phrases, PDF
@@ -355,6 +379,9 @@ def check_style():
         t = read(d)
         if '\u2014' in t:
             fail(f'{d}: contains an em dash')
+    for d in glob.glob(os.path.join(ROOT, 'docs', 'submission', '*.md')):
+        if '\u2014' in open(d, encoding='utf-8').read():
+            fail(f'{os.path.relpath(d, ROOT)}: contains an em dash')
     for tpl in glob.glob(os.path.join(ROOT, 'docs', 'templates', '*.in')):
         if '\u2014' in open(tpl, encoding='utf-8').read():
             fail(f'{os.path.basename(tpl)}: contains an em dash')

@@ -45,6 +45,7 @@ export function qualityReason(d, ctx = {}) {
   if (c.moving === true) return 'moving';
   if (c.fps < FPS_MIN) return 'low_fps';
   if (c.recentGaps >= GAPS_MAX || c.gapMax > GAP_MAX_S || c.gapTotal > GAP_TOTAL_S) return 'frame_gaps';
+  if (d.ownQuality) return null;                     // engine-slot model window (photon_engine.js): the model judges the signal itself, no extra mask
   if (!(d.sat <= SAT_MAX)) return 'saturation';      // also true when sat is NaN/undefined
   if (!d.valid) return 'invalid';
   return null;
@@ -52,9 +53,10 @@ export function qualityReason(d, ctx = {}) {
 
 /** Heart rate to display, or null (shown as an en dash). Needs d.valid, a finite estimate and a clean signal (no placement/motion/frame/saturation fault). */
 export function hrToShow(d, ctx = {}) {
-  const r = qualityReason(d, { ...ctx, calOk: true });
+  const q = d.ownQuality ? { ...d, ownQuality: false, valid: !!d.pulseLock } : d;   // engine-slot windows: the HR display keeps the v2 pulse lock and saturation gates
+  const r = qualityReason(q, { ...ctx, calOk: true });
   if (r && SIGNAL_REASONS.has(r)) return null;
-  return d.valid && Number.isFinite(d.hr) ? d.hr : null;
+  return q.valid && Number.isFinite(q.hr) ? q.hr : null;
 }
 
 /** Decide the user-facing state for one finished (non-calibration) engine window. */
