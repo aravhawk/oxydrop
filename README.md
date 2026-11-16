@@ -1,11 +1,71 @@
 <!-- GENERATED from docs/templates/README.md.in by scripts/render_docs.py. Edit the template, not this file. -->
 # OxyDrop
 
-**A phone-camera check for a drop in your blood oxygen from your own baseline. No extra hardware, no install, no video leaves the phone.**
+**Paper:** [paper/OxyDrop_paper.pdf](paper/OxyDrop_paper.pdf) (IEEE conference format, [view on GitHub](https://github.com/aravhawk/oxydrop/blob/main/paper/OxyDrop_paper.pdf))
 
-**Live app:** https://aravhawk.github.io/oxydrop/ (open on a phone; "Watch a recorded demo" works with no camera) · **Paper-style write-up:** [WHITEPAPER.md](WHITEPAPER.md) ([PDF](WHITEPAPER.pdf)) · **Model card:** [MODEL.md](MODEL.md)
+OxyDrop checks, with a phone camera, whether your blood oxygen has dropped from your own baseline. It needs no extra hardware and no install, and no video leaves the phone. OxyDrop is a research prototype, not a medical device.
 
-> **Headline, stated plainly: the pre-registered primary metric (P1, detecting SpO2 below 90 on six held-out people) was not beaten.** The previous engine (now behind `?engine=hybrid`), the fixed hybrid pipeline R, scores 0.809 [0.644, 0.863] against 0.796 [0.635, 0.856] for the best baseline, the shipped logistic chain (a tie). That 0.809 is **optimistic**: pipeline R was chosen after its outer-fold scores had been seen. The unbiased estimate for the whole selection procedure is the nested 0.779 [0.638, 0.831]. **The simpler chain has the higher point estimates**: a chain refit with the same levers and no CNN scores 0.816, and at the same conformal level the chain-only control answers 92.5% of windows at 90.3% accuracy against 74.5% at 89.5% for the deployed hybrid. All of these intervals overlap, so it is a tie, and the CNN alone ties as well. What held: the CNN beating the weaker baselines (clock, ratio-of-ratios), a calibrated three-state hybrid that runs on the device (ML is the app's core path by design, not because it wins), an open pre-registered leave-one-person-out audit, and an exploratory heart-rate gain (P2, within 5 bpm 0.480 against 0.419) that is **post hoc and comes from BUT PPG**, not a clean win (see below).
+**Code:** [github.com/aravhawk/oxydrop](https://github.com/aravhawk/oxydrop) · **Video figures:** [docs/video/](docs/video/) · **Long write-up:** [WHITEPAPER.md](WHITEPAPER.md) ([PDF](WHITEPAPER.pdf)) · **Model card:** [MODEL.md](MODEL.md)
+
+## One-page write-up
+
+**Problem.** Low blood oxygen often causes no symptoms, and many of the people at risk (COVID-19, COPD or asthma at home, people at altitude, low-resource clinics) have a phone but no pulse oximeter. Phone-camera oximetry already exists ([Hoffman et al., 2022](https://www.nature.com/articles/s41746-022-00665-y)). The open question we studied is whether a small model running in the browser can flag a drop below SpO2 90 on people it has never seen, and say "unsure" when it cannot tell.
+
+**Approach.** The user covers the rear camera and flash with a fingertip. The phone reduces each frame of the colour video to mean R, G and B, computes features for each 2 s window relative to the person's first minute, and runs a small network that outputs one of three states: *Low* ("Possible low oxygen: re-check with a pulse oximeter"), *Normal* ("Normal vs your baseline") or *Unsure* ("Unsure, re-measure"). The shipped network is PhotonDistill v2 (3 seeds of widths 32 / 32 / 64, 2,435 / 2,435 / 6,915 parameters). In each leave-one-person-out fold it is distilled from two teachers fitted on the training people only: the logistic chain on clean windows and a DC-colour regression on physics-simulated distant-flash copies. Every score comes from a person the model never saw, with nested tuning inside the training people, 95% person-bootstrap intervals and null-label controls.
+
+**Results** (six hypoxic people from the Hoffman data, time-matched balanced accuracy, 95% person-bootstrap CI):
+
+| Model | Clean light | Paired difference to the chain |
+|---|---|---|
+| Logistic chain (chain_v1, baseline) | 0.796 [0.636, 0.857] | reference |
+| PhotonDistill v2 (distill2, shipped) | 0.784 [0.596, 0.834] | -0.012 [-0.091, 0.012] |
+| PhotonDistill v2, GPU rerun of the same code | 0.761 [0.561, 0.830] | -0.035 [-0.127, -0.006] |
+
+On clean light PhotonDistill v2 is on par with the chain. It does not beat it: the paired interval includes zero and 4/6 people score better. A GPU rerun of the same code scored lower, and its paired interval excludes zero, so that run loses to the chain. We report the gap between the two runs as seed variance. Under a *simulated* distant flash, the gain of PhotonDistill v2 over the chain is +0.097 [0.011, 0.195] at stress level L4, +0.170 [0.027, 0.249] at L5 and +0.174 [0.044, 0.284] at the out-of-family level X1.
+
+**Limits and disclosures.**
+
+* The key result rests on 6 people, of whom 1 is dark-skinned, recorded on 1 phone model. Intervals are wide, and skin-tone fairness on phones cannot be assessed.
+* The stress test is simulated: it models a flash-to-lens offset, and behaviour on real phones with a distant flash is untested.
+* A three-number DC-colour control is nearly as robust under stress as PhotonDistill v2.
+* The round-3 models were designed post hoc, after the earlier held-out results had been seen (Amendments 6 to 8 of the pre-registration). The last round-3 score files arrived one minute after the stated cutoff.
+* The app never shows an SpO2 value, and it cannot tell whether you were already low during the first minute.
+* [Experimental in-browser capture demo](https://aravhawk.github.io/oxydrop/). Real-phone capture is unreliable on current iPhones, where the flash sits far from the lenses, so results here come from recorded datasets, not live capture.
+
+## How to run
+
+* **Locally:** `npm run serve`, then open http://localhost:8080 (the camera needs HTTPS or localhost). The app is static files in `app/` with no build step.
+* **Tests:** `npm test` runs the decision, parity, capture and docs checks. `npm run test:docs` checks every number in the generated docs against the results files.
+* **Reproduce the results:** `bash scripts/reproduce_ml.sh <stage>` (see [Reproduce](#reproduce)); the photon harness is `python -m oxydrop_ml.photon.evalkit`.
+
+## Credits
+
+**Datasets** (licences and use in [DATA_LICENSES.md](DATA_LICENSES.md)):
+
+* Hoffman et al., "Smartphone camera oximetry in an induced hypoxemia study", npj Digital Medicine 2022 ([paper](https://www.nature.com/articles/s41746-022-00665-y), [data](https://github.com/ubicomplab/oximetry-phone-cam-data), MIT). The only open phone-camera data with SpO2 below 90.
+* MTHS, Samavati et al. ([arXiv:2204.08989](https://arxiv.org/abs/2204.08989), [code and data](https://github.com/MahdiFarvardin/MEDVSE), CC BY-NC-ND 4.0, non-commercial research).
+* BUT PPG v2.0, Brno University of Technology ([PhysioNet](https://physionet.org/content/butppg/2.0.0/), CC BY 4.0).
+* OpenOximetry ([PhysioNet](https://physionet.org/content/openox-repo/1.1.1/), credentialed access; derived aggregates only, never redistributed).
+* PhysioNet PTT-PPG ([PhysioNet](https://physionet.org/content/pulse-transit-time-ppg/1.1.0/)), BIDMC ([PhysioNet](https://physionet.org/content/bidmc/1.0.0/)) and the apnoea neck-oximeter PPG data: unlabeled windows for self-supervised pretraining only.
+* moshekam PPG-during-exercise data (MIT, evaluation only), HealthRing (Zenodo, CC BY, a dropped experiment) and an altitude-chamber pilot (figshare, not relied on); details in [DATA_LICENSES.md](DATA_LICENSES.md).
+
+**Optical constants** (PhotonTwin forward model, [sources](python/oxydrop_ml/optics_data/SOURCES.md)): haemoglobin extinction from S. Prahl, Oregon Medical Laser Center ([OMLC](https://omlc.org/spectra/hemoglobin/summary.html)); melanin absorption and skin scattering from S. L. Jacques, "Skin Optics" ([OMLC](https://omlc.org/news/jan98/skinoptics.html)); camera sensitivity initialised from Jiang et al., WACV 2013.
+
+**Pretrained models and tutorials:** none from third parties. The CNN of the previous engine was pretrained by us, self-supervised, on the datasets above.
+
+**AI tools and compute:**
+
+* [Kiro](https://kiro.dev) with [Claude](https://www.anthropic.com/claude) Opus 5.5 and Sonnet 5.5 (Anthropic): code, analysis and drafting.
+* [T3 Code](https://github.com/pingdotgg/t3code) and Hark: agent tools used during development.
+* [Kaggle](https://www.kaggle.com): GPU kernels.
+* [Daytona](https://www.daytona.io): sandboxes for heavy training.
+* Libraries: numpy, scipy, scikit-learn, PyTorch, XGBoost, LightGBM, matplotlib, Node.js.
+
+The team reviewed the AI-assisted work and can explain every component.
+
+## Full details
+
+> **Earlier rounds. The pre-registered primary metric (P1, detecting SpO2 below 90 on six held-out people) was not beaten.** The previous engine (now behind `?engine=hybrid`), the fixed hybrid pipeline R, scores 0.809 [0.644, 0.863] against 0.796 [0.635, 0.856] for the best baseline, the shipped logistic chain (a tie). That 0.809 is **optimistic**: pipeline R was chosen after its outer-fold scores had been seen. The unbiased estimate for the whole selection procedure is the nested 0.779 [0.638, 0.831]. **The simpler chain has the higher point estimates**: a chain refit with the same levers and no CNN scores 0.816, and at the same conformal level the chain-only control answers 92.5% of windows at 90.3% accuracy against 74.5% at 89.5% for the deployed hybrid. All of these intervals overlap, so it is a tie, and the CNN alone ties as well. What held: the CNN beating the weaker baselines (clock, ratio-of-ratios), a calibrated three-state hybrid that runs on the device (ML is the app's core path by design, not because it wins), an open pre-registered leave-one-person-out audit, and an exploratory heart-rate gain (P2, within 5 bpm 0.480 against 0.419) that is **post hoc and comes from BUT PPG**, not a clean win (see below).
 
 > **Round 3, the model the app runs now: PhotonDistill v2, one small trained network. It is on par with the logistic chain on clean light and does not beat it** (0.784 [0.596, 0.834] against 0.796 [0.636, 0.857] on the photon harness, paired -0.012 [-0.091, 0.012], an interval that includes zero, 4/6 people better) and is more robust under a *simulated* distant flash (out-of-family stress X1: 0.682 against 0.508, paired +0.174 [0.044, 0.284]). It replaced round 2's PhotonDistill (0.758, which lost to the chain) under a rule fixed before any round-3 score; round-3 models were designed after the earlier results were seen, its last files arrived one minute after the stated cutoff, and a three-number colour control is nearly as robust. A rerun of the same code on a GPU scored 0.761 [0.561, 0.830] on clean light (paired -0.035 [-0.127, -0.006]) against 0.784 on the locked run; we report that gap as seed variance. Details and every disclosure: [MODEL.md](MODEL.md) section 0.
 
@@ -33,7 +93,7 @@ The app never shows an SpO2 value. It also shows heart rate and a quality score.
 
 ![Architecture](docs/figures/ml_architecture.png)
 
-## Results, honestly (leave-one-person-out, nested selection, 95% person-bootstrap intervals)
+## Results (leave-one-person-out, nested selection, 95% person-bootstrap intervals)
 
 The evaluation protocol was **pre-registered** (commit `3e708fe`, [PREREGISTRATION.md](python/oxydrop_ml/PREREGISTRATION.md)) before any CNN result existed. A win needs the paired interval of the difference to the **best** honest baseline to exclude zero.
 
